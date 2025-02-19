@@ -1,0 +1,786 @@
+[
+    {
+        "name": "不丹",
+        "weighted_average_color": "#fca72e"
+    },
+    {
+        "name": "东帝汶",
+        "weighted_average_color": "#bc331c"
+    },
+    {
+        "name": "中国",
+        "weighted_average_color": "#ee2124"
+    },
+    {
+        "name": "中非",
+        "weighted_average_color": "#988d5f"
+    },
+    {
+        "name": "丹麦",
+        "weighted_average_color": "#d4485f"
+    },
+    {
+        "name": "乌克兰",
+        "weighted_average_color": "#7f985d"
+    },
+    {
+        "name": "乌兹别克斯坦",
+        "weighted_average_color": "#65bea0"
+    },
+    {
+        "name": "乌干达",
+        "weighted_average_color": "#a1530b"
+    },
+    {
+        "name": "乌拉圭",
+        "weighted_average_color": "#9eb0d4"
+    },
+    {
+        "name": "乍得",
+        "weighted_average_color": "#965431"
+    },
+    {
+        "name": "也门",
+        "weighted_average_color": "#995a61"
+    },
+    {
+        "name": "亚美尼亚",
+        "weighted_average_color": "#99493b"
+    },
+    {
+        "name": "以色列",
+        "weighted_average_color": "#a4b8e5"
+    },
+    {
+        "name": "伊拉克",
+        "weighted_average_color": "#93575c"
+    },
+    {
+        "name": "伊朗",
+        "weighted_average_color": "#af9073"
+    },
+    {
+        "name": "伯利兹",
+        "weighted_average_color": "#572e81"
+    },
+    {
+        "name": "佛得角",
+        "weighted_average_color": "#3e5899"
+    },
+    {
+        "name": "俄罗斯",
+        "weighted_average_color": "#9c7696"
+    },
+    {
+        "name": "保加利亚",
+        "weighted_average_color": "#9c937f"
+    },
+    {
+        "name": "克罗地亚",
+        "weighted_average_color": "#af5983"
+    },
+    {
+        "name": "冈比亚",
+        "weighted_average_color": "#764f55"
+    },
+    {
+        "name": "冰岛",
+        "weighted_average_color": "#536499"
+    },
+    {
+        "name": "几内亚",
+        "weighted_average_color": "#987c33"
+    },
+    {
+        "name": "几内亚比绍",
+        "weighted_average_color": "#957f2b"
+    },
+    {
+        "name": "列支敦士登",
+        "weighted_average_color": "#6c214e"
+    },
+    {
+        "name": "刚果（布）",
+        "weighted_average_color": "#9c8440"
+    },
+    {
+        "name": "刚果（金）",
+        "weighted_average_color": "#4974b4"
+    },
+    {
+        "name": "利比亚",
+        "weighted_average_color": "#452a19"
+    },
+    {
+        "name": "利比里亚",
+        "weighted_average_color": "#c7748c"
+    },
+    {
+        "name": "加拿大",
+        "weighted_average_color": "#fe5c5c"
+    },
+    {
+        "name": "加纳",
+        "weighted_average_color": "#926928"
+    },
+    {
+        "name": "加蓬",
+        "weighted_average_color": "#67a168"
+    },
+    {
+        "name": "匈牙利",
+        "weighted_average_color": "#b18782"
+    },
+    {
+        "name": "北马其顿",
+        "weighted_average_color": "#e26128"
+    },
+    {
+        "name": "南苏丹",
+        "weighted_average_color": "#4f6150"
+    },
+    {
+        "name": "南非",
+        "weighted_average_color": "#5c5e5e"
+    },
+    {
+        "name": "博茨瓦纳",
+        "weighted_average_color": "#6794b2"
+    },
+    {
+        "name": "卡塔尔",
+        "weighted_average_color": "#af6077"
+    },
+    {
+        "name": "卢旺达",
+        "weighted_average_color": "#4a9e7c"
+    },
+    {
+        "name": "卢森堡",
+        "weighted_average_color": "#a498b2"
+    },
+    {
+        "name": "印度",
+        "weighted_average_color": "#a0916f"
+    },
+    {
+        "name": "印度尼西亚",
+        "weighted_average_color": "#ff7f7f"
+    },
+    {
+        "name": "危地马拉",
+        "weighted_average_color": "#81b7dc"
+    },
+    {
+        "name": "厄瓜多尔",
+        "weighted_average_color": "#bf872f"
+    },
+    {
+        "name": "厄立特里亚",
+        "weighted_average_color": "#945a57"
+    },
+    {
+        "name": "叙利亚",
+        "weighted_average_color": "#92565c"
+    },
+    {
+        "name": "古巴",
+        "weighted_average_color": "#786899"
+    },
+    {
+        "name": "吉尔吉斯斯坦",
+        "weighted_average_color": "#ff1300"
+    },
+    {
+        "name": "吉布提",
+        "weighted_average_color": "#75c3a7"
+    },
+    {
+        "name": "哈萨克斯坦",
+        "weighted_average_color": "#15b0b5"
+    },
+    {
+        "name": "哥伦比亚",
+        "weighted_average_color": "#b1762d"
+    },
+    {
+        "name": "哥斯达黎加",
+        "weighted_average_color": "#9c6e91"
+    },
+    {
+        "name": "喀麦隆",
+        "weighted_average_color": "#997633"
+    },
+    {
+        "name": "图瓦卢",
+        "weighted_average_color": "#3291bf"
+    },
+    {
+        "name": "土库曼斯坦",
+        "weighted_average_color": "#217e3e"
+    },
+    {
+        "name": "土耳其",
+        "weighted_average_color": "#e41825"
+    },
+    {
+        "name": "圣卢西亚",
+        "weighted_average_color": "#71c6e5"
+    },
+    {
+        "name": "圣基茨和尼维斯",
+        "weighted_average_color": "#5c4d24"
+    },
+    {
+        "name": "圣多美和普林西比",
+        "weighted_average_color": "#6d9726"
+    },
+    {
+        "name": "圣文森特和格林纳丁斯",
+        "weighted_average_color": "#6e8b3a"
+    },
+    {
+        "name": "圣马力诺",
+        "weighted_average_color": "#a9d2e4"
+    },
+    {
+        "name": "圭亚那",
+        "weighted_average_color": "#7d8451"
+    },
+    {
+        "name": "坦桑尼亚",
+        "weighted_average_color": "#267c53"
+    },
+    {
+        "name": "埃及",
+        "weighted_average_color": "#98585c"
+    },
+    {
+        "name": "埃塞俄比亚",
+        "weighted_average_color": "#857032"
+    },
+    {
+        "name": "基里巴斯",
+        "weighted_average_color": "#ae5e60"
+    },
+    {
+        "name": "塔吉克斯坦",
+        "weighted_average_color": "#a78969"
+    },
+    {
+        "name": "塞内加尔",
+        "weighted_average_color": "#9a8236"
+    },
+    {
+        "name": "塞尔维亚",
+        "weighted_average_color": "#aa8491"
+    },
+    {
+        "name": "塞拉利昂",
+        "weighted_average_color": "#5fb7aa"
+    },
+    {
+        "name": "塞浦路斯",
+        "weighted_average_color": "#f8f0e5"
+    },
+    {
+        "name": "塞舌尔",
+        "weighted_average_color": "#9a765f"
+    },
+    {
+        "name": "墨西哥",
+        "weighted_average_color": "#937671"
+    },
+    {
+        "name": "多哥",
+        "weighted_average_color": "#827c33"
+    },
+    {
+        "name": "多米尼克",
+        "weighted_average_color": "#3f6d3f"
+    },
+    {
+        "name": "多米尼加",
+        "weighted_average_color": "#93607a"
+    },
+    {
+        "name": "奥地利",
+        "weighted_average_color": "#da5f73"
+    },
+    {
+        "name": "委内瑞拉",
+        "weighted_average_color": "#9c5939"
+    },
+    {
+        "name": "孟加拉国",
+        "weighted_average_color": "#335c4b"
+    },
+    {
+        "name": "安哥拉",
+        "weighted_average_color": "#6d0d16"
+    },
+    {
+        "name": "安提瓜和巴布达",
+        "weighted_average_color": "#88333d"
+    },
+    {
+        "name": "安道尔",
+        "weighted_average_color": "#9f494a"
+    },
+    {
+        "name": "密克罗尼西亚联邦",
+        "weighted_average_color": "#78b3dd"
+    },
+    {
+        "name": "尼加拉瓜",
+        "weighted_average_color": "#5398d7"
+    },
+    {
+        "name": "尼日利亚",
+        "weighted_average_color": "#55af8b"
+    },
+    {
+        "name": "尼日尔",
+        "weighted_average_color": "#a2a157"
+    },
+    {
+        "name": "尼泊尔",
+        "weighted_average_color": "#82525e"
+    },
+    {
+        "name": "巴勒斯坦",
+        "weighted_average_color": "#647157"
+    },
+    {
+        "name": "巴哈马",
+        "weighted_average_color": "#366e58"
+    },
+    {
+        "name": "巴基斯坦",
+        "weighted_average_color": "#507c63"
+    },
+    {
+        "name": "巴巴多斯",
+        "weighted_average_color": "#4b545f"
+    },
+    {
+        "name": "巴布亚新几内亚",
+        "weighted_average_color": "#6d1716"
+    },
+    {
+        "name": "巴拉圭",
+        "weighted_average_color": "#997394"
+    },
+    {
+        "name": "巴拿马",
+        "weighted_average_color": "#b38696"
+    },
+    {
+        "name": "巴林",
+        "weighted_average_color": "#e66e65"
+    },
+    {
+        "name": "巴西",
+        "weighted_average_color": "#2f9939"
+    },
+    {
+        "name": "布基纳法索",
+        "weighted_average_color": "#796032"
+    },
+    {
+        "name": "布隆迪",
+        "weighted_average_color": "#ad9975"
+    },
+    {
+        "name": "希腊",
+        "weighted_average_color": "#76a4d1"
+    },
+    {
+        "name": "帕劳",
+        "weighted_average_color": "#2dabd1"
+    },
+    {
+        "name": "德国",
+        "weighted_average_color": "#9e4400"
+    },
+    {
+        "name": "意大利",
+        "weighted_average_color": "#99937e"
+    },
+    {
+        "name": "所罗门群岛",
+        "weighted_average_color": "#2e666e"
+    },
+    {
+        "name": "拉脱维亚",
+        "weighted_average_color": "#b04e5d"
+    },
+    {
+        "name": "挪威",
+        "weighted_average_color": "#a03c5d"
+    },
+    {
+        "name": "捷克",
+        "weighted_average_color": "#b47888"
+    },
+    {
+        "name": "摩尔多瓦",
+        "weighted_average_color": "#8e564d"
+    },
+    {
+        "name": "摩洛哥",
+        "weighted_average_color": "#bb282d"
+    },
+    {
+        "name": "摩纳哥",
+        "weighted_average_color": "#e68892"
+    },
+    {
+        "name": "文莱",
+        "weighted_average_color": "#cab345"
+    },
+    {
+        "name": "斐济",
+        "weighted_average_color": "#7b9cc3"
+    },
+    {
+        "name": "斯威士兰",
+        "weighted_average_color": "#9f6f6b"
+    },
+    {
+        "name": "斯洛伐克",
+        "weighted_average_color": "#b67690"
+    },
+    {
+        "name": "斯洛文尼亚",
+        "weighted_average_color": "#a852a8"
+    },
+    {
+        "name": "斯里兰卡",
+        "weighted_average_color": "#b7702d"
+    },
+    {
+        "name": "新加坡",
+        "weighted_average_color": "#f69aa1"
+    },
+    {
+        "name": "新西兰",
+        "weighted_average_color": "#2c3471"
+    },
+    {
+        "name": "日本",
+        "weighted_average_color": "#f2ced7"
+    },
+    {
+        "name": "智利",
+        "weighted_average_color": "#c37681"
+    },
+    {
+        "name": "朝鲜",
+        "weighted_average_color": "#a04567"
+    },
+    {
+        "name": "柬埔寨",
+        "weighted_average_color": "#6e2a73"
+    },
+    {
+        "name": "格林纳达",
+        "weighted_average_color": "#a26a30"
+    },
+    {
+        "name": "格鲁吉亚",
+        "weighted_average_color": "#ffa3a3"
+    },
+    {
+        "name": "梵蒂冈",
+        "weighted_average_color": "#fbf375"
+    },
+    {
+        "name": "比利时",
+        "weighted_average_color": "#a45921"
+    },
+    {
+        "name": "毛里塔尼亚",
+        "weighted_average_color": "#60723e"
+    },
+    {
+        "name": "毛里求斯",
+        "weighted_average_color": "#80703d"
+    },
+    {
+        "name": "汤加",
+        "weighted_average_color": "#cb2b2b"
+    },
+    {
+        "name": "沙特阿拉伯",
+        "weighted_average_color": "#0b5b39"
+    },
+    {
+        "name": "法国",
+        "weighted_average_color": "#a46e99"
+    },
+    {
+        "name": "波兰",
+        "weighted_average_color": "#ed899d"
+    },
+    {
+        "name": "波黑",
+        "weighted_average_color": "#495573"
+    },
+    {
+        "name": "泰国",
+        "weighted_average_color": "#97687b"
+    },
+    {
+        "name": "津巴布韦",
+        "weighted_average_color": "#937222"
+    },
+    {
+        "name": "洪都拉斯",
+        "weighted_average_color": "#52d1ec"
+    },
+    {
+        "name": "海地",
+        "weighted_average_color": "#6c1f6c"
+    },
+    {
+        "name": "澳大利亚",
+        "weighted_average_color": "#333774"
+    },
+    {
+        "name": "爱尔兰",
+        "weighted_average_color": "#b1b68a"
+    },
+    {
+        "name": "爱沙尼亚",
+        "weighted_average_color": "#557b99"
+    },
+    {
+        "name": "牙买加",
+        "weighted_average_color": "#566521"
+    },
+    {
+        "name": "特立尼达和多巴哥",
+        "weighted_average_color": "#b12b3e"
+    },
+    {
+        "name": "玻利维亚",
+        "weighted_average_color": "#917628"
+    },
+    {
+        "name": "瑙鲁",
+        "weighted_average_color": "#1b3367"
+    },
+    {
+        "name": "瑞典",
+        "weighted_average_color": "#4c8774"
+    },
+    {
+        "name": "瑞士",
+        "weighted_average_color": "#ff3232"
+    },
+    {
+        "name": "瓦努阿图",
+        "weighted_average_color": "#5b4927"
+    },
+    {
+        "name": "白俄罗斯",
+        "weighted_average_color": "#93402f"
+    },
+    {
+        "name": "科威特",
+        "weighted_average_color": "#7b685c"
+    },
+    {
+        "name": "科摩罗",
+        "weighted_average_color": "#8d936b"
+    },
+    {
+        "name": "科特迪瓦",
+        "weighted_average_color": "#a7b375"
+    },
+    {
+        "name": "秘鲁",
+        "weighted_average_color": "#e55f6c"
+    },
+    {
+        "name": "突尼斯",
+        "weighted_average_color": "#e91729"
+    },
+    {
+        "name": "立陶宛",
+        "weighted_average_color": "#946e2b"
+    },
+    {
+        "name": "索马里",
+        "weighted_average_color": "#498ede"
+    },
+    {
+        "name": "约旦",
+        "weighted_average_color": "#65584c"
+    },
+    {
+        "name": "纳米比亚",
+        "weighted_average_color": "#565e5e"
+    },
+    {
+        "name": "缅甸",
+        "weighted_average_color": "#c39638"
+    },
+    {
+        "name": "罗马尼亚",
+        "weighted_average_color": "#98593e"
+    },
+    {
+        "name": "美国",
+        "weighted_average_color": "#ba7e8f"
+    },
+    {
+        "name": "老挝",
+        "weighted_average_color": "#7c2e53"
+    },
+    {
+        "name": "肯尼亚",
+        "weighted_average_color": "#53381b"
+    },
+    {
+        "name": "芬兰",
+        "weighted_average_color": "#9aadc5"
+    },
+    {
+        "name": "苏丹",
+        "weighted_average_color": "#7b5553"
+    },
+    {
+        "name": "苏里南",
+        "weighted_average_color": "#926f5d"
+    },
+    {
+        "name": "英国",
+        "weighted_average_color": "#a26686"
+    },
+    {
+        "name": "荷兰",
+        "weighted_average_color": "#997590"
+    },
+    {
+        "name": "莫桑比克",
+        "weighted_average_color": "#7a6e32"
+    },
+    {
+        "name": "莱索托",
+        "weighted_average_color": "#5d919a"
+    },
+    {
+        "name": "菲律宾",
+        "weighted_average_color": "#87527f"
+    },
+    {
+        "name": "萨尔瓦多",
+        "weighted_average_color": "#5181c4"
+    },
+    {
+        "name": "萨摩亚",
+        "weighted_average_color": "#9c193d"
+    },
+    {
+        "name": "葡萄牙",
+        "weighted_average_color": "#a23306"
+    },
+    {
+        "name": "蒙古",
+        "weighted_average_color": "#934258"
+    },
+    {
+        "name": "西撒哈拉",
+        "weighted_average_color": "#5d6151"
+    },
+    {
+        "name": "西班牙",
+        "weighted_average_color": "#de6211"
+    },
+    {
+        "name": "贝宁",
+        "weighted_average_color": "#917934"
+    },
+    {
+        "name": "赞比亚",
+        "weighted_average_color": "#3a7501"
+    },
+    {
+        "name": "赤道几内亚",
+        "weighted_average_color": "#998961"
+    },
+    {
+        "name": "越南",
+        "weighted_average_color": "#dc331b"
+    },
+    {
+        "name": "阿塞拜疆",
+        "weighted_average_color": "#6a8573"
+    },
+    {
+        "name": "阿富汗",
+        "weighted_average_color": "#4e462b"
+    },
+    {
+        "name": "阿尔及利亚",
+        "weighted_average_color": "#86aa94"
+    },
+    {
+        "name": "阿尔巴尼亚",
+        "weighted_average_color": "#df0000"
+    },
+    {
+        "name": "阿曼",
+        "weighted_average_color": "#b4655c"
+    },
+    {
+        "name": "阿根廷",
+        "weighted_average_color": "#a0c5e5"
+    },
+    {
+        "name": "阿联酋",
+        "weighted_average_color": "#7f5c4b"
+    },
+    {
+        "name": "韩国",
+        "weighted_average_color": "#d6d1d7"
+    },
+    {
+        "name": "马尔代夫",
+        "weighted_average_color": "#8f3638"
+    },
+    {
+        "name": "马拉维",
+        "weighted_average_color": "#613b20"
+    },
+    {
+        "name": "马来西亚",
+        "weighted_average_color": "#ad6274"
+    },
+    {
+        "name": "马绍尔群岛",
+        "weighted_average_color": "#3c5b92"
+    },
+    {
+        "name": "马耳他",
+        "weighted_average_color": "#e68793"
+    },
+    {
+        "name": "马达加斯加",
+        "weighted_average_color": "#a89378"
+    },
+    {
+        "name": "马里",
+        "weighted_average_color": "#9f8727"
+    },
+    {
+        "name": "黎巴嫩",
+        "weighted_average_color": "#e48785"
+    },
+    {
+        "name": "黑山",
+        "weighted_average_color": "#e22d18"
+    }
+]
