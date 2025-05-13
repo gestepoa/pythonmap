@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+<Document>
+	<name>无标题项目</name>
+	<gx:CascadingStyle kml:id="__managed_style_22ED70F68A37FE5755B8">
+		<Style>
+			<IconStyle>
+				<scale>1.2</scale>
+				<Icon>
+					<href>https://earth.google.com/earth/document/icon?color=1976d2&amp;id=2000&amp;scale=4</href>
+				</Icon>
+				<hotSpot x="64" y="128" xunits="pixels" yunits="insetPixels"/>
+			</IconStyle>
+			<LabelStyle>
+			</LabelStyle>
+			<LineStyle>
+				<color>ff2dc0fb</color>
+				<width>4</width>
+			</LineStyle>
+			<PolyStyle>
+				<color>40ffffff</color>
+			</PolyStyle>
+			<BalloonStyle>
+				<displayMode>hide</displayMode>
+			</BalloonStyle>
+		</Style>
+	</gx:CascadingStyle>
+	<gx:CascadingStyle kml:id="__managed_style_110F4E475B37FE5755B8">
+		<Style>
+			<IconStyle>
+				<Icon>
+					<href>https://earth.google.com/earth/document/icon?color=1976d2&amp;id=2000&amp;scale=4</href>
+				</Icon>
+				<hotSpot x="64" y="128" xunits="pixels" yunits="insetPixels"/>
+			</IconStyle>
+			<LabelStyle>
+			</LabelStyle>
+			<LineStyle>
+				<color>ff2dc0fb</color>
+				<width>2.66667</width>
+			</LineStyle>
+			<PolyStyle>
+				<color>40ffffff</color>
+			</PolyStyle>
+			<BalloonStyle>
+				<displayMode>hide</displayMode>
+			</BalloonStyle>
+		</Style>
+	</gx:CascadingStyle>
+	<StyleMap id="__managed_style_09DAFB39B737FE5755B8">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#__managed_style_110F4E475B37FE5755B8</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#__managed_style_22ED70F68A37FE5755B8</styleUrl>
+		</Pair>
+	</StyleMap>
+	<Placemark id="003F45E5C537FE5755AF">
+		<name>克什米尔2</name>
+		<LookAt>
+			<longitude>79.85365167696415</longitude>
+			<latitude>35.14717629427233</latitude>
+			<altitude>-2.121972597635136e-09</altitude>
+			<heading>0</heading>
+			<tilt>0</tilt>
+			<gx:fovy>35</gx:fovy>
+			<range>1966148.375652859</range>
+			<altitudeMode>absolute</altitudeMode>
+		</LookAt>
+		<styleUrl>#__managed_style_09DAFB39B737FE5755B8</styleUrl>
+		<Polygon>
+			<outerBoundaryIs>
+				<LinearRing>
+					<coordinates>
+						73.67276738322904,36.91144391659337,0 73.88205781377278,36.70351123056453,0 73.0774320048728,36.68982598478897,0 72.60532851009242,36.24683256618066,0 72.53787365345345,35.91326307278458,0 72.80234067686254,35.82846736713189,0 73.11071518900417,35.84435081742323,0 73.4250495331312,35.52792194596555,0 73.77448866434406,35.52563881625357,0 74.01129369955447,34.88339811746836,0 73.48144016203015,34.51624839880481,0 73.64671011777178,33.06941728981744,0 74.33040344425758,32.78790276710167,0 74.69504071869633,32.82503720607646,0 74.71147308008817,32.49307955725509,0 75.33900583146026,32.32962882289512,0 75.5360808904335,32.30397024170796,0 75.94905018090176,32.62782974892485,0 75.79538516366668,32.90791339434733,0 76.81876048978182,33.23791066249477,0 77.34828245682208,32.81143735520137,0 77.70542724037225,32.97650232605321,0 77.98878963753151,32.6255949355653,0 78.38040670062379,32.75433904687014,0 78.29045519620657,32.4611356943043,0 78.40320755345932,32.51918199287829,0 78.72877016889255,32.69654880503852,0 78.96358299628714,32.33976277613932,0 79.31076726589994,32.59082578609917,0 78.95817143573123,33.39398460031889,0 78.69017268542198,34.0413031501754,0 78.99957365325216,34.33574542486402,0 78.22531628719905,34.69619137974853,0 77.96619843800077,35.48188772936079,0 77.3157264804682,35.52884724736877,0 76.187434375124,35.85071988022028,0 75.83161177161115,36.71313581029043,0 74.56697658066598,37.01650254824386,0 73.67276738322904,36.91144391659337,0 
+					</coordinates>
+				</LinearRing>
+			</outerBoundaryIs>
+		</Polygon>
+	</Placemark>
+</Document>
+</kml>
