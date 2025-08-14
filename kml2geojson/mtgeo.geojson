@@ -1311,26 +1311,6 @@
                 }
             },
             "id": "0F7CD6B847397B8B04DF"
-        },
-        {
-            "type": "Feature",
-            "geometry": {
-                "type": "Point",
-                "coordinates": [
-                    95.06726370096085,
-                    29.64313995266,
-                    6803.556766425913
-                ]
-            },
-            "properties": {
-                "name": "南迦巴瓦峰",
-                "styleUrl": "#__managed_style_00DD2323EB397B8CCE91",
-                "styleMapHash": {
-                    "normal": "#__managed_style_139FB53AEF397B8CCE91",
-                    "highlight": "#__managed_style_2CBB038C19397B8CCE91"
-                }
-            },
-            "id": "05E636C197397B8C988B"
         }
     ]
 }
