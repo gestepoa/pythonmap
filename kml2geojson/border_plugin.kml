@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+<Document id="root_doc">
+	<name>国界线补丁</name>
+	<gx:CascadingStyle kml:id="__managed_style_2213DBB33A3A63252D00">
+		<Style>
+			<IconStyle>
+				<scale>1.2</scale>
+				<Icon>
+					<href>https://earth.google.com/earth/document/icon?color=1976d2&amp;id=2000&amp;scale=4</href>
+				</Icon>
+				<hotSpot x="64" y="128" xunits="pixels" yunits="insetPixels"/>
+			</IconStyle>
+			<LabelStyle>
+			</LabelStyle>
+			<LineStyle>
+				<color>ff2dc0fb</color>
+				<width>4</width>
+			</LineStyle>
+			<PolyStyle>
+				<color>40ffffff</color>
+			</PolyStyle>
+			<BalloonStyle>
+				<displayMode>hide</displayMode>
+			</BalloonStyle>
+		</Style>
+	</gx:CascadingStyle>
+	<gx:CascadingStyle kml:id="__managed_style_1B76BF1DD73A63252D00">
+		<Style>
+			<IconStyle>
+				<Icon>
+					<href>https://earth.google.com/earth/document/icon?color=1976d2&amp;id=2000&amp;scale=4</href>
+				</Icon>
+				<hotSpot x="64" y="128" xunits="pixels" yunits="insetPixels"/>
+			</IconStyle>
+			<LabelStyle>
+			</LabelStyle>
+			<LineStyle>
+				<color>ff2dc0fb</color>
+				<width>2.66667</width>
+			</LineStyle>
+			<PolyStyle>
+				<color>40ffffff</color>
+			</PolyStyle>
+			<BalloonStyle>
+				<displayMode>hide</displayMode>
+			</BalloonStyle>
+		</Style>
+	</gx:CascadingStyle>
+	<StyleMap id="__managed_style_05FB2916EE3A63252D00">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#__managed_style_1B76BF1DD73A63252D00</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#__managed_style_2213DBB33A3A63252D00</styleUrl>
+		</Pair>
+	</StyleMap>
+	<Placemark id="02EAEF36833A63252CF8">
+		<name>中塔</name>
+		<LookAt>
+			<longitude>74.05616146612616</longitude>
+			<latitude>40.83223138912852</latitude>
+			<altitude>2590.059549625566</altitude>
+			<heading>4.800329307985293</heading>
+			<tilt>0</tilt>
+			<gx:fovy>35</gx:fovy>
+			<range>3363186.182563305</range>
+			<altitudeMode>absolute</altitudeMode>
+		</LookAt>
+		<styleUrl>#__managed_style_05FB2916EE3A63252D00</styleUrl>
+		<LineString>
+			<coordinates>
+				73.80166022457998,38.60688501848119,0 74.81230490223027,38.46030311308858,0 75.11874969328407,37.38569398466672,0 74.8913088667711,37.23164094068348,0 
+			</coordinates>
+		</LineString>
+	</Placemark>
+	<Placemark id="01486A2A1C3A632BC836">
+		<name>印巴</name>
+		<LookAt>
+			<longitude>76.12617544601635</longitude>
+			<latitude>35.4012928182315</latitude>
+			<altitude>1.414648398423424e-09</altitude>
+			<heading>4.800329307837218</heading>
+			<tilt>0</tilt>
+			<gx:fovy>35</gx:fovy>
+			<range>735459.4715224103</range>
+			<altitudeMode>absolute</altitudeMode>
+		</LookAt>
+		<styleUrl>#__managed_style_05FB2916EE3A63252D00</styleUrl>
+		<LineString>
+			<coordinates>
+				74.35458944310032,32.76870105221752,0 74.00380910190327,33.1894529085945,0 73.97646492635612,33.72128905178122,0 74.25087857230086,33.94609408657342,0 73.90410217466054,34.07568390313442,0 73.96122978876576,34.65346706840285,0 75.70918007718555,34.50307617011972,0 77.04863286117948,35.10991193186115,0 
+			</coordinates>
+		</LineString>
+	</Placemark>
+</Document>
+</kml>
