@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "PILine",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::4979" } },
+"features": [
+{ "type": "Feature", "id": "0D4A301CF93E6E00170E", "properties": { "name": "PILine", "styleUrl": "#__managed_style_18C35DDCCA3E6E001711", "styleMapHash": { "normal": "#__managed_style_26EEA69D313E6E001711", "highlight": "#__managed_style_35709240F43E6E001711" } }, "geometry": { "type": "LineString", "coordinates": [ [ 77.048633, 35.109912, 0.0 ], [ 77.799414, 35.495898, 0.0 ] ] } }
+]
+}
