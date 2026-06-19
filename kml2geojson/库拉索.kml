@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+<Document id="document">
+	<name>库拉索</name>
+	<visibility>0</visibility>
+	<gx:CascadingStyle kml:id="__managed_style_0227793513400B3257EC_highlight">
+		<Style>
+			<IconStyle>
+				<scale>1.2</scale>
+				<Icon>
+					<href>https://earth.google.com/earth/document/icon?color=1976d2&amp;id=2000&amp;scale=4</href>
+				</Icon>
+				<hotSpot x="64" y="128" xunits="pixels" yunits="insetPixels"/>
+			</IconStyle>
+			<LabelStyle>
+			</LabelStyle>
+			<LineStyle>
+				<color>ff2dc0fb</color>
+				<width>4</width>
+			</LineStyle>
+			<PolyStyle>
+				<color>40ffffff</color>
+			</PolyStyle>
+			<BalloonStyle>
+				<displayMode>hide</displayMode>
+			</BalloonStyle>
+		</Style>
+	</gx:CascadingStyle>
+	<gx:CascadingStyle kml:id="__managed_style_0227793513400B3257EC_normal">
+		<Style>
+			<IconStyle>
+				<Icon>
+					<href>https://earth.google.com/earth/document/icon?color=1976d2&amp;id=2000&amp;scale=4</href>
+				</Icon>
+				<hotSpot x="64" y="128" xunits="pixels" yunits="insetPixels"/>
+			</IconStyle>
+			<LabelStyle>
+			</LabelStyle>
+			<LineStyle>
+				<color>ff2dc0fb</color>
+				<width>2.66667</width>
+			</LineStyle>
+			<PolyStyle>
+				<color>40ffffff</color>
+			</PolyStyle>
+			<BalloonStyle>
+				<displayMode>hide</displayMode>
+			</BalloonStyle>
+		</Style>
+	</gx:CascadingStyle>
+	<StyleMap id="__managed_style_0227793513400B3257EC">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#__managed_style_0227793513400B3257EC_normal</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#__managed_style_0227793513400B3257EC_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+	<Placemark id="05BA5DFA1C400B3257D8">
+		<name>库拉索</name>
+		<LookAt>
+			<longitude>-69.03641463155869</longitude>
+			<latitude>12.34976191905174</latitude>
+			<altitude>15.47889170323387</altitude>
+			<heading>-9.351754862496363e-07</heading>
+			<tilt>0.5765143376515115</tilt>
+			<gx:fovy>35</gx:fovy>
+			<range>112442.8250288219</range>
+			<altitudeMode>absolute</altitudeMode>
+		</LookAt>
+		<styleUrl>#__managed_style_0227793513400B3257EC</styleUrl>
+		<Polygon>
+			<outerBoundaryIs>
+				<LinearRing>
+					<coordinates>
+						-69.16242194198858,12.37853110780817,0 -69.14933382629009,12.30720946767052,0 -69.15813066178652,12.29863767790196,0 -69.14142019612578,12.27074804912008,0 -69.11866646028862,12.25580245561923,0 -69.09795070439228,12.23086081463541,0 -69.08565974848948,12.20383270153041,0 -69.05888400646616,12.18580991072521,0 -69.04660134171037,12.20342388108087,0 -69.02026395032152,12.18753350787783,0 -69.00049344271743,12.13771293343838,0 -68.92897861959406,12.10252245192038,0 -68.80072002831197,12.0344930483198,0 -68.77828370927423,12.04097843877739,0 -68.73337117218925,12.04334116793017,0 -68.78155571442925,12.0907888666137,0 -68.81606233550707,12.14815531419308,0 -68.85648676811792,12.17441786995899,0 -68.90620884876805,12.17938490016628,0 -68.92841077916637,12.18790660450304,0 -68.97671139660692,12.19403506639685,0 -68.98687123628149,12.20893113698434,0 -69.02851382569641,12.24137411657573,0 -69.04894112379267,12.27545770664223,0 -69.05354898918745,12.31932480886407,0 -69.07385073656307,12.3553956746969,0 -69.09684524317737,12.36013746731756,0 -69.15109530188411,12.39206537805125,0 -69.16242194198858,12.37853110780817,0 
+					</coordinates>
+				</LinearRing>
+			</outerBoundaryIs>
+		</Polygon>
+	</Placemark>
+</Document>
+</kml>
