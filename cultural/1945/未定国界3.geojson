@@ -1,0 +1,9 @@
+{
+"type": "FeatureCollection",
+"name": "未定国界",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::4979" } },
+"features": [
+{ "type": "Feature", "id": "02EAEF36833A63252CF8", "properties": { "name": "中塔", "styleUrl": "#__managed_style_05FB2916EE3A63252D00", "styleMapHash": { "normal": "#__managed_style_1B76BF1DD73A63252D00", "highlight": "#__managed_style_2213DBB33A3A63252D00" } }, "geometry": { "type": "LineString", "coordinates": [ [ 99.199166880347292, 22.118007028201838, 0.0 ], [ 99.229665623969495, 22.311500618958505, 0.0 ], [ 99.303483305809976, 22.545651260797108, 0.0 ], [ 99.366533573865354, 22.798626570160135, 0.0 ], [ 99.472709531120003, 22.855852436540765, 0.0 ], [ 99.571837538371824, 22.952535272584896, 0.0 ], [ 99.535935766822263, 23.068660600506409, 0.0 ], [ 99.352353506309413, 23.073423936165867, 0.0 ], [ 99.105494232572852, 23.182511854138831, 0.0 ], [ 98.887234694025963, 23.255051255810901, 0.0 ] ] } },
+{ "type": "Feature", "id": "01486A2A1C3A632BC836", "properties": { "name": "印巴", "styleUrl": "#__managed_style_05FB2916EE3A63252D00", "styleMapHash": { "normal": "#__managed_style_1B76BF1DD73A63252D00", "highlight": "#__managed_style_2213DBB33A3A63252D00" } }, "geometry": null }
+]
+}
