@@ -1,0 +1,1302 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGL 3D 地球交互与动画录制</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Google Fonts Inter 字体 -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- 引入 Three.js r128 及其 OrbitControls 控制器 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <style>
+        :root {
+            --bg-body: #05070e;
+            --panel-bg: rgba(15, 23, 42, 0.86);
+            --panel-border: rgba(51, 65, 85, 0.75);
+            --section-border: rgba(30, 41, 59, 0.9);
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --accent-title: #38bdf8;
+            --input-bg: rgba(2, 6, 23, 0.8);
+            --input-border: #334155;
+            --input-text: #ffffff;
+            --btn-sec-bg: #1e293b;
+            --btn-sec-hover: #334155;
+            --btn-sec-border: rgba(71, 85, 105, 0.8);
+            --btn-sec-text: #e2e8f0;
+            --badge-bg: #1e293b;
+            --badge-text: #fcd34d;
+            --badge-border: rgba(245, 158, 11, 0.35);
+            --axis-line: linear-gradient(
+                to bottom,
+                transparent 5%,
+                rgba(251, 191, 36, 0.55) 20%,
+                rgba(251, 191, 36, 0.9) 50%,
+                rgba(251, 191, 36, 0.55) 80%,
+                transparent 95%
+            );
+            --axis-ring-border: rgba(251, 191, 36, 0.95);
+            --axis-ring-shadow: rgba(251, 191, 36, 0.6);
+            --frame-border: rgba(56, 189, 248, 0.65);
+            --frame-mask: rgba(2, 6, 23, 0.52);
+        }
+
+        body.light-theme {
+            --bg-body: #e2e8f0;
+            --panel-bg: rgba(255, 255, 255, 0.88);
+            --panel-border: rgba(148, 163, 184, 0.55);
+            --section-border: rgba(226, 232, 240, 0.95);
+            --text-primary: #0f172a;
+            --text-secondary: #334155;
+            --text-muted: #64748b;
+            --accent-title: #0284c7;
+            --input-bg: rgba(248, 250, 252, 0.95);
+            --input-border: #cbd5e1;
+            --input-text: #0f172a;
+            --btn-sec-bg: #f1f5f9;
+            --btn-sec-hover: #e2e8f0;
+            --btn-sec-border: #cbd5e1;
+            --btn-sec-text: #1e293b;
+            --badge-bg: #fffbeb;
+            --badge-text: #b45309;
+            --badge-border: rgba(217, 119, 6, 0.4);
+            --axis-line: linear-gradient(
+                to bottom,
+                transparent 5%,
+                rgba(217, 119, 6, 0.55) 20%,
+                rgba(180, 83, 9, 0.95) 50%,
+                rgba(217, 119, 6, 0.55) 80%,
+                transparent 95%
+            );
+            --axis-ring-border: rgba(180, 83, 9, 0.95);
+            --axis-ring-shadow: rgba(255, 255, 255, 0.9);
+            --frame-border: rgba(2, 132, 199, 0.75);
+            --frame-mask: rgba(15, 23, 42, 0.25);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: var(--bg-body);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: var(--text-primary);
+            user-select: none;
+            transition: background-color 0.35s ease, color 0.35s ease;
+        }
+
+        /* 3D 渲染容器全屏适配 */
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 录制画幅比例安全框预览（仅在 UI 层显示，不污染导出视频） */
+        #aspect-frame-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border: 1.5px dashed var(--frame-border);
+            box-shadow: 0 0 0 9999px var(--frame-mask);
+            z-index: 3;
+            pointer-events: none;
+            border-radius: 8px;
+            transition: width 0.25s ease, height 0.25s ease, border-color 0.3s ease;
+        }
+
+        #aspect-frame-badge {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            padding: 2px 7px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            background: rgba(15, 23, 42, 0.75);
+            color: #38bdf8;
+            border: 1px solid rgba(56, 189, 248, 0.35);
+            backdrop-filter: blur(4px);
+        }
+
+        /* 中轴线辅助参考线（仅在 UI 层显示，不污染录制画布） */
+        #axis-guide {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            width: 1.5px;
+            height: 100vh;
+            background: var(--axis-line);
+            z-index: 4;
+            pointer-events: none;
+            transform: translateX(-50%);
+            transition: background 0.3s ease;
+        }
+
+        /* 中心十字准星标记 */
+        #axis-guide::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 14px;
+            height: 14px;
+            border: 2px solid var(--axis-ring-border);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 8px var(--axis-ring-shadow);
+        }
+
+        /* 主题自适应面板与组件样式 */
+        .theme-panel {
+            background: var(--panel-bg);
+            border-color: var(--panel-border);
+            color: var(--text-primary);
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, transform 0.3s ease;
+        }
+
+        .theme-divider {
+            border-color: var(--section-border);
+        }
+
+        .theme-title {
+            color: var(--accent-title);
+        }
+
+        .theme-text-sec {
+            color: var(--text-secondary);
+        }
+
+        .theme-text-muted {
+            color: var(--text-muted);
+        }
+
+        .theme-input {
+            background: var(--input-bg);
+            border-color: var(--input-border);
+            color: var(--input-text);
+        }
+
+        .theme-btn-sec {
+            background: var(--btn-sec-bg);
+            border-color: var(--btn-sec-border);
+            color: var(--btn-sec-text);
+        }
+        .theme-btn-sec:hover:not(:disabled) {
+            background: var(--btn-sec-hover);
+        }
+
+        .theme-coord-badge {
+            background: var(--badge-bg);
+            color: var(--badge-text);
+            border-color: var(--badge-border);
+        }
+
+        /* 录制红点闪烁动画 */
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.25; transform: scale(0.85); }
+        }
+
+        .record-dot {
+            animation: pulse-dot 1s infinite ease-in-out;
+        }
+
+        /* 自定义滚动条适配小屏幕面板 */
+        #ui-panel::-webkit-scrollbar {
+            width: 5px;
+        }
+        #ui-panel::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        #ui-panel::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.35);
+            border-radius: 9999px;
+        }
+    </style>
+</head>
+<body class="relative w-screen h-screen overflow-hidden">
+
+    <!-- 视频录制画幅比例预览参考框（直观查看 9:16 等目标构图范围，不进入录制视频） -->
+    <div id="aspect-frame-overlay">
+        <span id="aspect-frame-badge">9:16 · 1080×1920</span>
+    </div>
+
+    <!-- 中心中轴线辅助线与中心准星 -->
+    <div id="axis-guide"></div>
+
+    <!-- 右上角醒目：亮版 / 暗版主题切换悬浮按钮 -->
+    <div class="fixed top-4 right-4 z-20 flex items-center gap-2">
+        <button id="theme-toggle-btn" title="切换亮色/暗色背景模式（录制视频同步生效）"
+            class="theme-panel flex items-center gap-2 px-3.5 py-2 rounded-xl border shadow-lg backdrop-blur-xl text-xs font-semibold cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all">
+            <span id="theme-toggle-icon" class="text-sm">☀️</span>
+            <span id="theme-toggle-text">切换亮版</span>
+        </button>
+    </div>
+
+    <!-- 顶部状态/提示轻量消息框（替代 alert） -->
+    <div id="toast-message" class="theme-panel fixed top-16 right-4 z-30 hidden max-w-xs px-4 py-2.5 rounded-xl border text-xs shadow-xl backdrop-blur-md transition-all duration-300">
+        <span id="toast-text" class="font-medium">提示信息</span>
+    </div>
+
+    <!-- 移动端折叠按钮 -->
+    <button id="toggle-panel-btn" class="theme-panel fixed top-4 left-4 z-20 md:hidden flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-medium shadow-lg backdrop-blur-md">
+        <span>⚙️ 控制面板</span>
+    </button>
+
+    <!-- 左侧主控制面板 -->
+    <div id="ui-panel" class="theme-panel fixed top-14 md:top-5 left-4 md:left-5 z-10 w-[calc(100vw-2rem)] sm:w-80 max-h-[calc(100vh-5rem)] overflow-y-auto backdrop-blur-xl p-4 sm:p-5 rounded-2xl border shadow-2xl">
+        
+        <!-- 面板标题与实时中心坐标徽章 -->
+        <div class="theme-divider flex items-center justify-between pb-3 mb-3.5 border-b">
+            <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-sky-500 shadow-[0_0_8px_#38bdf8]"></span>
+                <h1 class="text-sm font-bold tracking-wide">3D 地球交互与录制</h1>
+            </div>
+            <span id="live-coord-badge" title="当前屏幕中轴线实时经纬度" class="theme-coord-badge px-2 py-0.5 text-[11px] font-mono rounded-md border">
+                0.0°E, 0.0°N
+            </span>
+        </div>
+
+        <!-- 1. 地图贴图设置 -->
+        <div class="theme-divider pb-3.5 mb-3.5 border-b">
+            <div class="flex items-center justify-between mb-2">
+                <span class="theme-title text-xs font-semibold">1. 地图贴图设置</span>
+                <button id="btnRestoreDefaultMap" class="theme-text-muted hover:text-sky-500 text-[11px] transition-colors underline cursor-pointer">
+                    恢复默认网格图
+                </button>
+            </div>
+            <label class="block w-full cursor-pointer">
+                <input type="file" id="uploadMap" accept="image/png, image/jpeg, image/webp" class="theme-text-sec block w-full text-xs
+                    file:mr-3 file:py-1.5 file:px-3
+                    file:rounded-lg file:border-0
+                    file:text-xs file:font-medium
+                    file:bg-sky-500/20 file:text-sky-600 dark:file:text-sky-300
+                    hover:file:bg-sky-500/30 file:cursor-pointer file:transition-colors
+                "/>
+            </label>
+            <p class="theme-text-muted text-[11px] mt-1.5 leading-relaxed">
+                推荐使用 2:1 比例的等距圆柱投影地图 (Equirectangular)，中心为 0° 经线。
+            </p>
+        </div>
+
+        <!-- 2. 中轴线经纬度定位（起始点设定） -->
+        <div class="theme-divider pb-3.5 mb-3.5 border-b">
+            <div class="flex items-center justify-between mb-2">
+                <span class="theme-title text-xs font-semibold">2. 起始中轴线定位</span>
+                <div class="flex items-center gap-2">
+                    <label class="theme-text-sec inline-flex items-center gap-1 text-[11px] cursor-pointer">
+                        <input type="checkbox" id="toggleAxisLine" checked class="rounded border-slate-400 text-amber-500 focus:ring-0 cursor-pointer">
+                        <span>中轴线</span>
+                    </label>
+                    <label class="theme-text-sec inline-flex items-center gap-1 text-[11px] cursor-pointer">
+                        <input type="checkbox" id="toggleGraticule" checked class="rounded border-slate-400 text-sky-500 focus:ring-0 cursor-pointer">
+                        <span>经纬网</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 当前已保存的起始锚点坐标提示 -->
+            <div class="flex items-center justify-between px-2.5 py-1 mb-2 rounded-lg bg-sky-500/10 border border-sky-500/20 text-[11px]">
+                <span class="theme-text-sec">当前设定旋转起点:</span>
+                <span id="anchor-coord-label" class="font-mono font-semibold text-sky-500">0.0°E, 0.0°N</span>
+            </div>
+
+            <div class="space-y-2">
+                <div class="flex items-center justify-between gap-2">
+                    <label for="inputLon" class="theme-text-sec text-xs min-w-[72px]">起始经度 (°):</label>
+                    <input type="number" id="inputLon" value="0.0" min="-180" max="180" step="0.5"
+                        class="theme-input w-24 px-2.5 py-1 border rounded-lg text-xs font-mono focus:outline-none focus:border-sky-500 transition-colors">
+                    <span class="theme-text-muted text-[11px] font-mono">-180~180</span>
+                </div>
+
+                <div class="flex items-center justify-between gap-2">
+                    <label for="inputLat" class="theme-text-sec text-xs min-w-[72px]">起始纬度 (°):</label>
+                    <input type="number" id="inputLat" value="0.0" min="-90" max="90" step="0.5"
+                        class="theme-input w-24 px-2.5 py-1 border rounded-lg text-xs font-mono focus:outline-none focus:border-sky-500 transition-colors">
+                    <span class="theme-text-muted text-[11px] font-mono">-90~90</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 mt-2.5">
+                <button id="btnLocate" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-xs font-medium text-white shadow transition-all cursor-pointer">
+                    定位并设为起点
+                </button>
+                <button id="btnResetZero" class="theme-btn-sec px-3 py-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer">
+                    归零 (0°, 0°)
+                </button>
+            </div>
+        </div>
+
+        <!-- 3. 旋转动画控制 -->
+        <div class="theme-divider pb-3.5 mb-3.5 border-b">
+            <div class="flex items-center justify-between mb-2.5">
+                <span class="theme-title text-xs font-semibold">3. 旋转动画控制</span>
+                <span id="rotation-state-badge" class="theme-text-muted text-[11px]">已暂停</span>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2">
+                <button id="btnStart" class="px-2.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 disabled:opacity-40 disabled:pointer-events-none text-xs font-medium text-white shadow transition-all cursor-pointer">
+                    ▶ 开始
+                </button>
+                <button id="btnPause" disabled class="px-2.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:pointer-events-none text-xs font-medium text-white shadow transition-all cursor-pointer">
+                    ⏸ 暂停
+                </button>
+                <button id="btnRestart" title="回到当前设定的起始经纬度并重新开始旋转" class="theme-btn-sec px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer">
+                    ↺ 重新开始
+                </button>
+            </div>
+
+            <!-- 旋转一周 (360°) 实时进度条 -->
+            <div class="mt-3">
+                <div class="flex items-center justify-between text-[11px] mb-1">
+                    <span class="theme-text-muted">单周旋转进度:</span>
+                    <span id="rotation-progress-text" class="font-mono font-semibold text-sky-500">0.0° / 360° (0%)</span>
+                </div>
+                <div class="w-full h-1.5 bg-slate-500/20 rounded-full overflow-hidden border border-slate-500/20">
+                    <div id="rotation-progress-bar" class="h-full bg-gradient-to-r from-sky-500 to-amber-500 transition-none" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2.5 mt-3">
+                <label for="speedRange" class="theme-text-sec text-xs whitespace-nowrap">旋转速度:</label>
+                <input type="range" id="speedRange" min="0.1" max="3.0" step="0.1" value="0.5"
+                    class="flex-1 h-1.5 bg-slate-500/30 rounded-lg appearance-none cursor-pointer accent-sky-500">
+                <span id="speedVal" class="text-xs font-mono font-semibold text-sky-500 w-10 text-right">0.5°</span>
+            </div>
+        </div>
+
+        <!-- 4. 录制与导出动画（含长宽比与清晰度设置） -->
+        <div>
+            <div class="flex items-center justify-between mb-2.5">
+                <span class="theme-title text-xs font-semibold">4. 录制与导出设置</span>
+                <div class="flex items-center gap-2">
+                    <label class="theme-text-sec inline-flex items-center gap-1 text-[11px] cursor-pointer" title="在屏幕上显示录制长宽比辅助参考框">
+                        <input type="checkbox" id="toggleFrameGuide" checked class="rounded border-slate-400 text-sky-500 focus:ring-0 cursor-pointer">
+                        <span>画幅框</span>
+                    </label>
+                    <div id="record-status" class="hidden items-center gap-1.5 px-2 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/40 text-[11px] font-mono text-rose-500 font-semibold">
+                        <span class="w-2 h-2 rounded-full bg-rose-500 record-dot"></span>
+                        <span id="record-timer">00:00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 视频长宽比与清晰度选择 -->
+            <div class="space-y-2 mb-3">
+                <div class="flex items-center justify-between gap-2">
+                    <label for="selectAspectRatio" class="theme-text-sec text-xs whitespace-nowrap">视频长宽比:</label>
+                    <select id="selectAspectRatio" class="theme-input flex-1 px-2.5 py-1.5 border rounded-lg text-xs font-medium focus:outline-none focus:border-sky-500 transition-colors cursor-pointer">
+                        <option value="9:16" selected>9:16 竖屏 (手机/短视频)</option>
+                        <option value="16:9">16:9 横屏 (电脑/宽屏)</option>
+                        <option value="1:1">1:1 方形 (社媒通用)</option>
+                        <option value="3:4">3:4 竖屏 (图文/小红书)</option>
+                        <option value="4:3">4:3 传统横屏</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center justify-between gap-2">
+                    <label for="selectQuality" class="theme-text-sec text-xs whitespace-nowrap">视频清晰度:</label>
+                    <select id="selectQuality" class="theme-input flex-1 px-2.5 py-1.5 border rounded-lg text-xs font-medium focus:outline-none focus:border-sky-500 transition-colors cursor-pointer">
+                        <option value="720">标清 720P (流畅轻量)</option>
+                        <option value="1080" selected>高清 1080P (推荐·16Mbps)</option>
+                        <option value="1440">超清 2K 1440P (细腻·24Mbps)</option>
+                        <option value="2160">极清 4K 2160P (影院级·40Mbps)</option>
+                    </select>
+                </div>
+
+                <!-- 实际输出分辨率与码率预览条 -->
+                <div class="flex items-center justify-between px-2.5 py-1 rounded-lg bg-slate-500/10 border border-slate-500/20 text-[11px]">
+                    <span class="theme-text-muted">导出规格:</span>
+                    <span id="export-spec-label" class="font-mono font-semibold text-emerald-400">1080 × 1920 px · 60fps</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+                <button id="btnRecord" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-xs font-medium text-white shadow transition-all cursor-pointer">
+                    ⏺ 开始录制
+                </button>
+                <button id="btnExport" disabled class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:pointer-events-none text-xs font-medium text-white shadow transition-all cursor-pointer">
+                    💾 导出下载
+                </button>
+            </div>
+
+            <p id="recordHint" class="theme-text-muted text-[11px] mt-2 leading-relaxed">
+                默认以 9:16 竖屏高清录制。点击“开始录制”将从设定起点旋转满一周（360°）后自动完成。
+            </p>
+        </div>
+    </div>
+
+    <!-- 底部操作说明提示栏 -->
+    <div id="instructions" class="theme-panel fixed bottom-4 left-1/2 -translate-x-1/2 z-10 px-4 py-1.5 rounded-full border text-xs pointer-events-none whitespace-nowrap shadow-lg backdrop-blur-md">
+        拖拽设定起始视角 · 滚轮缩放 · 虚线框为视频导出画幅范围
+    </div>
+
+    <!-- WebGL 渲染容器 -->
+    <div id="canvas-container"></div>
+
+    <script>
+        // === 工具函数：显示轻量通知消息（替代 alert） ===
+        let toastTimeout = null;
+        function showToast(message) {
+            const toast = document.getElementById('toast-message');
+            const toastText = document.getElementById('toast-text');
+            toastText.textContent = message;
+            toast.classList.remove('hidden');
+            if (toastTimeout) clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3200);
+        }
+
+        // === 移动端控制面板折叠切换 ===
+        const uiPanel = document.getElementById('ui-panel');
+        const togglePanelBtn = document.getElementById('toggle-panel-btn');
+        let isPanelOpen = true;
+        togglePanelBtn.addEventListener('click', () => {
+            isPanelOpen = !isPanelOpen;
+            if (isPanelOpen) {
+                uiPanel.classList.remove('-translate-x-[120%]');
+            } else {
+                uiPanel.classList.add('-translate-x-[120%]');
+            }
+        });
+
+        // === 1. 初始化 Three.js 基础场景与亮暗主题背景纹理 ===
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+
+        // 生成高质感径向渐变背景纹理（直接作为 scene.background，确保录制的视频也包含对应亮/暗背景）
+        function createSceneBackgroundTexture(isLight) {
+            const bgCanvas = document.createElement('canvas');
+            bgCanvas.width = 1024;
+            bgCanvas.height = 1024;
+            const ctx = bgCanvas.getContext('2d');
+
+            const cx = bgCanvas.width / 2;
+            const cy = bgCanvas.height / 2;
+            const grad = ctx.createRadialGradient(cx, cy, 60, cx, cy, 720);
+
+            if (isLight) {
+                grad.addColorStop(0, '#e2e8f0');
+                grad.addColorStop(0.65, '#d5dee9');
+                grad.addColorStop(1, '#cbd5e1');
+            } else {
+                grad.addColorStop(0, '#070b14');
+                grad.addColorStop(0.6, '#050810');
+                grad.addColorStop(1, '#030508');
+            }
+
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+
+            return new THREE.CanvasTexture(bgCanvas);
+        }
+
+        const darkBgTexture = createSceneBackgroundTexture(false);
+        const lightBgTexture = createSceneBackgroundTexture(true);
+        scene.background = darkBgTexture;
+
+        // 相机设置：基础垂直视野 BASE_FOV = 45°，当画幅变窄（如 9:16 竖屏）时自动扩展垂直视野以保证地球完整居中不裁切
+        const BASE_FOV = 45;
+        const camera = new THREE.PerspectiveCamera(BASE_FOV, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const INITIAL_DISTANCE = 15;
+        camera.position.set(0, 0, INITIAL_DISTANCE);
+
+        // 根据目标宽高比计算自适应垂直 FOV：当 aspect < 1 (如 9:16) 时，锁定水平视野等于 45°，从而使地球在竖屏下同样完整显示
+        function getAdaptiveFov(aspect) {
+            if (aspect < 1) {
+                const rad = THREE.MathUtils.degToRad(BASE_FOV / 2);
+                return THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(rad) / aspect));
+            }
+            return BASE_FOV;
+        }
+
+        // 更新主交互相机的视野与比例（兼顾当前窗口比例与所选录制画幅框，确保地球在安全框内大小合适）
+        function updateInteractiveCameraProjection() {
+            const windowAspect = window.innerWidth / window.innerHeight;
+            camera.aspect = windowAspect;
+            camera.fov = getAdaptiveFov(windowAspect);
+            camera.updateProjectionMatrix();
+        }
+        updateInteractiveCameraProjection();
+
+        // 渲染器设置：开启 preserveDrawingBuffer: true 以支持 canvas 视频流捕捉与录制
+        const renderer = new THREE.WebGLRenderer({
+            antialias: true,
+            preserveDrawingBuffer: true
+        });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        // 轨道控制器 (支持鼠标左键拖拽与触摸旋转、滚轮缩放)
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.enablePan = false;
+        controls.minDistance = 6.5;
+        controls.maxDistance = 32;
+
+        // === 2. 创建高分辨率默认 2:1 经纬度网格贴图 (中心为 0° 本初子午线) ===
+        function createDefaultGlobeTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 2048;
+            canvas.height = 1024;
+            const ctx = canvas.getContext('2d');
+
+            // 1) 绘制深海渐变底色
+            const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            grad.addColorStop(0, '#0e294b');
+            grad.addColorStop(0.5, '#154273');
+            grad.addColorStop(1, '#0e294b');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 2) 绘制次级 15° 细网格线
+            ctx.strokeStyle = 'rgba(148, 163, 184, 0.14)';
+            ctx.lineWidth = 1;
+            for (let lon = -180; lon <= 180; lon += 15) {
+                const x = ((lon + 180) / 360) * canvas.width;
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let lat = -75; lat <= 75; lat += 15) {
+                const y = ((90 - lat) / 180) * canvas.height;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+
+            // 3) 绘制主 30° 经纬线与度数标注
+            ctx.strokeStyle = 'rgba(226, 232, 240, 0.3)';
+            ctx.lineWidth = 2;
+            ctx.font = '600 20px Inter, sans-serif';
+            ctx.fillStyle = 'rgba(241, 245, 249, 0.8)';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            for (let lon = -180; lon <= 180; lon += 30) {
+                const x = ((lon + 180) / 360) * canvas.width;
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+
+                if (lon !== 0 && lon !== -180 && lon !== 180) {
+                    const label = lon > 0 ? `${lon}°E` : `${Math.abs(lon)}°W`;
+                    ctx.fillText(label, x, canvas.height / 2 - 22);
+                    ctx.fillText(label, x, canvas.height / 4);
+                    ctx.fillText(label, x, (canvas.height * 3) / 4);
+                }
+            }
+
+            for (let lat = -60; lat <= 60; lat += 30) {
+                const y = ((90 - lat) / 180) * canvas.height;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+
+                if (lat !== 0) {
+                    const label = lat > 0 ? `${lat}°N` : `${Math.abs(lat)}°S`;
+                    ctx.fillText(label, canvas.width / 2 + 48, y);
+                    ctx.fillText(label, canvas.width / 4, y);
+                    ctx.fillText(label, (canvas.width * 3) / 4, y);
+                }
+            }
+
+            // 4) 高亮 0° 赤道线 (Equator)
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height / 2);
+            ctx.lineTo(canvas.width, canvas.height / 2);
+            ctx.stroke();
+
+            ctx.fillStyle = '#38bdf8';
+            ctx.font = 'bold 22px Inter, sans-serif';
+            ctx.fillText('0° 赤道 (Equator)', canvas.width / 2 + 160, canvas.height / 2 + 24);
+
+            // 5) 高亮 0° 本初子午线 (Prime Meridian - 位于贴图水平中心 x = 1024)
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.moveTo(canvas.width / 2, 0);
+            ctx.lineTo(canvas.width / 2, canvas.height);
+            ctx.stroke();
+
+            // 绘制 (0°, 0°) 原点靶心标记
+            ctx.fillStyle = '#fbbf24';
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2, canvas.height / 2, 9, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.font = 'bold 26px Inter, sans-serif';
+            ctx.fillText('0° 本初子午线', canvas.width / 2, canvas.height / 2 - 26);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+            return texture;
+        }
+
+        // === 3. 创建纯净地球模型与经纬网叠加层 ===
+        const globeGroup = new THREE.Group();
+        scene.add(globeGroup);
+
+        const radius = 5;
+        const segments = 64;
+        const geometry = new THREE.SphereGeometry(radius, segments, segments);
+        const defaultTexture = createDefaultGlobeTexture();
+
+        const material = new THREE.MeshBasicMaterial({
+            map: defaultTexture
+        });
+
+        const globe = new THREE.Mesh(geometry, material);
+        // 关键校准：将球体网格绕 Y 轴偏转 -90 度 (-Math.PI / 2)，使 0° 经线初始正对 +Z 轴相机视线中轴线
+        globe.rotation.y = -Math.PI / 2;
+        globeGroup.add(globe);
+
+        // 添加三维球面经纬度线框网格 (Wireframe Graticule)
+        const wireframeGeometry = new THREE.WireframeGeometry(new THREE.SphereGeometry(radius + 0.012, 36, 18));
+        const wireframeMaterial = new THREE.LineBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.13
+        });
+        const graticule = new THREE.LineSegments(wireframeGeometry, wireframeMaterial);
+        globeGroup.add(graticule);
+
+        // === 3.5 亮版 / 暗版主题切换逻辑 ===
+        let isLightMode = false;
+        const themeToggleBtn = document.getElementById('theme-toggle-btn');
+        const themeToggleIcon = document.getElementById('theme-toggle-icon');
+        const themeToggleText = document.getElementById('theme-toggle-text');
+
+        function applyTheme(light) {
+            isLightMode = light;
+            document.body.classList.toggle('light-theme', isLightMode);
+
+            if (isLightMode) {
+                themeToggleIcon.textContent = '🌙';
+                themeToggleText.textContent = '切换暗版';
+                scene.background = lightBgTexture;
+                wireframeMaterial.color.setHex(0x0f172a);
+                wireframeMaterial.opacity = 0.15;
+            } else {
+                themeToggleIcon.textContent = '☀️';
+                themeToggleText.textContent = '切换亮版';
+                scene.background = darkBgTexture;
+                wireframeMaterial.color.setHex(0xffffff);
+                wireframeMaterial.opacity = 0.13;
+            }
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            applyTheme(!isLightMode);
+            showToast(isLightMode ? '已切换为亮版背景模式' : '已切换为暗版深空模式');
+        });
+
+        // === 4. 地图贴图上传与恢复默认逻辑 ===
+        const uploadMapInput = document.getElementById('uploadMap');
+        const btnRestoreDefaultMap = document.getElementById('btnRestoreDefaultMap');
+
+        uploadMapInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                    const texture = new THREE.Texture(img);
+                    texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+                    texture.needsUpdate = true;
+                    material.map = texture;
+                    material.needsUpdate = true;
+                    showToast(`已成功加载地图贴图: ${file.name}`);
+                };
+                img.onerror = function() {
+                    showToast('图片加载失败，请选择有效的 PNG 或 JPEG 文件');
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        btnRestoreDefaultMap.addEventListener('click', () => {
+            uploadMapInput.value = '';
+            material.map = defaultTexture;
+            material.needsUpdate = true;
+            showToast('已恢复默认经纬度网格贴图');
+        });
+
+        // 中轴线、球面经纬网与录制画幅框显示开关
+        const axisGuide = document.getElementById('axis-guide');
+        document.getElementById('toggleAxisLine').addEventListener('change', function(e) {
+            axisGuide.style.display = e.target.checked ? 'block' : 'none';
+        });
+
+        document.getElementById('toggleGraticule').addEventListener('change', function(e) {
+            graticule.visible = e.target.checked;
+        });
+
+        const aspectFrameOverlay = document.getElementById('aspect-frame-overlay');
+        document.getElementById('toggleFrameGuide').addEventListener('change', function(e) {
+            aspectFrameOverlay.style.display = e.target.checked ? 'block' : 'none';
+        });
+
+        // === 5. 起始定位经纬度记忆 (anchorLon, anchorLat) 与双向同步 ===
+        const inputLon = document.getElementById('inputLon');
+        const inputLat = document.getElementById('inputLat');
+        const liveCoordBadge = document.getElementById('live-coord-badge');
+        const anchorCoordLabel = document.getElementById('anchor-coord-label');
+        const btnLocate = document.getElementById('btnLocate');
+        const btnResetZero = document.getElementById('btnResetZero');
+        const rotationProgressText = document.getElementById('rotation-progress-text');
+        const rotationProgressBar = document.getElementById('rotation-progress-bar');
+
+        let anchorLon = 0.0;
+        let anchorLat = 0.0;
+        let rotatedAngleDeg = 0.0;
+        let isProgrammaticUpdate = false;
+        let isUserDragging = false;
+
+        function normalizeLon(deg) {
+            let d = ((deg + 180) % 360);
+            if (d < 0) d += 360;
+            return d - 180;
+        }
+
+        function formatLonLatText(lon, lat) {
+            const lonDir = lon >= 0 ? 'E' : 'W';
+            const latDir = lat >= 0 ? 'N' : 'S';
+            return `${Math.abs(lon).toFixed(1)}°${lonDir}, ${Math.abs(lat).toFixed(1)}°${latDir}`;
+        }
+
+        function updateAnchorLabel() {
+            anchorCoordLabel.textContent = formatLonLatText(anchorLon, anchorLat);
+        }
+
+        function updateProgressUI(deg) {
+            const clamped = Math.max(0, Math.min(360, deg));
+            const percent = Math.round((clamped / 360) * 100);
+            rotationProgressText.textContent = `${clamped.toFixed(1)}° / 360° (${percent}%)`;
+            rotationProgressBar.style.width = `${(clamped / 360) * 100}%`;
+        }
+
+        function getCurrentCenterLonLat() {
+            const azimuthal = controls.getAzimuthalAngle();
+            const polar = controls.getPolarAngle();
+
+            const currentLat = 90 - THREE.MathUtils.radToDeg(polar);
+            const rawLon = THREE.MathUtils.radToDeg(azimuthal - globeGroup.rotation.y);
+            const currentLon = normalizeLon(rawLon);
+
+            return { lon: currentLon, lat: currentLat };
+        }
+
+        function updateLiveCoordBadge() {
+            const { lon, lat } = getCurrentCenterLonLat();
+            liveCoordBadge.textContent = formatLonLatText(lon, lat);
+        }
+
+        function setCenterLonLat(lonDeg, latDeg, saveAsAnchor = true) {
+            const lon = Math.max(-180, Math.min(180, parseFloat(lonDeg) || 0));
+            const lat = Math.max(-90, Math.min(90, parseFloat(latDeg) || 0));
+
+            if (saveAsAnchor) {
+                anchorLon = lon;
+                anchorLat = lat;
+                inputLon.value = anchorLon.toFixed(1);
+                inputLat.value = anchorLat.toFixed(1);
+                updateAnchorLabel();
+            }
+
+            rotatedAngleDeg = 0;
+            updateProgressUI(0);
+
+            const lonRad = THREE.MathUtils.degToRad(lon);
+            const latRad = THREE.MathUtils.degToRad(lat);
+            const currentDist = camera.position.length();
+
+            isProgrammaticUpdate = true;
+            camera.position.set(
+                0,
+                currentDist * Math.sin(latRad),
+                currentDist * Math.cos(latRad)
+            );
+            controls.update();
+
+            globeGroup.rotation.y = -lonRad;
+            isProgrammaticUpdate = false;
+
+            updateLiveCoordBadge();
+        }
+
+        controls.addEventListener('start', () => {
+            isUserDragging = true;
+        });
+
+        controls.addEventListener('end', () => {
+            isUserDragging = false;
+        });
+
+        controls.addEventListener('change', () => {
+            if (isProgrammaticUpdate) return;
+
+            updateLiveCoordBadge();
+
+            if (isUserDragging || !isRotating) {
+                const { lon, lat } = getCurrentCenterLonLat();
+                anchorLon = lon;
+                anchorLat = lat;
+                rotatedAngleDeg = 0;
+                updateProgressUI(0);
+                updateAnchorLabel();
+
+                if (document.activeElement !== inputLon && document.activeElement !== inputLat) {
+                    inputLon.value = anchorLon.toFixed(1);
+                    inputLat.value = anchorLat.toFixed(1);
+                }
+            }
+        });
+
+        function applyInputsToAnchor() {
+            const lon = Math.max(-180, Math.min(180, parseFloat(inputLon.value) || 0));
+            const lat = Math.max(-90, Math.min(90, parseFloat(inputLat.value) || 0));
+            setCenterLonLat(lon, lat, true);
+        }
+
+        btnLocate.addEventListener('click', () => {
+            applyInputsToAnchor();
+            showToast(`已定位并设定起点: 经度 ${anchorLon.toFixed(1)}°, 纬度 ${anchorLat.toFixed(1)}°`);
+        });
+
+        [inputLon, inputLat].forEach(input => {
+            input.addEventListener('change', () => {
+                applyInputsToAnchor();
+            });
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    input.blur();
+                    applyInputsToAnchor();
+                    showToast(`已定位并设定起点: 经度 ${anchorLon.toFixed(1)}°, 纬度 ${anchorLat.toFixed(1)}°`);
+                }
+            });
+        });
+
+        btnResetZero.addEventListener('click', () => {
+            setCenterLonLat(0, 0, true);
+            showToast('已将起始定位归零至 (0° 本初子午线, 0° 赤道)');
+        });
+
+        // === 6. 地球旋转动画控制 (开始 / 暂停 / 重新开始) ===
+        let isRotating = false;
+        let rotationSpeedDeg = 0.5;
+
+        const btnStart = document.getElementById('btnStart');
+        const btnPause = document.getElementById('btnPause');
+        const btnRestart = document.getElementById('btnRestart');
+        const speedRange = document.getElementById('speedRange');
+        const speedVal = document.getElementById('speedVal');
+        const rotationStateBadge = document.getElementById('rotation-state-badge');
+
+        function setRotationState(rotating) {
+            isRotating = rotating;
+            btnStart.disabled = rotating;
+            btnPause.disabled = !rotating;
+            rotationStateBadge.textContent = rotating ? '旋转中' : '已暂停';
+            rotationStateBadge.className = rotating
+                ? 'text-[11px] text-emerald-500 font-semibold'
+                : 'theme-text-muted text-[11px]';
+        }
+
+        function restartRotationFromAnchor() {
+            const targetLon = parseFloat(inputLon.value);
+            const targetLat = parseFloat(inputLat.value);
+            if (!isNaN(targetLon)) anchorLon = Math.max(-180, Math.min(180, targetLon));
+            if (!isNaN(targetLat)) anchorLat = Math.max(-90, Math.min(90, targetLat));
+
+            setCenterLonLat(anchorLon, anchorLat, true);
+            setRotationState(true);
+        }
+
+        btnStart.addEventListener('click', () => {
+            if (rotatedAngleDeg >= 360) {
+                rotatedAngleDeg = 0;
+                updateProgressUI(0);
+            }
+            setRotationState(true);
+        });
+
+        btnPause.addEventListener('click', () => {
+            setRotationState(false);
+        });
+
+        btnRestart.addEventListener('click', () => {
+            restartRotationFromAnchor();
+            showToast(`已回到起始经纬度 (${anchorLon.toFixed(1)}°, ${anchorLat.toFixed(1)}°) 重新开始旋转`);
+        });
+
+        speedRange.addEventListener('input', (e) => {
+            rotationSpeedDeg = parseFloat(e.target.value);
+            speedVal.textContent = rotationSpeedDeg.toFixed(1) + '°';
+        });
+
+        // === 7. 视频长宽比（默认 9:16）与清晰度选项配置、画幅参考框计算 ===
+        const selectAspectRatio = document.getElementById('selectAspectRatio');
+        const selectQuality = document.getElementById('selectQuality');
+        const exportSpecLabel = document.getElementById('export-spec-label');
+        const aspectFrameBadge = document.getElementById('aspect-frame-badge');
+
+        // 根据用户选择的长宽比和清晰度档位，计算精确的目标像素宽高（确保为偶数以兼容 H.264/VP9 编码器）与目标码率
+        function getVideoExportConfig() {
+            const ratioStr = selectAspectRatio.value; // 如 "9:16"
+            const [rw, rh] = ratioStr.split(':').map(Number);
+            const baseShortEdge = parseInt(selectQuality.value, 10) || 1080; // 短边基准像素：720 / 1080 / 1440 / 2160
+
+            let width, height;
+            if (rw <= rh) {
+                // 竖屏或方形（如 9:16 -> 1080x1920, 1:1 -> 1080x1080, 3:4 -> 1080x1440）
+                width = baseShortEdge;
+                height = Math.round((baseShortEdge * rh) / rw);
+            } else {
+                // 横屏（如 16:9 -> 1920x1080, 4:3 -> 1440x1080）
+                height = baseShortEdge;
+                width = Math.round((baseShortEdge * rw) / rh);
+            }
+
+            // 强制对齐到偶数像素，防止部分浏览器编码器报错
+            width = width % 2 === 0 ? width : width + 1;
+            height = height % 2 === 0 ? height : height + 1;
+
+            // 根据清晰度匹配高画质码率 (bps)
+            const bitrateMap = {
+                720: 8000000,    // 8 Mbps
+                1080: 16000000,  // 16 Mbps
+                1440: 24000000,  // 24 Mbps
+                2160: 40000000   // 40 Mbps
+            };
+            const bitrate = bitrateMap[baseShortEdge] || 16000000;
+
+            return {
+                ratioStr,
+                aspect: width / height,
+                width,
+                height,
+                bitrate,
+                qualityLabel: `${baseShortEdge}P`
+            };
+        }
+
+        // 更新屏幕上的画幅比例虚线参考框与规格文字，并同步调整相机视野使地球在 9:16 框内完整居中
+        function updateAspectFrameAndCamera() {
+            const cfg = getVideoExportConfig();
+            exportSpecLabel.textContent = `${cfg.width} × ${cfg.height} px · 60fps`;
+            aspectFrameBadge.textContent = `${cfg.ratioStr} · ${cfg.width}×${cfg.height}`;
+
+            // 计算在当前浏览器视口内居中留白 8% 后的安全参考框尺寸
+            const maxW = window.innerWidth * 0.90;
+            const maxH = window.innerHeight * 0.88;
+            let boxW = maxW;
+            let boxH = boxW / cfg.aspect;
+
+            if (boxH > maxH) {
+                boxH = maxH;
+                boxW = boxH * cfg.aspect;
+            }
+
+            aspectFrameOverlay.style.width = `${Math.round(boxW)}px`;
+            aspectFrameOverlay.style.height = `${Math.round(boxH)}px`;
+
+            // 让主视口相机也参考目标画幅比例调整缩放感，使屏幕预览框内的地球大小与最终导出视频完全一致
+            const windowAspect = window.innerWidth / window.innerHeight;
+            camera.aspect = windowAspect;
+            // 计算保证地球在屏幕上该参考框内完整显示的垂直 FOV
+            const targetFovInBox = getAdaptiveFov(cfg.aspect);
+            const targetRad = THREE.MathUtils.degToRad(targetFovInBox / 2);
+            const heightRatio = window.innerHeight / boxH;
+            camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(targetRad) * heightRatio));
+            camera.updateProjectionMatrix();
+        }
+
+        selectAspectRatio.addEventListener('change', () => {
+            updateAspectFrameAndCamera();
+            const cfg = getVideoExportConfig();
+            showToast(`已切换视频长宽比为 ${cfg.ratioStr} (${cfg.width}×${cfg.height})`);
+        });
+
+        selectQuality.addEventListener('change', () => {
+            updateAspectFrameAndCamera();
+            const cfg = getVideoExportConfig();
+            showToast(`已切换视频清晰度为 ${cfg.qualityLabel} (${cfg.width}×${cfg.height})`);
+        });
+
+        // === 8. 专用离屏高分辨率渲染器与录制系统（保证导出视频精确为 9:16 等指定分辨率，不受浏览器窗口尺寸影响） ===
+        const btnRecord = document.getElementById('btnRecord');
+        const btnExport = document.getElementById('btnExport');
+        const recordStatus = document.getElementById('record-status');
+        const recordTimer = document.getElementById('record-timer');
+        const recordHint = document.getElementById('recordHint');
+
+        // 创建专用于视频录制的离屏渲染器与独立录制相机，避免录制时主屏幕画面变形或受窗口分辨率限制
+        const recordRenderer = new THREE.WebGLRenderer({
+            antialias: true,
+            preserveDrawingBuffer: true
+        });
+        recordRenderer.setPixelRatio(1); // 严格按目标像素 1:1 输出（如精确的 1080x1920）
+        const recordCamera = new THREE.PerspectiveCamera(BASE_FOV, 9 / 16, 0.1, 1000);
+
+        // 将当前主相机的姿态同步给录制专用相机，并根据录制长宽比设置自适应 FOV
+        function syncAndRenderRecordFrame(cfg) {
+            recordCamera.position.copy(camera.position);
+            recordCamera.quaternion.copy(camera.quaternion);
+            recordCamera.up.copy(camera.up);
+            recordCamera.aspect = cfg.aspect;
+            recordCamera.fov = getAdaptiveFov(cfg.aspect);
+            recordCamera.updateProjectionMatrix();
+
+            recordRenderer.render(scene, recordCamera);
+        }
+
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let recordedBlobUrl = null;
+        let recordedMimeType = '';
+        let activeExportConfig = null;
+        let isRecording = false;
+        let isAutoRecordOneTurn = false;
+        let recordStartTime = 0;
+        let timerInterval = null;
+
+        // 检测当前浏览器支持的最佳视频编码格式 (优先 MP4，其次 WebM VP9/VP8)
+        function getSupportedMimeType() {
+            if (typeof MediaRecorder === 'undefined') return '';
+            const types = [
+                'video/mp4;codecs=avc1.42E01E',
+                'video/mp4',
+                'video/webm;codecs=vp9',
+                'video/webm;codecs=vp8',
+                'video/webm'
+            ];
+            for (const type of types) {
+                if (MediaRecorder.isTypeSupported(type)) {
+                    return type;
+                }
+            }
+            return '';
+        }
+
+        function formatDuration(ms) {
+            const totalSeconds = Math.floor(ms / 1000);
+            const mins = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+            const secs = String(totalSeconds % 60).padStart(2, '0');
+            return `${mins}:${secs}`;
+        }
+
+        function startRecording() {
+            if (!recordRenderer.domElement.captureStream) {
+                showToast('当前浏览器环境不支持 Canvas 视频流录制');
+                return;
+            }
+
+            // 1. 获取当前选定的长宽比与清晰度配置（默认 9:16 · 1080x1920），配置离屏录制画布尺寸
+            activeExportConfig = getVideoExportConfig();
+            recordRenderer.setSize(activeExportConfig.width, activeExportConfig.height, false);
+
+            // 锁定录制期间的分辨率与比例下拉框，避免录制中途改变画布尺寸导致编码中断
+            selectAspectRatio.disabled = true;
+            selectQuality.disabled = true;
+
+            // 2. 复位到用户设定的起始经纬度 (anchorLon, anchorLat)，将旋转进度归零 (0°)，并立即渲染起始帧
+            restartRotationFromAnchor();
+            renderer.render(scene, camera);
+            syncAndRenderRecordFrame(activeExportConfig);
+
+            // 3. 初始化 60 FPS 视频流与对应清晰度码率的 MediaRecorder
+            const stream = recordRenderer.domElement.captureStream(60);
+            recordedMimeType = getSupportedMimeType();
+            const options = recordedMimeType
+                ? { mimeType: recordedMimeType, videoBitsPerSecond: activeExportConfig.bitrate }
+                : { videoBitsPerSecond: activeExportConfig.bitrate };
+
+            try {
+                mediaRecorder = new MediaRecorder(stream, options);
+            } catch (err) {
+                mediaRecorder = new MediaRecorder(stream);
+            }
+
+            recordedChunks = [];
+            if (recordedBlobUrl) {
+                URL.revokeObjectURL(recordedBlobUrl);
+                recordedBlobUrl = null;
+            }
+
+            mediaRecorder.ondataavailable = function(e) {
+                if (e.data && e.data.size > 0) {
+                    recordedChunks.push(e.data);
+                }
+            };
+
+            mediaRecorder.onstop = function() {
+                const finalMime = recordedMimeType || 'video/webm';
+                const blob = new Blob(recordedChunks, { type: finalMime });
+                recordedBlobUrl = URL.createObjectURL(blob);
+                btnExport.disabled = false;
+                selectAspectRatio.disabled = false;
+                selectQuality.disabled = false;
+                recordHint.textContent = `已完成 ${activeExportConfig.ratioStr} (${activeExportConfig.width}×${activeExportConfig.height}) 360° 录制！请点击“导出下载”。`;
+            };
+
+            // 4. 启动录制与单周自动停止追踪
+            mediaRecorder.start(100);
+            isRecording = true;
+            isAutoRecordOneTurn = true;
+            btnRecord.textContent = '⏹ 停止录制';
+            btnExport.disabled = true;
+            recordStatus.classList.remove('hidden');
+            recordStatus.classList.add('inline-flex');
+            recordHint.textContent = `正在以 ${activeExportConfig.ratioStr} (${activeExportConfig.width}×${activeExportConfig.height}) 录制，旋转满 360° 自动完成...`;
+            showToast(`开始录制 ${activeExportConfig.ratioStr} 视频 (${activeExportConfig.width}×${activeExportConfig.height})`);
+
+            recordStartTime = Date.now();
+            recordTimer.textContent = '00:00';
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                recordTimer.textContent = formatDuration(Date.now() - recordStartTime);
+            }, 250);
+        }
+
+        function stopRecording(completedFullTurn = false) {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+            isRecording = false;
+            isAutoRecordOneTurn = false;
+            selectAspectRatio.disabled = false;
+            selectQuality.disabled = false;
+            if (timerInterval) clearInterval(timerInterval);
+            btnRecord.textContent = '⏺ 开始录制';
+            recordStatus.classList.add('hidden');
+            recordStatus.classList.remove('inline-flex');
+
+            if (completedFullTurn) {
+                showToast('已完整旋转一周 (360°) 并自动完成录制，可点击“导出下载”保存视频！');
+            } else {
+                showToast('已手动停止录制，可点击“导出下载”保存视频');
+            }
+        }
+
+        btnRecord.addEventListener('click', () => {
+            if (!isRecording) {
+                startRecording();
+            } else {
+                setRotationState(false);
+                stopRecording(false);
+            }
+        });
+
+        btnExport.addEventListener('click', () => {
+            if (!recordedBlobUrl) return;
+            const ext = (recordedMimeType && recordedMimeType.includes('mp4')) ? 'mp4' : 'webm';
+            const cfg = activeExportConfig || getVideoExportConfig();
+            const ratioTag = cfg.ratioStr.replace(':', 'x');
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = recordedBlobUrl;
+            a.download = `globe_${ratioTag}_${cfg.width}x${cfg.height}_${Date.now()}.${ext}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            showToast(`正在下载 ${cfg.ratioStr} (${cfg.width}×${cfg.height}) 视频文件 (.${ext})`);
+        });
+
+        // === 9. 窗口尺寸自适应 ===
+        window.addEventListener('resize', () => {
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            updateAspectFrameAndCamera();
+        });
+
+        // === 10. 核心渲染循环 ===
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (isRotating) {
+                let stepDeg = rotationSpeedDeg;
+
+                // 若处于录制模式且开启了旋转一周 (360°) 自动停止
+                if (isRecording && isAutoRecordOneTurn && (rotatedAngleDeg + stepDeg >= 360)) {
+                    stepDeg = 360 - rotatedAngleDeg;
+                    rotatedAngleDeg = 360;
+
+                    isProgrammaticUpdate = true;
+                    globeGroup.rotation.y += THREE.MathUtils.degToRad(stepDeg);
+                    controls.update();
+                    isProgrammaticUpdate = false;
+
+                    updateProgressUI(360);
+                    updateLiveCoordBadge();
+                    renderer.render(scene, camera);
+                    if (activeExportConfig) {
+                        syncAndRenderRecordFrame(activeExportConfig);
+                    }
+
+                    // 精确到达 360° 一周后，自动停止旋转并结束录制
+                    setRotationState(false);
+                    stopRecording(true);
+                    return;
+                }
+
+                // 正常帧推进
+                rotatedAngleDeg += stepDeg;
+                const displayDeg = isRecording ? rotatedAngleDeg : (rotatedAngleDeg % 360);
+
+                isProgrammaticUpdate = true;
+                globeGroup.rotation.y += THREE.MathUtils.degToRad(stepDeg);
+                controls.update();
+                isProgrammaticUpdate = false;
+
+                updateProgressUI(displayDeg);
+                updateLiveCoordBadge();
+            } else {
+                controls.update();
+            }
+
+            // 渲染主屏幕交互视图
+            renderer.render(scene, camera);
+
+            // 若正在录制，同步渲染高分辨率指定长宽比离屏画布
+            if (isRecording && activeExportConfig) {
+                syncAndRenderRecordFrame(activeExportConfig);
+            }
+        }
+
+        // 在 window.onload 事件后初始化定位、画幅参考框并启动动画循环
+        window.onload = function() {
+            updateAspectFrameAndCamera();
+            setCenterLonLat(0, 0, true);
+            animate();
+        };
+    </script>
+</body>
+</html>

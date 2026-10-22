@@ -1,0 +1,3685 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>profpi · Fourier Explorer Pro — 傅里叶级数本轮绘图仪 (9:16 超清竖屏版 · 正交双圆环投影 · 支持大型SVG导入)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            canvasDark: '#05070b',
+            panelDark: '#0d1119',
+            borderDark: '#1e2738',
+            accentCyan: '#38bdf8',
+            accentBlue: '#0284c7',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom scrollbars and range sliders */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.25);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(56, 189, 248, 0.5);
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.25);
+    }
+    .dark input[type="range"]::-webkit-slider-runnable-track {
+      background: #1e293b;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #38bdf8;
+      margin-top: -5px;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.65);
+      transition: transform 0.15s ease, background-color 0.15s ease;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+      background: #7dd3fc;
+    }
+
+    .glass-panel {
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    /* Strict 9:16 Portrait Stage Container */
+    .stage-9-16 {
+      aspect-ratio: 9 / 16;
+    }
+
+    /* Offscreen SVG container for accurate geometry calculation */
+    #offscreen-svg-host {
+      position: fixed;
+      left: -99999px;
+      top: -99999px;
+      width: 2000px;
+      height: 2000px;
+      visibility: hidden;
+      pointer-events: none;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-[#05070b] dark:text-slate-100 font-sans min-h-screen flex flex-col selection:bg-sky-500 selection:text-white transition-colors duration-200">
+
+  <!-- Hidden Offscreen SVG Mount for Geometry & CTM Computation -->
+  <div id="offscreen-svg-host" aria-hidden="true"></div>
+
+  <!-- Top Navigation Header (profpi style) -->
+  <header class="sticky top-0 z-30 border-b border-slate-200 dark:border-[#1a2232] bg-white/85 dark:bg-[#080b12]/85 glass-panel">
+    <div class="max-w-[1600px] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
+      <!-- Left Brand -->
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2">
+          <span class="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center text-white font-mono font-bold text-lg shadow-md shadow-sky-500/20">π</span>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="font-bold tracking-tight text-slate-900 dark:text-white text-sm sm:text-base">profpi</span>
+              <span class="text-slate-400 dark:text-slate-600">/</span>
+              <span class="font-semibold text-sky-600 dark:text-sky-400 text-sm sm:text-base">Fourier Explorer Pro</span>
+              <span class="hidden md:inline-block text-[10px] font-mono px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-500 border border-sky-500/30">9:16 竖屏超清 · 双模式</span>
+            </div>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">复数单链 &amp; 正交双环投影绘图 · 9:16 原生超清导出 · 无大小限制 SVG 导入</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center Formula Badge (Dynamic by Mode) -->
+      <div id="header-formula-badge" class="hidden xl:flex items-center gap-3 px-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-[#111726] border border-slate-200/80 dark:border-slate-800 text-xs font-mono text-slate-700 dark:text-sky-300">
+        <span>z<sub>N</sub>(t) = ∑<sub>k∈K<sub>N</sub></sub> c<sub>k</sub> e<sup>2πikt</sup></span>
+        <span class="text-slate-300 dark:text-slate-700">|</span>
+        <span class="text-slate-500 dark:text-slate-400">c<sub>k</sub> = (1/M) ∑ z<sub>n</sub> e<sup>-2πikn/M</sup></span>
+      </div>
+
+      <!-- Right Quick Actions -->
+      <div class="flex items-center gap-2">
+        <!-- Sound Chime Toggle (like the video) -->
+        <button id="btn-sound-toggle" type="button" title="切换完成周期提示音 (Video Chime Sound)" class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900/80 hover:border-sky-500/50 flex items-center gap-1.5 transition">
+          <span id="sound-icon">🔇</span>
+          <span class="hidden sm:inline" id="sound-label">周期音效: 关</span>
+        </button>
+
+        <!-- Export Snapshot -->
+        <button id="btn-export-png" type="button" title="导出当前 9:16 画布为超清 PNG" class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900/80 hover:border-sky-500/50 flex items-center gap-1.5 transition">
+          <span>📷</span>
+          <span class="hidden sm:inline">9:16 超清截图</span>
+        </button>
+
+        <!-- Download Drawing Animation Video -->
+        <button id="btn-header-record" type="button" title="录制并下载 9:16 超清竖屏绘图动画视频" class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-sky-500/40 bg-sky-500/15 text-sky-600 dark:text-sky-300 hover:bg-sky-500/25 flex items-center gap-1.5 transition">
+          <span id="header-record-icon">🎥</span>
+          <span class="hidden sm:inline" id="header-record-label">下载 9:16 超清视频</span>
+        </button>
+
+        <!-- Dark/Light Theme Toggle -->
+        <button id="btn-theme-toggle" type="button" title="切换深色/浅色模式" class="p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900/80 hover:border-sky-500/50 text-slate-700 dark:text-slate-300 transition">
+          <svg id="icon-sun" class="w-4 h-4 hidden dark:block text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="5"></circle>
+            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
+          </svg>
+          <svg id="icon-moon" class="w-4 h-4 block dark:hidden text-slate-700" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 max-w-[1600px] w-full mx-auto px-3 sm:px-6 py-4 flex flex-col gap-5">
+
+    <!-- Top Preset Bar (Try a shape) -->
+    <section class="bg-white dark:bg-[#0d1119] border border-slate-200 dark:border-[#1e2738] rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-sm">
+      <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+        <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mr-1 flex items-center gap-1">
+          <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          预设图形 (Presets):
+        </span>
+        <button data-preset="heart" class="preset-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-sky-500/15 text-sky-600 dark:text-sky-300 border border-sky-500/40 hover:bg-sky-500/25 transition flex items-center gap-1.5">
+          ♥ 爱心 (Heart)
+        </button>
+        <button data-preset="star" class="preset-btn px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800/70 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/40 transition">
+          ★ 五角星 (Star)
+        </button>
+        <button data-preset="butterfly" class="preset-btn px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800/70 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/40 transition">
+          🦋 蝴蝶曲线 (Butterfly)
+        </button>
+        <button data-preset="lissajous" class="preset-btn px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800/70 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/40 transition">
+          ∞ 利萨如 (Lissajous)
+        </button>
+        <button data-preset="astroid" class="preset-btn px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800/70 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/40 transition">
+          ✦ 星形线 (Astroid)
+        </button>
+        <button data-preset="pi" class="preset-btn px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800/70 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/40 transition">
+          π 圆周率符号 (Pi)
+        </button>
+      </div>
+
+      <!-- Status Toast / Notification Pill -->
+      <div id="status-toast" class="text-xs font-mono px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span id="status-text">已加载: 爱心轮廓 (2048 采样点 · 9:16 竖屏 1080P)</span>
+      </div>
+    </section>
+
+    <!-- Main 2-Column Interactive Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+
+      <!-- LEFT COLUMN: Control Panel (5 cols on desktop) -->
+      <aside class="lg:col-span-5 flex flex-col gap-4">
+
+        <!-- Card 0: Drawing Mode Switcher (Complex Single-Chain vs Orthogonal Dual-Epicycle Projection) -->
+        <div class="bg-white dark:bg-[#0d1119] border border-slate-200 dark:border-[#1e2738] rounded-xl p-4 flex flex-col gap-3 shadow-sm">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+              绘图几何模式 (Epicycle Mode)
+            </h2>
+            <span id="mode-badge-pill" class="text-[11px] font-mono px-2 py-0.5 rounded bg-sky-500/15 text-sky-600 dark:text-sky-300 border border-sky-500/30">
+              复平面单链 c_k
+            </span>
+          </div>
+
+          <!-- 2-Button Segmented Switcher -->
+          <div class="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-100 dark:bg-[#080b11] border border-slate-200/80 dark:border-slate-800">
+            <button id="btn-mode-complex" type="button" class="py-2.5 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 bg-sky-500 text-white shadow-sm shadow-sky-500/30">
+              <span>🌀</span>
+              <span>复数单链模式</span>
+            </button>
+            <button id="btn-mode-orthogonal" type="button" class="py-2.5 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-sky-500 dark:hover:text-sky-300">
+              <span>📐</span>
+              <span>正交双环投影</span>
+            </button>
+          </div>
+
+          <p id="mode-desc-text" class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+            当前为<strong>复数单链模式</strong>：将 $(x(t), y(t))$ 视为复数 $z(t) = x(t) + i y(t)$，由单一旋转本轮链首尾相接直接描绘轨迹。点击上方「正交双环投影」可拆分为上方 $X(t)$ 与左方 $Y(t)$ 两组实数级数正交交汇作画。
+          </p>
+        </div>
+
+        <!-- Card 1: Dedicated SVG Import Module -->
+        <div class="bg-white dark:bg-[#0d1119] border border-slate-200 dark:border-[#1e2738] rounded-xl p-4 flex flex-col gap-3.5 shadow-sm">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              导入 SVG (SVG Import)
+            </h2>
+            <span class="text-[11px] font-mono px-2 py-0.5 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
+              无大小限制
+            </span>
+          </div>
+
+          <!-- Drag & Drop Zone -->
+          <input id="svg-file-input" type="file" accept=".svg,image/svg+xml,*/*" class="hidden" />
+          <div id="svg-dropzone" role="button" tabindex="0" class="group cursor-pointer border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-sky-400 dark:hover:border-sky-400 rounded-xl p-4 text-center transition bg-slate-50/60 dark:bg-[#090d14]/60 hover:bg-sky-500/5 flex flex-col items-center justify-center gap-2 select-none">
+            <div class="w-10 h-10 rounded-full bg-sky-500/10 text-sky-500 flex items-center justify-center group-hover:scale-110 transition pointer-events-none">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+              </svg>
+            </div>
+            <div class="pointer-events-none">
+              <p class="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200">
+                点击选择或拖入 <span class="text-sky-500 underline">.svg 矢量文件</span>
+              </p>
+              <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                无文件大小限制（完美支持 5MB–20MB+ 复杂地图/CAD/插画路径）
+              </p>
+            </div>
+          </div>
+
+          <!-- Multi-Path & Extraction Settings -->
+          <div class="bg-slate-50 dark:bg-[#090d14] border border-slate-200/80 dark:border-slate-800/80 rounded-lg p-3 flex flex-col gap-2.5 text-xs">
+            <div class="flex items-center justify-between">
+              <label for="svg-path-strategy" class="font-medium text-slate-600 dark:text-slate-300">多路径提取策略:</label>
+              <select id="svg-path-strategy" class="bg-white dark:bg-[#131b29] border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-sky-500">
+                <option value="stitch" selected>智能连接所有子路径 (最近邻拼接)</option>
+                <option value="longest">仅提取最长主轮廓 (适合剪影/地图主岛)</option>
+              </select>
+            </div>
+
+            <div class="flex items-center justify-between">
+              <label for="svg-min-subpath" class="font-medium text-slate-600 dark:text-slate-300">忽略极小噪点碎片:</label>
+              <select id="svg-min-subpath" class="bg-white dark:bg-[#131b29] border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-sky-500">
+                <option value="0">保留全部子路径 (0%)</option>
+                <option value="0.001" selected>过滤 &lt; 0.1% 总长的碎片</option>
+                <option value="0.005">过滤 &lt; 0.5% 总长的碎片</option>
+                <option value="0.02">过滤 &lt; 2.0% 总长的碎片</option>
+              </select>
+            </div>
+
+            <label class="flex items-center justify-between cursor-pointer select-none pt-0.5">
+              <span class="font-medium text-slate-600 dark:text-slate-300">自动剔除全画幅外框矩形:</span>
+              <input id="svg-filter-rect" type="checkbox" checked class="w-4 h-4 accent-sky-500 rounded cursor-pointer" />
+            </label>
+
+            <label class="flex items-center justify-between cursor-pointer select-none">
+              <span class="font-medium text-slate-600 dark:text-slate-300">支持直接粘贴 SVG 源码文本:</span>
+              <button id="btn-toggle-svg-paste" type="button" class="text-[11px] text-sky-500 hover:underline font-medium">展开粘贴框</button>
+            </label>
+
+            <!-- Collapsible raw SVG code paste box -->
+            <div id="svg-paste-box" class="hidden flex-col gap-2 pt-1">
+              <textarea id="svg-raw-textarea" rows="3" placeholder="在此粘贴 <svg>...</svg> 源码或 <path d='...'/> 字符串" class="w-full rounded-md bg-white dark:bg-[#111726] border border-slate-200 dark:border-slate-700 p-2 text-[11px] font-mono text-slate-700 dark:text-slate-200 focus:outline-none focus:border-sky-500"></textarea>
+              <button id="btn-parse-raw-svg" type="button" class="w-full py-1.5 rounded-md bg-sky-500 hover:bg-sky-600 text-white font-medium text-xs transition">解析粘贴的 SVG 代码</button>
+            </div>
+          </div>
+
+          <!-- SVG File Info Readout -->
+          <div id="svg-info-card" class="hidden bg-sky-500/10 border border-sky-500/30 rounded-lg p-2.5 text-[11px] font-mono text-slate-700 dark:text-sky-200 flex-col gap-1">
+            <div class="flex justify-between">
+              <span class="text-slate-500 dark:text-slate-400">文件名:</span>
+              <span id="info-filename" class="font-semibold truncate max-w-[180px]">map.svg</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-500 dark:text-slate-400">文件大小 / 耗时:</span>
+              <span id="info-filesize">--</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-500 dark:text-slate-400">有效子路径 / 总周长:</span>
+              <span id="info-subpaths">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 2: Harmonics (Circles) & Sampling Controls -->
+        <div class="bg-white dark:bg-[#0d1119] border border-slate-200 dark:border-[#1e2738] rounded-xl p-4 flex flex-col gap-4 shadow-sm">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+              谐波与本轮控制 (Harmonics)
+            </h2>
+            <span id="fidelity-badge" class="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+              能量还原度: 99.98%
+            </span>
+          </div>
+
+          <!-- Circles Slider + Numeric Input -->
+          <div class="flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+              <label for="slider-circles" class="text-xs font-medium text-slate-700 dark:text-slate-200">
+                <span id="label-circles-title">计算本轮数量</span> (<span class="font-mono text-sky-400">N</span>):
+              </label>
+              <div class="flex items-center gap-1.5">
+                <input id="input-circles" type="number" min="1" max="4096" value="256" class="w-20 px-2 py-1 rounded bg-slate-100 dark:bg-[#090d14] border border-slate-200 dark:border-slate-700 font-mono text-xs text-right text-sky-600 dark:text-sky-400 font-bold focus:outline-none focus:border-sky-500" />
+                <span id="label-max-circles" class="text-xs font-mono text-slate-400">/ 2048</span>
+              </div>
+            </div>
+
+            <input id="slider-circles" type="range" min="1" max="2048" value="256" class="w-full" />
+
+            <!-- Quick Step Buttons (aligned with 1, 2, 4, 8, 32, 128, 256, 1024) -->
+            <div class="flex flex-wrap items-center justify-between gap-1 pt-1">
+              <button type="button" data-circle-set="1" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/30 hover:bg-sky-500/10 text-[11px] font-mono transition">1</button>
+              <button type="button" data-circle-set="2" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/30 hover:bg-sky-500/10 text-[11px] font-mono transition">2</button>
+              <button type="button" data-circle-set="4" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/30 hover:bg-sky-500/10 text-[11px] font-mono transition">4</button>
+              <button type="button" data-circle-set="8" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/30 hover:bg-sky-500/10 text-[11px] font-mono transition">8</button>
+              <button type="button" data-circle-set="32" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/30 hover:bg-sky-500/10 text-[11px] font-mono transition">32</button>
+              <button type="button" data-circle-set="128" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/30 hover:bg-sky-500/10 text-[11px] font-mono transition">128</button>
+              <button type="button" data-circle-set="256" class="circle-quick-btn px-2 py-1 rounded bg-sky-500/20 text-sky-600 dark:text-sky-300 border border-sky-500/50 font-semibold text-[11px] font-mono shadow-sm shadow-sky-500/10 transition">256</button>
+              <button type="button" data-circle-set="1024" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/30 hover:bg-sky-500/10 text-[11px] font-mono transition">1024</button>
+            </div>
+          </div>
+
+          <!-- Sample Resolution & Max Displayed Circles -->
+          <div class="grid grid-cols-2 gap-2.5 pt-2 border-t border-slate-200/70 dark:border-slate-800/80 text-xs">
+            <div class="flex flex-col gap-1">
+              <label for="select-samples" class="text-slate-500 dark:text-slate-400 font-medium">采样点精度 (FFT M):</label>
+              <select id="select-samples" class="bg-slate-100 dark:bg-[#090d14] border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-sky-500">
+                <option value="256">256 点 (极速)</option>
+                <option value="512">512 点 (标准)</option>
+                <option value="1024">1024 点 (精细)</option>
+                <option value="2048" selected>2048 点 (支持1024本轮)</option>
+                <option value="4096">4096 点 (超清SVG)</option>
+                <option value="8192">8192 点 (5MB+巨型图)</option>
+              </select>
+            </div>
+
+            <div class="flex flex-col gap-1">
+              <label for="select-shown-circles" class="text-slate-500 dark:text-slate-400 font-medium">每组最多渲染圆环:</label>
+              <select id="select-shown-circles" class="bg-slate-100 dark:bg-[#090d14] border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-sky-500">
+                <option value="64">前 64 个大圆</option>
+                <option value="128" selected>前 128 个圆 (视频同款)</option>
+                <option value="256">前 256 个圆</option>
+                <option value="512">前 512 个圆</option>
+                <option value="99999">显示全部圆环</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 3: Playback, Auto-Step (Video Mode) & 9:16 Ultra-HD Recording -->
+        <div class="bg-white dark:bg-[#0d1119] border border-slate-200 dark:border-[#1e2738] rounded-xl p-4 flex flex-col gap-4 shadow-sm">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
+              9:16 超清竖屏动画与录制 (Playback & UHD Export)
+            </h2>
+            <span id="cycle-progress-label" class="text-[11px] font-mono text-slate-400">t = 0.000</span>
+          </div>
+
+          <!-- Primary Transport Buttons -->
+          <div class="grid grid-cols-2 gap-2">
+            <button id="btn-play-pause" type="button" class="py-2.5 px-3 rounded-lg bg-sky-500 hover:bg-sky-600 text-white font-semibold text-xs transition flex items-center justify-center gap-2 shadow-sm shadow-sky-500/20">
+              <span id="play-icon">⏸</span>
+              <span id="play-label">暂停动画 (Pause)</span>
+            </button>
+            <button id="btn-reset-cycle" type="button" class="py-2.5 px-3 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs transition flex items-center justify-center gap-1.5">
+              <span>↺</span>
+              <span>重绘当前周期</span>
+            </button>
+          </div>
+
+          <!-- Video Auto-Step 1 -> 1024 Mode Button -->
+          <div class="flex flex-col gap-1.5">
+            <button id="btn-autostep" type="button" class="w-full py-2.5 px-3 rounded-lg border border-sky-500/40 bg-gradient-to-r from-sky-500/15 via-indigo-500/15 to-sky-500/15 hover:from-sky-500/25 hover:to-indigo-500/25 text-sky-600 dark:text-sky-300 font-semibold text-xs transition flex items-center justify-between">
+              <span class="flex items-center gap-2">
+                <span id="autostep-dot" class="w-2 h-2 rounded-full bg-slate-400"></span>
+                <span>🎬 视频同款递增演示 (1 → 1024 自动闯关)</span>
+              </span>
+              <span id="autostep-status" class="font-mono text-[11px] px-1.5 py-0.5 rounded bg-slate-900/40">OFF</span>
+            </button>
+            <div class="text-[11px] font-mono text-slate-500 dark:text-slate-400 px-1 flex items-center justify-between">
+              <span>闯关序列:</span>
+              <span class="text-sky-500 dark:text-sky-400">1 → 2 → 4 → 8 → 32 → 128 → 256 → 1024</span>
+            </div>
+          </div>
+
+          <!-- 9:16 Ultra-HD Download Drawing Animation Panel -->
+          <div class="p-3 rounded-xl bg-slate-50 dark:bg-[#090d14] border border-slate-200/80 dark:border-slate-800 flex flex-col gap-2.5">
+            <div class="flex items-center justify-between text-xs gap-2">
+              <span class="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 shrink-0">
+                <span>📐</span>
+                <span>9:16 竖屏清晰度:</span>
+              </span>
+              <select id="select-video-res" class="bg-white dark:bg-[#131b29] border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1 text-[11px] font-mono text-sky-600 dark:text-sky-300 font-semibold focus:outline-none focus:border-sky-500 w-full">
+                <option value="1080" selected>1080P 全高清竖屏 (1080 × 1920 · 30 Mbps)</option>
+                <option value="1440">2K 超清竖屏 (1440 × 2560 · 45 Mbps)</option>
+                <option value="2160">4K 极清竖屏 (2160 × 3840 · 60 Mbps)</option>
+              </select>
+            </div>
+
+            <div class="flex items-center justify-between text-xs gap-2">
+              <span class="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 shrink-0">
+                <span>🎥</span>
+                <span>录制动画模式:</span>
+              </span>
+              <select id="select-record-mode" class="bg-white dark:bg-[#131b29] border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1 text-[11px] text-slate-700 dark:text-slate-200 focus:outline-none focus:border-sky-500 w-full">
+                <option value="autostep" selected>完整递增过程 (1 → 1024 全程共8关)</option>
+                <option value="cycle">仅当前本轮单周期 (0 → 100%)</option>
+                <option value="manual">手动控制开始/结束</option>
+              </select>
+            </div>
+
+            <button id="btn-download-anim" type="button" class="w-full py-2.5 px-3 rounded-lg bg-gradient-to-r from-emerald-500 to-sky-500 hover:from-emerald-600 hover:to-sky-600 text-white font-semibold text-xs transition flex items-center justify-center gap-2 shadow-sm shadow-sky-500/20">
+              <span id="record-btn-dot" class="w-2 h-2 rounded-full bg-white"></span>
+              <span id="record-btn-text">一键录制 9:16 超清 1→1024 全过程视频</span>
+            </button>
+          </div>
+
+          <!-- Speed Slider -->
+          <div class="flex flex-col gap-1.5">
+            <div class="flex justify-between text-xs">
+              <label for="slider-speed" class="text-slate-600 dark:text-slate-300 font-medium">旋转绘制速度 (Speed):</label>
+              <span id="label-speed" class="font-mono text-sky-500 font-semibold">1.0x</span>
+            </div>
+            <input id="slider-speed" type="range" min="0.1" max="4.0" step="0.05" value="1.0" class="w-full" />
+          </div>
+
+          <!-- Visibility & Camera Toggles -->
+          <div class="pt-2 border-t border-slate-200/70 dark:border-slate-800/80 grid grid-cols-2 gap-2 text-xs">
+            <label class="flex items-center gap-2 cursor-pointer select-none p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/50">
+              <input id="chk-show-circles" type="checkbox" checked class="w-4 h-4 accent-sky-500 rounded" />
+              <span>显示本轮圆环</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer select-none p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/50">
+              <input id="chk-show-radii" type="checkbox" checked class="w-4 h-4 accent-sky-500 rounded" />
+              <span>显示旋转半径</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer select-none p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/50">
+              <input id="chk-show-original" type="checkbox" class="w-4 h-4 accent-sky-500 rounded" />
+              <span>显示原始底图轮廓</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer select-none p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/50">
+              <input id="chk-video-hud" type="checkbox" checked class="w-4 h-4 accent-sky-500 rounded" />
+              <span>显示数值展开与 HUD</span>
+            </label>
+            <label class="col-span-2 flex items-center justify-between cursor-pointer select-none p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/50">
+              <span class="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-medium">
+                <input id="chk-show-projection" type="checkbox" checked class="w-4 h-4 accent-emerald-500 rounded" />
+                <span>📐 显示正交双环投影虚线与坐标辅助框 (Orthogonal Guides)</span>
+              </span>
+            </label>
+            <label class="col-span-2 flex items-center justify-between cursor-pointer select-none p-1.5 rounded-lg bg-slate-50 dark:bg-[#090d14] border border-slate-200/60 dark:border-slate-800">
+              <span class="flex items-center gap-2 font-medium text-sky-600 dark:text-sky-400">
+                <input id="chk-follow-tip" type="checkbox" class="w-4 h-4 accent-sky-500 rounded" />
+                <span>🔍 镜头跟随末端画笔放大 (Follow Pen Tip)</span>
+              </span>
+              <select id="select-follow-zoom" class="bg-white dark:bg-[#131b29] border border-slate-200 dark:border-slate-700 rounded px-1.5 py-0.5 font-mono text-[11px]">
+                <option value="3">3x 放大</option>
+                <option value="6" selected>6x 放大</option>
+                <option value="12">12x 显微</option>
+                <option value="25">25x 超微</option>
+              </select>
+            </label>
+          </div>
+        </div>
+      </aside>
+
+      <!-- RIGHT COLUMN: 9:16 Vertical Stage & Live Frequency Spectrum (7 cols on desktop) -->
+      <section class="lg:col-span-7 flex flex-col gap-4">
+
+        <!-- Main 9:16 Vertical Showcase Card -->
+        <div class="relative bg-[#070a11] border border-slate-200 dark:border-[#1e2738] rounded-2xl overflow-hidden shadow-xl flex flex-col">
+
+          <!-- Top Stage Control Bar -->
+          <div class="px-4 py-2.5 bg-slate-900/95 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
+            <div class="flex flex-wrap items-center gap-2 text-xs font-mono text-slate-200">
+              <span class="px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30 font-semibold" id="res-pill-badge">9:16 · 1080×1920</span>
+              <span class="text-sky-400 font-semibold" id="top-bar-circles">本轮数量: 256</span>
+              <span class="text-slate-600">·</span>
+              <span id="top-bar-rms">相对 RMS 误差: 0.3120%</span>
+            </div>
+
+            <div class="flex items-center gap-1.5">
+              <!-- Quick One-Click Mode Switcher Button right above the 9:16 Canvas -->
+              <button id="btn-stage-mode-toggle" type="button" title="在复数单链模式与正交双圆环投影模式之间切换" class="px-2.5 h-7 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 flex items-center justify-center gap-1.5 text-xs font-medium transition">
+                <span id="stage-mode-icon">📐</span>
+                <span id="stage-mode-label">切换: 正交双环投影</span>
+              </button>
+
+              <button id="btn-zoom-in" type="button" title="放大画布" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 flex items-center justify-center text-sm font-mono transition">+</button>
+              <button id="btn-zoom-out" type="button" title="缩小画布" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 flex items-center justify-center text-sm font-mono transition">−</button>
+              <button id="btn-reset-view" type="button" title="重置平移与缩放视角" class="px-2.5 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 flex items-center justify-center text-xs transition">
+                重置视角
+              </button>
+            </div>
+          </div>
+
+          <!-- Centered 9:16 Vertical Stage Area -->
+          <div class="w-full py-4 px-3 sm:px-6 flex items-center justify-center bg-gradient-to-b from-[#080c14] via-[#05070b] to-[#080c14]">
+            <!-- Strict 9:16 Portrait Canvas Wrapper -->
+            <div id="canvas-wrapper" class="relative w-full max-w-[430px] sm:max-w-[468px] stage-9-16 mx-auto rounded-2xl overflow-hidden border border-sky-500/30 shadow-[0_0_50px_rgba(2,132,199,0.18)] bg-[#05070b] select-none cursor-grab active:cursor-grabbing">
+              <canvas id="epicycle-canvas" width="1080" height="1920" class="block w-full h-full"></canvas>
+
+              <!-- Loading Overlay for Huge 5MB+ SVG Parsing -->
+              <div id="svg-loading-overlay" class="hidden absolute inset-0 bg-slate-950/85 glass-panel z-20 flex-col items-center justify-center gap-3 text-center p-6">
+                <div class="w-10 h-10 border-2 border-sky-400 border-t-transparent rounded-full animate-spin"></div>
+                <p id="loading-title" class="text-sm font-semibold text-white">正在解析大型 SVG 矢量路径...</p>
+                <p id="loading-subtitle" class="text-xs font-mono text-sky-300">正在提取几何矩阵与执行快速傅里叶变换 (FFT)</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Canvas Hint Bar -->
+          <div class="px-4 py-2 bg-slate-900/95 border-t border-slate-800/80 text-[11px] text-slate-400 flex flex-wrap items-center justify-between gap-2">
+            <span id="canvas-interaction-hint">💡 竖屏 9:16 舞台：支持滚轮缩放、左键拖拽平移；录制的视频与截图均为原生 9:16 超清竖屏比例。</span>
+            <span id="terms-used-readout" class="font-mono text-slate-300">已显示 128 个本轮 · 参与计算 256 个本轮</span>
+          </div>
+        </div>
+
+        <!-- Live Frequency Spectrum Card (profpi style) -->
+        <div class="bg-white dark:bg-[#0d1119] border border-slate-200 dark:border-[#1e2738] rounded-xl p-4 flex flex-col gap-3 shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 id="spectrum-card-title" class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                <span>📊 实时复数傅里叶频谱图 (Frequency Spectrum |c<sub>k</sub>|)</span>
+              </h3>
+              <p id="spectrum-card-desc" class="text-[11px] text-slate-500 dark:text-slate-400">
+                横轴为旋转频率 k（负频率顺时针旋转，正频率逆时针旋转），纵轴为圆环半径 |c<sub>k</sub>|。亮蓝色代表当前参与绘图的本轮，暗灰色为已截断的高频项。
+              </p>
+            </div>
+            <div class="flex items-center gap-2 text-xs">
+              <button id="btn-spectrum-scale" type="button" class="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-[11px] hover:border-sky-500 border border-transparent transition">
+                纵轴: 对数刻度 (Log)
+              </button>
+            </div>
+          </div>
+
+          <div class="w-full h-32 sm:h-36 bg-slate-50 dark:bg-[#070a10] border border-slate-200/70 dark:border-slate-800/80 rounded-lg overflow-hidden relative">
+            <canvas id="spectrum-canvas" class="block w-full h-full"></canvas>
+          </div>
+        </div>
+
+      </section>
+    </div>
+
+    <!-- Bottom Educational Cards (Modeled after profpi.com/tools/fourier-explorer/) -->
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 pb-8">
+      <!-- Card 1 -->
+      <div class="bg-white dark:bg-[#0d1119] border border-slate-200 dark:border-[#1e2738] rounded-xl p-5 flex flex-col gap-2.5 shadow-sm">
+        <div class="flex items-center gap-2 text-sky-600 dark:text-sky-400 font-semibold text-sm">
+          <span class="w-6 h-6 rounded-md bg-sky-500/15 flex items-center justify-center font-mono text-xs">01</span>
+          <h4>复数单链 vs 正交双圆环投影</h4>
+        </div>
+        <p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+          在<strong>复数单链模式</strong>下，曲线被视为复平面上的周期信号 $z(t) = x(t) + i y(t)$，由一组包含正负频率 $k$ 的旋转向量 $c_k e^{2\pi i k t}$ 首尾相连直接画出。而在<strong>正交双环投影模式</strong>下，我们将 $x(t)$ 和 $y(t)$ 拆分为两个独立的实数傅里叶级数：上方圆环组只负责计算水平分量 $x(t)$，左方圆环组只负责计算垂直分量 $y(t)$，两者的正交投影延长线在右下角交汇出完整轨迹。
+        </p>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="bg-white dark:bg-[#0d1119] border border-slate-200 dark:border-[#1e2738] rounded-xl p-5 flex flex-col gap-2.5 shadow-sm">
+        <div class="flex items-center gap-2 text-sky-600 dark:text-sky-400 font-semibold text-sm">
+          <span class="w-6 h-6 rounded-md bg-sky-500/15 flex items-center justify-center font-mono text-xs">02</span>
+          <h4>为什么截断仍能还原与 RMS 误差</h4>
+        </div>
+        <p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+          我们将所有频率项按振幅从大到小排序。排在最前面的大圆决定了图形的整体宏观轮廓（低频骨架），而排在后面的微小圆环则以极高的转速修补边角与海岸线锯齿（高频细节）。根据帕塞瓦尔定理（Parseval's theorem），无论是复数单链还是正交双链，相对均方根误差都精准反映了未包含圆环的能量占比。
+        </p>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="bg-white dark:bg-[#0d1119] border border-slate-200 dark:border-[#1e2738] rounded-xl p-5 flex flex-col gap-2.5 shadow-sm">
+        <div class="flex items-center gap-2 text-sky-600 dark:text-sky-400 font-semibold text-sm">
+          <span class="w-6 h-6 rounded-md bg-sky-500/15 flex items-center justify-center font-mono text-xs">03</span>
+          <h4>9:16 超清渲染与大型 SVG 智能拼接</h4>
+        </div>
+        <p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+          画布内置独立于屏幕尺寸的 <strong>9:16 超高清帧缓冲（支持 1080×1920、1440×2560 及 2160×3840 4K 竖屏）</strong>，配合高达 30–60 Mbps 码率的 60FPS 视频编码器，两种模式录制的竖屏视频均纤毫毕现。同时支持本地直接解析 <strong>5MB–20MB+ 的大型 SVG</strong> 并自动串联多段子路径。
+        </p>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    /**
+     * ============================================================================
+     * PROFPI · FOURIER EXPLORER PRO — CORE APPLICATION ENGINE (9:16 ULTRA-HD EDITION)
+     * Includes:
+     * 1. Radix-2 Cooley-Tukey Fast Fourier Transform (FFT) for instant 4096/8192 pts
+     * 2. Dual Mode Engine:
+     *    - Complex Single-Chain Epicycle Mode (z(t) = sum c_k e^{2*pi*i*k*t})
+     *    - Orthogonal Dual-Epicycle Projection Mode (Independent Top X(t) & Left Y(t) real Fourier series)
+     * 3. Unrestricted Large SVG Parser (5MB–20MB+) with compound path splitter & CTM
+     * 4. Greedy Nearest-Neighbor Multi-Path Stitcher
+     * 5. True 9:16 Vertical Ultra-HD Renderer (1080P / 2K / 4K) & High-Bitrate 60FPS Recorder
+     * ============================================================================
+     */
+
+    // Custom 8-stage progression sequence of circle counts:
+    const VIDEO_AUTO_STEPS = [1, 2, 4, 8, 32, 128, 256, 1024];
+
+    // 9:16 Vertical Resolution Presets (Width x Height & Target Bitrate)
+    const VIDEO_RES_PRESETS = {
+      1080: { width: 1080, height: 1920, bitrate: 30000000, label: '1080P (1080×1920)' },
+      1440: { width: 1440, height: 2560, bitrate: 45000000, label: '2K (1440×2560)' },
+      2160: { width: 2160, height: 3840, bitrate: 60000000, label: '4K (2160×3840)' }
+    };
+
+    // Orthogonal Mode World Layout Constants (arranged cleanly so Top Chain, Left Chain, and Bottom-Right Drawing Area never overlap)
+    const ORTHO_LAYOUT = {
+      drawOffsetX: 0.92,
+      drawOffsetY: 0.92,
+      topChainCenterY: -1.22,
+      leftChainCenterX: -1.22
+    };
+
+    // --- Application State ---
+    const state = {
+      shapeName: '爱心 (HEART)',
+      epicycleMode: 'complex',   // 'complex' | 'orthogonal'
+      rawSubpaths: [],           // Array of subpaths (each is array of {x, y}) before resampling
+      sampledPoints: [],         // Uniformly resampled M complex points [{x, y}]
+      sampleCount: 2048,         // Power of 2: 256, 512, 1024, 2048, 4096, 8192
+
+      // Complex Mode Harmonics
+      harmonics: [],             // Sorted by amplitude descending: { freq, re, im, amp, phase }
+      harmonicsByFreq: [],       // Ordered by frequency k from -M/2 to +M/2 for Spectrum Chart
+
+      // Orthogonal Mode Real Harmonics (Top X-chain & Left Y-chain)
+      harmonicsX: [],            // Sorted by amp descending: { freq, amp, phase, energy } for x(t) = x0 + sum amp * cos(2*pi*k*t + phase)
+      harmonicsY: [],            // Sorted by amp descending: { freq, amp, phase, cosPhase, energy } for y(t) = y0 + sum amp * sin(2*pi*k*t + phase)
+      orthoByFreq: [],           // Ordered by positive frequency k = 1 ... M/2 for Dual Spectrum Chart
+
+      dcTerm: { re: 0, im: 0 },  // k = 0 center offset (x0, y0)
+      totalVarianceEnergy: 1,    // Sum of |c_k|^2 for k != 0
+
+      // Cached Real-Time Numerical Expansion Strings for Top Canvas Display
+      expansionFormulaX: '',
+      expansionFormulaY: '',
+      expansionShownTerms: 0,
+
+      // Controls
+      numCircles: 256,
+      maxShownCircles: 128,
+      isPlaying: true,
+      speed: 1.0,
+      t: 0,                      // Time parameter in [0, 1]
+      trail: [],                 // Drawn pen path [{x, y}] in curve coordinates
+
+      // Auto-Step (1 -> 1024 progression mode)
+      autoStepEnabled: false,
+      autoStepIndex: 0,
+      pauseHoldTimer: 0,
+
+      // Visibility & View
+      showCircles: true,
+      showRadii: true,
+      showOriginal: false,
+      showVideoHud: true,
+      showProjectionLines: true,
+      followTip: false,
+      followZoom: 6,
+      spectrumLogScale: true,
+      soundEnabled: false,
+
+      // 9:16 Ultra-HD Canvas Resolution (Locked 9:16 Aspect Ratio)
+      videoWidth: 1080,
+      videoHeight: 1920,
+      videoBitrate: 30000000,
+
+      // Camera Pan/Zoom (camPanX/Y stored in virtual 540x960 stage units)
+      camZoom: 1.0,
+      camPanX: 0,
+      camPanY: 0,
+      isDraggingCanvas: false,
+      dragStartX: 0,
+      dragStartY: 0,
+
+      // Video Recording State
+      isRecording: false,
+      recordMode: 'autostep',    // 'autostep' | 'cycle' | 'manual'
+      mediaRecorder: null,
+      recordedChunks: [],
+      recordMimeType: '',
+      recordFileExt: 'webm',
+
+      // Last Loaded SVG Metadata
+      lastSvgElement: null,
+      lastSvgMeta: null
+    };
+
+    // --- Web Audio API Synthesizer for Subtle Video Cycle Chime ---
+    let audioCtx = null;
+    function playCycleChime(stepRatio = 0.5) {
+      if (!state.soundEnabled) return;
+      try {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        const now = audioCtx.currentTime;
+        const osc = new OscillatorNode(audioCtx, { type: 'sine' });
+        const gain = new GainNode(audioCtx);
+        const baseFreq = 220 + stepRatio * 180;
+        osc.frequency.setValueAtTime(baseFreq, now);
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.exponentialRampToValueAtTime(0.08, now + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.65);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.7);
+      } catch (e) {
+        // Ignore audio context restrictions
+      }
+    }
+
+    // ============================================================================
+    // 1. RADIX-2 COOLEY-TUKEY FAST FOURIER TRANSFORM (FFT)
+    // Computes both Complex Harmonics c_k AND Orthogonal Real Harmonics (X_k, Y_k)
+    // ============================================================================
+    function computeFFT(points) {
+      const M = points.length;
+      const re = new Float64Array(M);
+      const im = new Float64Array(M);
+      for (let i = 0; i < M; i++) {
+        re[i] = points[i].x;
+        im[i] = points[i].y;
+      }
+
+      // Bit-reversal permutation
+      let j = 0;
+      for (let i = 0; i < M; i++) {
+        if (i < j) {
+          const tr = re[i]; re[i] = re[j]; re[j] = tr;
+          const ti = im[i]; im[i] = im[j]; im[j] = ti;
+        }
+        let m = M >> 1;
+        while (m >= 1 && j >= m) {
+          j -= m;
+          m >>= 1;
+        }
+        j += m;
+      }
+
+      // Butterfly updates
+      for (let len = 2; len <= M; len <<= 1) {
+        const halfLen = len >> 1;
+        const angleStep = (-2 * Math.PI) / len;
+        const wStepRe = Math.cos(angleStep);
+        const wStepIm = Math.sin(angleStep);
+
+        for (let i = 0; i < M; i += len) {
+          let wRe = 1.0;
+          let wIm = 0.0;
+          for (let k = 0; k < halfLen; k++) {
+            const evenIdx = i + k;
+            const oddIdx = i + k + halfLen;
+
+            const uRe = re[evenIdx];
+            const uIm = im[evenIdx];
+            const vRe = re[oddIdx] * wRe - im[oddIdx] * wIm;
+            const vIm = re[oddIdx] * wIm + im[oddIdx] * wRe;
+
+            re[evenIdx] = uRe + vRe;
+            im[evenIdx] = uIm + vIm;
+            re[oddIdx] = uRe - vRe;
+            im[oddIdx] = uIm - vIm;
+
+            const nextWRe = wRe * wStepRe - wIm * wStepIm;
+            wIm = wRe * wStepIm + wIm * wStepRe;
+            wRe = nextWRe;
+          }
+        }
+      }
+
+      // 1A. Normalize by 1/M and map indices to centered frequencies [-M/2, ..., M/2 - 1]
+      const nonZeroHarmonics = [];
+      const byFreq = [];
+      let dcTerm = { re: re[0] / M, im: im[0] / M, freq: 0, amp: 0, phase: 0 };
+      let totalEnergy = 0;
+
+      for (let idx = 0; idx < M; idx++) {
+        const cRe = re[idx] / M;
+        const cIm = im[idx] / M;
+        const freq = idx < (M >> 1) ? idx : idx - M;
+        const amp = Math.hypot(cRe, cIm);
+        const phase = Math.atan2(cIm, cRe);
+
+        const item = { freq, re: cRe, im: cIm, amp, phase };
+        byFreq.push(item);
+
+        if (freq === 0) {
+          dcTerm = item;
+        } else {
+          nonZeroHarmonics.push(item);
+          totalEnergy += amp * amp;
+        }
+      }
+
+      // 1B. Decompose into two independent Real Fourier Series for Orthogonal X(t) and Y(t) modes:
+      // For each positive frequency k = 1 ... M/2:
+      //   c_k = re[k]/M + i*im[k]/M,  c_{-k} = re[M-k]/M + i*im[M-k]/M
+      //   X_k = (c_k + conj(c_{-k})) / 2
+      //   Y_k = (c_k - conj(c_{-k})) / (2i)
+      //   For 1 <= k < M/2, multiplicity m_k = 2; for k = M/2 (Nyquist), m_k = 1.
+      const halfM = M >> 1;
+      const harmonicsX = [];
+      const harmonicsY = [];
+      const orthoByFreq = [];
+
+      for (let k = 1; k <= halfM; k++) {
+        const isNyquist = k === halfM;
+        const mult = isNyquist ? 1.0 : 2.0;
+        const energyWeight = isNyquist ? 1.0 : 0.5;
+
+        const ckRe = re[k] / M;
+        const ckIm = im[k] / M;
+        const cmkRe = re[M - k] / M;
+        const cmkIm = im[M - k] / M;
+
+        // Real signal X(t) complex coefficient X_k
+        const xkRe = 0.5 * (ckRe + cmkRe);
+        const xkIm = 0.5 * (ckIm - cmkIm);
+        const ampX = mult * Math.hypot(xkRe, xkIm);
+        const phaseX = Math.atan2(xkIm, xkRe);
+        const energyX = energyWeight * ampX * ampX;
+
+        // Real signal Y(t) complex coefficient Y_k = (c_k - conj(c_{-k})) / (2i)
+        const ykRe = 0.5 * (ckIm + cmkIm);
+        const ykIm = 0.5 * (cmkRe - ckRe);
+        const ampY = mult * Math.hypot(ykRe, ykIm);
+        const cosPhaseY = Math.atan2(ykIm, ykRe);
+        // Shift phase by +pi/2 so that ampY * sin(2*pi*k*t + phaseY) === ampY * cos(2*pi*k*t + cosPhaseY)
+        // This ensures the Left Epicycle Chain's VERTICAL coordinate (sin) directly projects horizontally onto Y(t)!
+        const phaseY = Math.atan2(
+          Math.sin(cosPhaseY + Math.PI / 2),
+          Math.cos(cosPhaseY + Math.PI / 2)
+        );
+        const energyY = energyWeight * ampY * ampY;
+
+        const itemX = { freq: k, amp: ampX, phase: phaseX, energy: energyX };
+        const itemY = { freq: k, amp: ampY, phase: phaseY, cosPhase: cosPhaseY, energy: energyY };
+
+        harmonicsX.push(itemX);
+        harmonicsY.push(itemY);
+        orthoByFreq.push({ freq: k, ampX, ampY, energyX, energyY });
+      }
+
+      // Sort by frequency ascending for spectrum chart
+      byFreq.sort((a, b) => a.freq - b.freq);
+
+      // Sort non-zero harmonics by amplitude descending (largest epicycles first!)
+      nonZeroHarmonics.sort((a, b) => b.amp - a.amp);
+      harmonicsX.sort((a, b) => b.amp - a.amp);
+      harmonicsY.sort((a, b) => b.amp - a.amp);
+
+      state.dcTerm = dcTerm;
+      state.harmonics = nonZeroHarmonics;
+      state.harmonicsByFreq = byFreq;
+      state.harmonicsX = harmonicsX;
+      state.harmonicsY = harmonicsY;
+      state.orthoByFreq = orthoByFreq;
+      state.totalVarianceEnergy = Math.max(totalEnergy, 1e-12);
+    }
+
+    // Helper: Maximum selectable circles N for the current mode
+    function getMaxSelectableCircles() {
+      if (state.epicycleMode === 'orthogonal') {
+        return Math.max(1, state.harmonicsX.length);
+      }
+      return Math.max(1, state.harmonics.length);
+    }
+
+    // Compute Relative RMS Error and Fidelity for current N circles in either mode
+    function computeErrorMetrics(N) {
+      let capturedEnergy = 0;
+      if (state.epicycleMode === 'orthogonal') {
+        const countX = Math.min(N, state.harmonicsX.length);
+        const countY = Math.min(N, state.harmonicsY.length);
+        for (let i = 0; i < countX; i++) {
+          capturedEnergy += state.harmonicsX[i].energy;
+        }
+        for (let i = 0; i < countY; i++) {
+          capturedEnergy += state.harmonicsY[i].energy;
+        }
+      } else {
+        const count = Math.min(N, state.harmonics.length);
+        for (let i = 0; i < count; i++) {
+          const a = state.harmonics[i].amp;
+          capturedEnergy += a * a;
+        }
+      }
+      const ratio = Math.min(1, capturedEnergy / state.totalVarianceEnergy);
+      const residualRatio = Math.max(0, 1 - ratio);
+      const rmsErrorPercent = Math.sqrt(residualRatio) * 100;
+      const fidelityPercent = ratio * 100;
+      return { rmsErrorPercent, fidelityPercent };
+    }
+
+    /**
+     * Builds the real-time numerical series expansion strings for the current shape, mode, and active N circles
+     */
+    function updateNumericalExpansionStrings() {
+      const maxExplicitTerms = 2; // 2 explicit terms fit cleanly on 9:16 portrait HUD
+      const formatSignedZero = (v) => (Math.abs(v) < 0.0005 ? '0.00' : v.toFixed(2));
+      const x0Str = formatSignedZero(state.dcTerm.re);
+      const y0Str = formatSignedZero(state.dcTerm.im);
+
+      if (state.epicycleMode === 'orthogonal') {
+        const activeLimit = Math.min(state.numCircles, state.harmonicsX.length);
+        const shownCount = Math.min(activeLimit, maxExplicitTerms);
+        state.expansionShownTerms = shownCount;
+
+        const xTerms = [];
+        const yTerms = [];
+
+        for (let i = 0; i < shownCount; i++) {
+          const hx = state.harmonicsX[i];
+          const rxStr = hx.amp.toFixed(3);
+          const kxStr = String(hx.freq);
+          const phxAbs = Math.abs(hx.phase).toFixed(2);
+          const phxSign = hx.phase >= 0 ? '+' : '-';
+          xTerms.push(`${rxStr}·cos(2π(${kxStr})t${phxSign}${phxAbs})`);
+
+          const hy = state.harmonicsY[i];
+          const ryStr = hy.amp.toFixed(3);
+          const kyStr = String(hy.freq);
+          const phyAbs = Math.abs(hy.phase).toFixed(2);
+          const phySign = hy.phase >= 0 ? '+' : '-';
+          yTerms.push(`${ryStr}·sin(2π(${kyStr})t${phySign}${phyAbs})`);
+        }
+
+        const remaining = activeLimit - shownCount;
+        const eqSymbol = remaining > 0 ? '≈' : '=';
+        const tailStr = remaining > 0 ? ` + ··· [+${remaining}项]` : '';
+
+        state.expansionFormulaX = `X上(t) ${eqSymbol} ${x0Str}${xTerms.length ? ' + ' + xTerms.join(' + ') : ''}${tailStr}`;
+        state.expansionFormulaY = `Y左(t) ${eqSymbol} ${y0Str}${yTerms.length ? ' + ' + yTerms.join(' + ') : ''}${tailStr}`;
+      } else {
+        const activeLimit = Math.min(state.numCircles, state.harmonics.length);
+        const shownCount = Math.min(activeLimit, maxExplicitTerms);
+        state.expansionShownTerms = shownCount;
+
+        const xTerms = [];
+        const yTerms = [];
+
+        for (let i = 0; i < shownCount; i++) {
+          const h = state.harmonics[i];
+          const rStr = h.amp.toFixed(3);
+          const kStr = String(h.freq);
+          const phiAbs = Math.abs(h.phase).toFixed(2);
+          const phiSign = h.phase >= 0 ? '+' : '-';
+          xTerms.push(`${rStr}·cos(2π(${kStr})t${phiSign}${phiAbs})`);
+          yTerms.push(`${rStr}·sin(2π(${kStr})t${phiSign}${phiAbs})`);
+        }
+
+        const remaining = activeLimit - shownCount;
+        const eqSymbol = remaining > 0 ? '≈' : '=';
+        const tailStr = remaining > 0 ? ` + ··· [+${remaining}项]` : '';
+
+        state.expansionFormulaX = `x(t) ${eqSymbol} ${x0Str}${xTerms.length ? ' + ' + xTerms.join(' + ') : ''}${tailStr}`;
+        state.expansionFormulaY = `y(t) ${eqSymbol} ${y0Str}${yTerms.length ? ' + ' + yTerms.join(' + ') : ''}${tailStr}`;
+      }
+    }
+
+    // ============================================================================
+    // 2. UNRESTRICTED LARGE SVG PARSER & MULTI-PATH STITCHING ENGINE (HARDENED)
+    // ============================================================================
+    function matIdentity() {
+      return [1, 0, 0, 1, 0, 0];
+    }
+
+    function matMultiply(m1, m2) {
+      return [
+        m1[0] * m2[0] + m1[2] * m2[1],
+        m1[1] * m2[0] + m1[3] * m2[1],
+        m1[0] * m2[2] + m1[2] * m2[3],
+        m1[1] * m2[2] + m1[3] * m2[3],
+        m1[0] * m2[4] + m1[2] * m2[5] + m1[4],
+        m1[1] * m2[4] + m1[3] * m2[5] + m1[5]
+      ];
+    }
+
+    function applyMatToPoint(m, x, y) {
+      return {
+        x: m[0] * x + m[2] * y + m[4],
+        y: m[1] * x + m[3] * y + m[5]
+      };
+    }
+
+    function parseTransformAttribute(transformStr) {
+      if (!transformStr || typeof transformStr !== 'string') return matIdentity();
+      let current = matIdentity();
+      const regex = /([a-zA-Z]+)\s*\(([^)]*)\)/g;
+      let match;
+      while ((match = regex.exec(transformStr)) !== null) {
+        const type = match[1].toLowerCase();
+        const args = (match[2].match(/[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/g) || []).map(Number);
+        if (args.length === 0) continue;
+
+        let m = matIdentity();
+        if (type === 'matrix' && args.length >= 6) {
+          m = [args[0], args[1], args[2], args[3], args[4], args[5]];
+        } else if (type === 'translate') {
+          const tx = args[0] || 0;
+          const ty = args.length > 1 ? args[1] : 0;
+          m = [1, 0, 0, 1, tx, ty];
+        } else if (type === 'scale') {
+          const sx = args[0];
+          const sy = args.length > 1 ? args[1] : sx;
+          m = [sx, 0, 0, sy, 0, 0];
+        } else if (type === 'rotate') {
+          const rad = ((args[0] || 0) * Math.PI) / 180;
+          const cos = Math.cos(rad);
+          const sin = Math.sin(rad);
+          if (args.length >= 3) {
+            const cx = args[1], cy = args[2];
+            m = matMultiply([1, 0, 0, 1, cx, cy], matMultiply([cos, sin, -sin, cos, 0, 0], [1, 0, 0, 1, -cx, -cy]));
+          } else {
+            m = [cos, sin, -sin, cos, 0, 0];
+          }
+        } else if (type === 'skewx') {
+          const rad = ((args[0] || 0) * Math.PI) / 180;
+          m = [1, 0, Math.tan(rad), 1, 0, 0];
+        } else if (type === 'skewy') {
+          const rad = ((args[0] || 0) * Math.PI) / 180;
+          m = [1, Math.tan(rad), 0, 1, 0, 0];
+        }
+        current = matMultiply(current, m);
+      }
+      return current;
+    }
+
+    function getCumulativeTransform(el, rootSvg) {
+      const chain = [];
+      let cur = el;
+      while (cur && cur.nodeType === 1) {
+        chain.unshift(cur);
+        if (cur === rootSvg) break;
+        cur = cur.parentNode;
+      }
+      let mat = matIdentity();
+      for (let i = 0; i < chain.length; i++) {
+        const node = chain[i];
+        const tAttr = node.getAttribute && node.getAttribute('transform');
+        if (tAttr) {
+          mat = matMultiply(mat, parseTransformAttribute(tAttr));
+        }
+        const styleAttr = node.getAttribute && node.getAttribute('style');
+        if (styleAttr && styleAttr.includes('transform')) {
+          const m = styleAttr.match(/transform\s*:\s*([^;]+)/i);
+          if (m && m[1]) {
+            mat = matMultiply(mat, parseTransformAttribute(m[1]));
+          }
+        }
+      }
+      return mat;
+    }
+
+    function sampleCubicBezier(x0, y0, x1, y1, x2, y2, x3, y3, outPts) {
+      const chord = Math.hypot(x3 - x0, y3 - y0);
+      const net = Math.hypot(x1 - x0, y1 - y0) + Math.hypot(x2 - x1, y2 - y1) + Math.hypot(x3 - x2, y3 - y2);
+      const steps = Math.max(4, Math.min(36, Math.ceil(6 + (net - chord) * 0.25 + net * 0.04)));
+      for (let s = 1; s <= steps; s++) {
+        const t = s / steps;
+        const mt = 1 - t;
+        const a = mt * mt * mt;
+        const b = 3 * mt * mt * t;
+        const c = 3 * mt * t * t;
+        const d = t * t * t;
+        outPts.push({
+          x: a * x0 + b * x1 + c * x2 + d * x3,
+          y: a * y0 + b * y1 + c * y2 + d * y3
+        });
+      }
+    }
+
+    function sampleQuadBezier(x0, y0, x1, y1, x2, y2, outPts) {
+      const net = Math.hypot(x1 - x0, y1 - y0) + Math.hypot(x2 - x1, y2 - y1);
+      const steps = Math.max(4, Math.min(28, Math.ceil(5 + net * 0.05)));
+      for (let s = 1; s <= steps; s++) {
+        const t = s / steps;
+        const mt = 1 - t;
+        outPts.push({
+          x: mt * mt * x0 + 2 * mt * t * x1 + t * t * x2,
+          y: mt * mt * y0 + 2 * mt * t * y1 + t * t * y2
+        });
+      }
+    }
+
+    function sampleEllipticalArc(x1, y1, rx, ry, phiDeg, largeArcFlag, sweepFlag, x2, y2, outPts) {
+      if (Math.abs(x1 - x2) < 1e-7 && Math.abs(y1 - y2) < 1e-7) return;
+      rx = Math.abs(rx);
+      ry = Math.abs(ry);
+      if (rx < 1e-7 || ry < 1e-7) {
+        outPts.push({ x: x2, y: y2 });
+        return;
+      }
+
+      const phi = (phiDeg * Math.PI) / 180;
+      const cosPhi = Math.cos(phi);
+      const sinPhi = Math.sin(phi);
+
+      const dx2 = (x1 - x2) / 2;
+      const dy2 = (y1 - y2) / 2;
+      const x1p = cosPhi * dx2 + sinPhi * dy2;
+      const y1p = -sinPhi * dx2 + cosPhi * dy2;
+
+      let rxSq = rx * rx;
+      let rySq = ry * ry;
+      const x1pSq = x1p * x1p;
+      const y1pSq = y1p * y1p;
+
+      const lambda = x1pSq / rxSq + y1pSq / rySq;
+      if (lambda > 1) {
+        const sqrtL = Math.sqrt(lambda);
+        rx *= sqrtL;
+        ry *= sqrtL;
+        rxSq = rx * rx;
+        rySq = ry * ry;
+      }
+
+      const sign = largeArcFlag === sweepFlag ? -1 : 1;
+      const num = Math.max(0, rxSq * rySq - rxSq * y1pSq - rySq * x1pSq);
+      const den = rxSq * y1pSq + rySq * x1pSq;
+      const coef = sign * Math.sqrt(den > 1e-12 ? num / den : 0);
+
+      const cxp = coef * ((rx * y1p) / ry);
+      const cyp = coef * (-(ry * x1p) / rx);
+
+      const cx = cosPhi * cxp - sinPhi * cyp + (x1 + x2) / 2;
+      const cy = sinPhi * cxp + cosPhi * cyp + (y1 + y2) / 2;
+
+      const vecAngle = (ux, uy, vx, vy) => {
+        const dot = ux * vx + uy * vy;
+        const len = Math.hypot(ux, uy) * Math.hypot(vx, vy);
+        const ang = Math.acos(Math.max(-1, Math.min(1, len > 0 ? dot / len : 1)));
+        return ux * vy - uy * vx < 0 ? -ang : ang;
+      };
+
+      const theta1 = vecAngle(1, 0, (x1p - cxp) / rx, (y1p - cyp) / ry);
+      let dTheta = vecAngle(
+        (x1p - cxp) / rx,
+        (y1p - cyp) / ry,
+        (-x1p - cxp) / rx,
+        (-y1p - cyp) / ry
+      );
+
+      if (!sweepFlag && dTheta > 0) dTheta -= 2 * Math.PI;
+      else if (sweepFlag && dTheta < 0) dTheta += 2 * Math.PI;
+
+      const steps = Math.max(6, Math.min(48, Math.ceil((Math.abs(dTheta) / (Math.PI / 16)) * 2)));
+      for (let s = 1; s <= steps; s++) {
+        const theta = theta1 + (dTheta * s) / steps;
+        const cosT = Math.cos(theta);
+        const sinT = Math.sin(theta);
+        outPts.push({
+          x: cosPhi * rx * cosT - sinPhi * ry * sinT + cx,
+          y: sinPhi * rx * cosT + cosPhi * ry * sinT + cy
+        });
+      }
+    }
+
+    function parsePathDToSubpaths(dStr, matrix) {
+      if (!dStr || typeof dStr !== 'string') return [];
+      const len = dStr.length;
+      let idx = 0;
+
+      const skipSeparators = () => {
+        while (idx < len) {
+          const code = dStr.charCodeAt(idx);
+          if (code === 32 || code === 44 || code === 9 || code === 10 || code === 13) {
+            idx++;
+          } else {
+            break;
+          }
+        }
+      };
+
+      const peekIsCommand = () => {
+        skipSeparators();
+        if (idx >= len) return false;
+        const ch = dStr[idx];
+        return /[a-df-zA-DF-Z]/.test(ch);
+      };
+
+      const readFlag = () => {
+        skipSeparators();
+        if (idx < len && (dStr[idx] === '0' || dStr[idx] === '1')) {
+          const val = dStr[idx] === '1' ? 1 : 0;
+          idx++;
+          return val;
+        }
+        return readNumber();
+      };
+
+      const readNumber = () => {
+        skipSeparators();
+        if (idx >= len) return NaN;
+        const start = idx;
+        if (dStr[idx] === '+' || dStr[idx] === '-') idx++;
+        let hasDigits = false;
+        while (idx < len && dStr.charCodeAt(idx) >= 48 && dStr.charCodeAt(idx) <= 57) {
+          idx++;
+          hasDigits = true;
+        }
+        if (idx < len && dStr[idx] === '.') {
+          idx++;
+          while (idx < len && dStr.charCodeAt(idx) >= 48 && dStr.charCodeAt(idx) <= 57) {
+            idx++;
+            hasDigits = true;
+          }
+        }
+        if (!hasDigits) return NaN;
+        if (idx < len && (dStr[idx] === 'e' || dStr[idx] === 'E')) {
+          const expStart = idx;
+          idx++;
+          if (idx < len && (dStr[idx] === '+' || dStr[idx] === '-')) idx++;
+          let hasExpDigits = false;
+          while (idx < len && dStr.charCodeAt(idx) >= 48 && dStr.charCodeAt(idx) <= 57) {
+            idx++;
+            hasExpDigits = true;
+          }
+          if (!hasExpDigits) idx = expStart;
+        }
+        return parseFloat(dStr.slice(start, idx));
+      };
+
+      const subpaths = [];
+      let curSubpath = null;
+
+      let curX = 0, curY = 0;
+      let startX = 0, startY = 0;
+      let lastCubicCtrlX = 0, lastCubicCtrlY = 0;
+      let lastQuadCtrlX = 0, lastQuadCtrlY = 0;
+      let lastCmd = '';
+      let activeCmd = '';
+
+      while (idx < len) {
+        if (peekIsCommand()) {
+          activeCmd = dStr[idx++];
+        } else if (!activeCmd) {
+          idx++;
+          continue;
+        }
+
+        if (activeCmd === 'Z' || activeCmd === 'z') {
+          if (curSubpath && curSubpath.length > 0) {
+            curSubpath.push({ x: startX, y: startY });
+          }
+          curX = startX;
+          curY = startY;
+          lastCmd = activeCmd;
+          activeCmd = '';
+          continue;
+        }
+
+        const isRel = activeCmd >= 'a' && activeCmd <= 'z';
+        const upper = activeCmd.toUpperCase();
+
+        if (upper === 'M') {
+          const nx = readNumber();
+          const ny = readNumber();
+          if (Number.isNaN(nx) || Number.isNaN(ny)) break;
+          curX = isRel ? curX + nx : nx;
+          curY = isRel ? curY + ny : ny;
+          startX = curX;
+          startY = curY;
+
+          if (curSubpath && curSubpath.length >= 2) {
+            subpaths.push(curSubpath);
+          }
+          curSubpath = [{ x: curX, y: curY }];
+          lastCmd = activeCmd;
+          activeCmd = isRel ? 'l' : 'L';
+          continue;
+        }
+
+        if (!curSubpath) {
+          curSubpath = [{ x: curX, y: curY }];
+        }
+
+        if (upper === 'L') {
+          const nx = readNumber();
+          const ny = readNumber();
+          if (Number.isNaN(nx) || Number.isNaN(ny)) break;
+          curX = isRel ? curX + nx : nx;
+          curY = isRel ? curY + ny : ny;
+          curSubpath.push({ x: curX, y: curY });
+          lastCmd = activeCmd;
+        } else if (upper === 'H') {
+          const nx = readNumber();
+          if (Number.isNaN(nx)) break;
+          curX = isRel ? curX + nx : nx;
+          curSubpath.push({ x: curX, y: curY });
+          lastCmd = activeCmd;
+        } else if (upper === 'V') {
+          const ny = readNumber();
+          if (Number.isNaN(ny)) break;
+          curY = isRel ? curY + ny : ny;
+          curSubpath.push({ x: curX, y: curY });
+          lastCmd = activeCmd;
+        } else if (upper === 'C') {
+          const x1 = readNumber(), y1 = readNumber();
+          const x2 = readNumber(), y2 = readNumber();
+          const x = readNumber(), y = readNumber();
+          if (Number.isNaN(x) || Number.isNaN(y)) break;
+          const ax1 = isRel ? curX + x1 : x1;
+          const ay1 = isRel ? curY + y1 : y1;
+          const ax2 = isRel ? curX + x2 : x2;
+          const ay2 = isRel ? curY + y2 : y2;
+          const ax = isRel ? curX + x : x;
+          const ay = isRel ? curY + y : y;
+          sampleCubicBezier(curX, curY, ax1, ay1, ax2, ay2, ax, ay, curSubpath);
+          lastCubicCtrlX = ax2;
+          lastCubicCtrlY = ay2;
+          curX = ax;
+          curY = ay;
+          lastCmd = activeCmd;
+        } else if (upper === 'S') {
+          const x2 = readNumber(), y2 = readNumber();
+          const x = readNumber(), y = readNumber();
+          if (Number.isNaN(x) || Number.isNaN(y)) break;
+          let ax1 = curX, ay1 = curY;
+          if (lastCmd === 'C' || lastCmd === 'c' || lastCmd === 'S' || lastCmd === 's') {
+            ax1 = 2 * curX - lastCubicCtrlX;
+            ay1 = 2 * curY - lastCubicCtrlY;
+          }
+          const ax2 = isRel ? curX + x2 : x2;
+          const ay2 = isRel ? curY + y2 : y2;
+          const ax = isRel ? curX + x : x;
+          const ay = isRel ? curY + y : y;
+          sampleCubicBezier(curX, curY, ax1, ay1, ax2, ay2, ax, ay, curSubpath);
+          lastCubicCtrlX = ax2;
+          lastCubicCtrlY = ay2;
+          curX = ax;
+          curY = ay;
+          lastCmd = activeCmd;
+        } else if (upper === 'Q') {
+          const x1 = readNumber(), y1 = readNumber();
+          const x = readNumber(), y = readNumber();
+          if (Number.isNaN(x) || Number.isNaN(y)) break;
+          const ax1 = isRel ? curX + x1 : x1;
+          const ay1 = isRel ? curY + y1 : y1;
+          const ax = isRel ? curX + x : x;
+          const ay = isRel ? curY + y : y;
+          sampleQuadBezier(curX, curY, ax1, ay1, ax, ay, curSubpath);
+          lastQuadCtrlX = ax1;
+          lastQuadCtrlY = ay1;
+          curX = ax;
+          curY = ay;
+          lastCmd = activeCmd;
+        } else if (upper === 'T') {
+          const x = readNumber(), y = readNumber();
+          if (Number.isNaN(x) || Number.isNaN(y)) break;
+          let ax1 = curX, ay1 = curY;
+          if (lastCmd === 'Q' || lastCmd === 'q' || lastCmd === 'T' || lastCmd === 't') {
+            ax1 = 2 * curX - lastQuadCtrlX;
+            ay1 = 2 * curY - lastQuadCtrlY;
+          }
+          const ax = isRel ? curX + x : x;
+          const ay = isRel ? curY + y : y;
+          sampleQuadBezier(curX, curY, ax1, ay1, ax, ay, curSubpath);
+          lastQuadCtrlX = ax1;
+          lastQuadCtrlY = ay1;
+          curX = ax;
+          curY = ay;
+          lastCmd = activeCmd;
+        } else if (upper === 'A') {
+          const rx = readNumber();
+          const ry = readNumber();
+          const xAxisRot = readNumber();
+          const largeArc = readFlag();
+          const sweep = readFlag();
+          const x = readNumber();
+          const y = readNumber();
+          if (Number.isNaN(x) || Number.isNaN(y)) break;
+          const ax = isRel ? curX + x : x;
+          const ay = isRel ? curY + y : y;
+          sampleEllipticalArc(curX, curY, rx, ry, xAxisRot, largeArc, sweep, ax, ay, curSubpath);
+          curX = ax;
+          curY = ay;
+          lastCmd = activeCmd;
+        } else {
+          idx++;
+        }
+      }
+
+      if (curSubpath && curSubpath.length >= 2) {
+        subpaths.push(curSubpath);
+      }
+
+      const results = [];
+      for (let s = 0; s < subpaths.length; s++) {
+        const raw = subpaths[s];
+        const transformed = [];
+        let arcLen = 0;
+        for (let i = 0; i < raw.length; i++) {
+          const pt = applyMatToPoint(matrix, raw[i].x, raw[i].y);
+          if (Number.isFinite(pt.x) && Number.isFinite(pt.y)) {
+            if (transformed.length > 0) {
+              const prev = transformed[transformed.length - 1];
+              const seg = Math.hypot(pt.x - prev.x, pt.y - prev.y);
+              if (seg > 1e-7) {
+                arcLen += seg;
+                transformed.push(pt);
+              }
+            } else {
+              transformed.push(pt);
+            }
+          }
+        }
+        if (transformed.length >= 2 && arcLen > 1e-5) {
+          results.push({ pts: transformed, length: arcLen });
+        }
+      }
+
+      return results;
+    }
+
+    function extractBasicShapeSubpath(el, matrix) {
+      const tag = el.tagName.toLowerCase();
+      const rawPts = [];
+
+      if (tag === 'polygon' || tag === 'polyline') {
+        const ptsAttr = el.getAttribute('points') || '';
+        const nums = (ptsAttr.match(/[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/g) || []).map(Number);
+        for (let i = 0; i + 1 < nums.length; i += 2) {
+          rawPts.push({ x: nums[i], y: nums[i + 1] });
+        }
+        if (tag === 'polygon' && rawPts.length > 2) {
+          rawPts.push({ x: rawPts[0].x, y: rawPts[0].y });
+        }
+      } else if (tag === 'line') {
+        const x1 = parseFloat(el.getAttribute('x1') || '0');
+        const y1 = parseFloat(el.getAttribute('y1') || '0');
+        const x2 = parseFloat(el.getAttribute('x2') || '0');
+        const y2 = parseFloat(el.getAttribute('y2') || '0');
+        rawPts.push({ x: x1, y: y1 }, { x: x2, y: y2 });
+      } else if (tag === 'rect') {
+        const x = parseFloat(el.getAttribute('x') || '0');
+        const y = parseFloat(el.getAttribute('y') || '0');
+        const w = parseFloat(el.getAttribute('width') || '0');
+        const h = parseFloat(el.getAttribute('height') || '0');
+        if (w > 0 && h > 0) {
+          rawPts.push(
+            { x, y },
+            { x: x + w, y },
+            { x: x + w, y: y + h },
+            { x, y: y + h },
+            { x, y }
+          );
+        }
+      } else if (tag === 'circle' || tag === 'ellipse') {
+        const cx = parseFloat(el.getAttribute('cx') || '0');
+        const cy = parseFloat(el.getAttribute('cy') || '0');
+        const rx = tag === 'circle'
+          ? parseFloat(el.getAttribute('r') || '0')
+          : parseFloat(el.getAttribute('rx') || '0');
+        const ry = tag === 'circle'
+          ? rx
+          : parseFloat(el.getAttribute('ry') || '0');
+        if (rx > 0 && ry > 0) {
+          const steps = 64;
+          for (let s = 0; s <= steps; s++) {
+            const ang = (s / steps) * 2 * Math.PI;
+            rawPts.push({
+              x: cx + rx * Math.cos(ang),
+              y: cy + ry * Math.sin(ang)
+            });
+          }
+        }
+      }
+
+      if (rawPts.length < 2) return null;
+
+      const transformed = [];
+      let arcLen = 0;
+      for (let i = 0; i < rawPts.length; i++) {
+        const pt = applyMatToPoint(matrix, rawPts[i].x, rawPts[i].y);
+        if (!Number.isFinite(pt.x) || !Number.isFinite(pt.y)) continue;
+        if (transformed.length > 0) {
+          const prev = transformed[transformed.length - 1];
+          const seg = Math.hypot(pt.x - prev.x, pt.y - prev.y);
+          if (seg > 1e-7) {
+            arcLen += seg;
+            transformed.push(pt);
+          }
+        } else {
+          transformed.push(pt);
+        }
+      }
+
+      if (transformed.length < 2 || arcLen <= 1e-5) return null;
+      return { pts: transformed, length: arcLen };
+    }
+
+    function isLikelyBackgroundRect(pts, overallBBox) {
+      if (pts.length < 4 || pts.length > 16) return false;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i];
+        if (p.x < minX) minX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y > maxY) maxY = p.y;
+      }
+      const w = maxX - minX;
+      const h = maxY - minY;
+      const totalW = overallBBox.maxX - overallBBox.minX;
+      const totalH = overallBBox.maxY - overallBBox.minY;
+      if (totalW <= 0 || totalH <= 0) return false;
+
+      if (w < totalW * 0.96 || h < totalH * 0.96) return false;
+
+      const tol = Math.max(w, h) * 0.015;
+      let onEdgeCount = 0;
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i];
+        const onEdge =
+          Math.abs(p.x - minX) <= tol ||
+          Math.abs(p.x - maxX) <= tol ||
+          Math.abs(p.y - minY) <= tol ||
+          Math.abs(p.y - maxY) <= tol;
+        if (onEdge) onEdgeCount++;
+      }
+      return onEdgeCount / pts.length >= 0.95;
+    }
+
+    function extractSubpathsFromSVGString(svgText, fileName = 'custom.svg', fileSize = 0) {
+      const t0 = performance.now();
+
+      let cleanText = (svgText || '')
+        .replace(/^\uFEFF/, '')
+        .replace(/\0/g, '')
+        .replace(/<\?xml[\s\S]*?\?>/gi, '')
+        .replace(/<!DOCTYPE[\s\S]*?(?:\[[\s\S]*?\][\s\S]*?)?>/gi, '')
+        .trim();
+
+      if (!/<svg[\s>]/i.test(cleanText)) {
+        if (/^<(path|polygon|polyline|rect|circle|ellipse|g)[\s>]/i.test(cleanText)) {
+          cleanText = `<svg xmlns="http://www.w3.org/2000/svg">${cleanText}</svg>`;
+        } else if (/^[Mm][\d\s.,+-]/.test(cleanText)) {
+          cleanText = `<svg xmlns="http://www.w3.org/2000/svg"><path d="${cleanText}"/></svg>`;
+        }
+      }
+
+      const parser = new DOMParser();
+      let doc = parser.parseFromString(cleanText, 'image/svg+xml');
+      let svgRoot = doc.querySelector('svg');
+
+      if (!svgRoot || doc.querySelector('parsererror')) {
+        const htmlDoc = parser.parseFromString(cleanText, 'text/html');
+        svgRoot = htmlDoc.querySelector('svg');
+      }
+
+      if (!svgRoot) {
+        const match = cleanText.match(/<svg[\s\S]*<\/svg>/i);
+        if (match) {
+          const htmlDoc = parser.parseFromString(match[0], 'text/html');
+          svgRoot = htmlDoc.querySelector('svg');
+        }
+      }
+
+      if (!svgRoot) {
+        throw new Error('未在文件中找到有效的 <svg> 节点，请检查文件内容。');
+      }
+
+      const useElements = Array.from(svgRoot.querySelectorAll('use'));
+      for (let u = 0; u < useElements.length; u++) {
+        const useEl = useElements[u];
+        const href = useEl.getAttribute('href') || useEl.getAttribute('xlink:href') || '';
+        if (href.startsWith('#')) {
+          const targetId = href.slice(1);
+          const target = svgRoot.querySelector(`[id="${CSS.escape ? CSS.escape(targetId) : targetId}"]`);
+          if (target && target !== useEl) {
+            const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            const x = parseFloat(useEl.getAttribute('x') || '0');
+            const y = parseFloat(useEl.getAttribute('y') || '0');
+            const existingTransform = useEl.getAttribute('transform') || '';
+            g.setAttribute('transform', `${existingTransform} translate(${x}, ${y})`.trim());
+            const clone = target.cloneNode(true);
+            if (clone.tagName && clone.tagName.toLowerCase() === 'symbol') {
+              while (clone.firstChild) g.appendChild(clone.firstChild);
+            } else {
+              g.appendChild(clone);
+            }
+            if (useEl.parentNode) {
+              useEl.parentNode.replaceChild(g, useEl);
+            }
+          }
+        }
+      }
+
+      const allShapes = Array.from(
+        svgRoot.querySelectorAll('path, polygon, polyline, rect, circle, ellipse, line')
+      );
+
+      let activeShapes = allShapes.filter(el => {
+        if (el.closest('defs, clipPath, clippath, mask, pattern, marker, symbol')) return false;
+        const disp = (el.getAttribute('display') || '').toLowerCase();
+        const vis = (el.getAttribute('visibility') || '').toLowerCase();
+        if (disp === 'none' || vis === 'hidden') return false;
+        const styleAttr = (el.getAttribute('style') || '').toLowerCase();
+        if (/display\s*:\s*none/.test(styleAttr) || /visibility\s*:\s*hidden/.test(styleAttr)) return false;
+        return true;
+      });
+
+      if (activeShapes.length === 0 && allShapes.length > 0) {
+        activeShapes = allShapes;
+      }
+
+      const rawExtracted = [];
+      let totalArcLength = 0;
+
+      for (let i = 0; i < activeShapes.length; i++) {
+        const el = activeShapes[i];
+        const matrix = getCumulativeTransform(el, svgRoot);
+        const tag = el.tagName.toLowerCase();
+
+        if (tag === 'path') {
+          const dAttr = el.getAttribute('d');
+          if (!dAttr) continue;
+          const subpaths = parsePathDToSubpaths(dAttr, matrix);
+          for (let s = 0; s < subpaths.length; s++) {
+            rawExtracted.push(subpaths[s]);
+            totalArcLength += subpaths[s].length;
+          }
+        } else {
+          const shapeSubpath = extractBasicShapeSubpath(el, matrix);
+          if (shapeSubpath) {
+            rawExtracted.push(shapeSubpath);
+            totalArcLength += shapeSubpath.length;
+          }
+        }
+      }
+
+      if (rawExtracted.length === 0 || totalArcLength <= 0) {
+        throw new Error('未能在 SVG 中提取到任何有效的矢量路径或几何轮廓。');
+      }
+
+      const overallBBox = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+      for (let i = 0; i < rawExtracted.length; i++) {
+        const pts = rawExtracted[i].pts;
+        for (let j = 0; j < pts.length; j++) {
+          const p = pts[j];
+          if (p.x < overallBBox.minX) overallBBox.minX = p.x;
+          if (p.y < overallBBox.minY) overallBBox.minY = p.y;
+          if (p.x > overallBBox.maxX) overallBBox.maxX = p.x;
+          if (p.y > overallBBox.maxY) overallBBox.maxY = p.y;
+        }
+      }
+
+      const filterRectEnabled = document.getElementById('svg-filter-rect').checked;
+      let candidateSubpaths = rawExtracted;
+      if (filterRectEnabled && candidateSubpaths.length > 1) {
+        const withoutBg = candidateSubpaths.filter(sp => !isLikelyBackgroundRect(sp.pts, overallBBox));
+        if (withoutBg.length > 0) {
+          candidateSubpaths = withoutBg;
+        }
+      }
+
+      const minFraction = parseFloat(document.getElementById('svg-min-subpath').value || '0.001');
+      const candidateTotalLen = candidateSubpaths.reduce((acc, d) => acc + d.length, 0);
+      const minAllowedLen = candidateTotalLen * minFraction;
+
+      let finalSubpaths = candidateSubpaths.filter(d => d.length >= minAllowedLen);
+      if (finalSubpaths.length === 0) {
+        finalSubpaths = candidateSubpaths;
+      }
+
+      if (finalSubpaths.length > 4000) {
+        finalSubpaths.sort((a, b) => b.length - a.length);
+        finalSubpaths = finalSubpaths.slice(0, 4000);
+      }
+
+      const finalTotalLen = finalSubpaths.reduce((acc, d) => acc + d.length, 0);
+      const elapsedMs = Math.round(performance.now() - t0);
+
+      return {
+        subpaths: finalSubpaths,
+        fileName,
+        fileSize,
+        totalLength: Math.max(1, Math.round(finalTotalLen)),
+        elapsedMs
+      };
+    }
+
+    async function extractContourFromRasterSVG(svgText, fileName, fileSize) {
+      const t0 = performance.now();
+      return new Promise((resolve, reject) => {
+        const blob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          const size = 600;
+          const c = document.createElement('canvas');
+          c.width = size;
+          c.height = size;
+          const cctx = c.getContext('2d');
+          cctx.drawImage(img, 20, 20, size - 40, size - 40);
+          const imgData = cctx.getImageData(0, 0, size, size).data;
+
+          const mask = new Uint8Array(size * size);
+          let fgCount = 0;
+          for (let i = 0; i < size * size; i++) {
+            const r = imgData[i * 4];
+            const g = imgData[i * 4 + 1];
+            const b = imgData[i * 4 + 2];
+            const a = imgData[i * 4 + 3];
+            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+            if (a > 64 && lum < 240) {
+              mask[i] = 1;
+              fgCount++;
+            }
+          }
+
+          if (fgCount < 10) {
+            reject(new Error('SVG 中既无矢量路径，也未检测到有效的位图轮廓。'));
+            return;
+          }
+
+          let startX = -1, startY = -1;
+          outer: for (let y = 1; y < size - 1; y++) {
+            for (let x = 1; x < size - 1; x++) {
+              if (mask[y * size + x]) {
+                startX = x;
+                startY = y;
+                break outer;
+              }
+            }
+          }
+
+          const dirs = [
+            [1, 0], [1, 1], [0, 1], [-1, 1],
+            [-1, 0], [-1, -1], [0, -1], [1, -1]
+          ];
+          const boundary = [];
+          let cx = startX, cy = startY;
+          let backtrackDir = 4;
+          const maxIter = size * size;
+
+          for (let step = 0; step < maxIter; step++) {
+            boundary.push({ x: cx, y: cy });
+            let foundNext = false;
+            for (let k = 0; k < 8; k++) {
+              const dIdx = (backtrackDir + 1 + k) % 8;
+              const nx = cx + dirs[dIdx][0];
+              const ny = cy + dirs[dIdx][1];
+              if (nx >= 0 && nx < size && ny >= 0 && ny < size && mask[ny * size + nx]) {
+                cx = nx;
+                cy = ny;
+                backtrackDir = (dIdx + 4) % 8;
+                foundNext = true;
+                break;
+              }
+            }
+            if (!foundNext || (cx === startX && cy === startY && boundary.length > 5)) {
+              break;
+            }
+          }
+
+          if (boundary.length < 3) {
+            reject(new Error('无法从位图 SVG 中提取闭合边界。'));
+            return;
+          }
+
+          let len = 0;
+          for (let i = 1; i < boundary.length; i++) {
+            len += Math.hypot(boundary[i].x - boundary[i - 1].x, boundary[i].y - boundary[i - 1].y);
+          }
+
+          resolve({
+            subpaths: [{ pts: boundary, length: len }],
+            fileName,
+            fileSize,
+            totalLength: Math.round(len),
+            elapsedMs: Math.round(performance.now() - t0)
+          });
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error('SVG 文件解析失败。'));
+        };
+        img.src = url;
+      });
+    }
+
+    function stitchAndResampleSubpaths(subpathsData, M, strategy = 'stitch') {
+      if (!subpathsData || subpathsData.length === 0) return [];
+
+      let chosenSubpaths = subpathsData.slice();
+      if (strategy === 'longest') {
+        chosenSubpaths.sort((a, b) => b.length - a.length);
+        chosenSubpaths = [chosenSubpaths[0]];
+      }
+
+      chosenSubpaths.sort((a, b) => b.length - a.length);
+      const used = new Uint8Array(chosenSubpaths.length);
+      const orderedPointArrays = [];
+
+      let currentPts = chosenSubpaths[0].pts;
+      used[0] = 1;
+      orderedPointArrays.push(currentPts);
+      let curEnd = currentPts[currentPts.length - 1];
+
+      for (let step = 1; step < chosenSubpaths.length; step++) {
+        let bestIdx = -1;
+        let bestDistSq = Infinity;
+        let reverseBest = false;
+
+        for (let i = 0; i < chosenSubpaths.length; i++) {
+          if (used[i]) continue;
+          const candidate = chosenSubpaths[i].pts;
+          const pStart = candidate[0];
+          const pEnd = candidate[candidate.length - 1];
+
+          const dStart = (pStart.x - curEnd.x) ** 2 + (pStart.y - curEnd.y) ** 2;
+          if (dStart < bestDistSq) {
+            bestDistSq = dStart;
+            bestIdx = i;
+            reverseBest = false;
+          }
+
+          const dEnd = (pEnd.x - curEnd.x) ** 2 + (pEnd.y - curEnd.y) ** 2;
+          if (dEnd < bestDistSq) {
+            bestDistSq = dEnd;
+            bestIdx = i;
+            reverseBest = true;
+          }
+        }
+
+        if (bestIdx !== -1) {
+          used[bestIdx] = 1;
+          let nextPts = chosenSubpaths[bestIdx].pts;
+          if (reverseBest) {
+            nextPts = nextPts.slice().reverse();
+          }
+          orderedPointArrays.push(nextPts);
+          curEnd = nextPts[nextPts.length - 1];
+        }
+      }
+
+      const combined = [];
+      for (let i = 0; i < orderedPointArrays.length; i++) {
+        const arr = orderedPointArrays[i];
+        for (let j = 0; j < arr.length; j++) {
+          combined.push(arr[j]);
+        }
+      }
+
+      return resampleClosedPolyline(combined, M);
+    }
+
+    function resampleClosedPolyline(rawPts, M) {
+      if (!rawPts || rawPts.length === 0) return [];
+      if (rawPts.length === 1) {
+        return Array.from({ length: M }, () => ({ x: 0, y: 0 }));
+      }
+
+      const pts = rawPts.slice();
+      const first = pts[0];
+      const last = pts[pts.length - 1];
+      if (Math.hypot(first.x - last.x, first.y - last.y) > 1e-6) {
+        pts.push({ x: first.x, y: first.y });
+      }
+
+      const cumLen = new Float64Array(pts.length);
+      cumLen[0] = 0;
+      for (let i = 1; i < pts.length; i++) {
+        const dx = pts[i].x - pts[i - 1].x;
+        const dy = pts[i].y - pts[i - 1].y;
+        cumLen[i] = cumLen[i - 1] + Math.hypot(dx, dy);
+      }
+
+      const totalLen = cumLen[pts.length - 1];
+      if (totalLen <= 1e-9) {
+        return Array.from({ length: M }, () => ({ x: 0, y: 0 }));
+      }
+
+      const resampled = new Array(M);
+      let segIdx = 0;
+
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+      for (let k = 0; k < M; k++) {
+        const targetDist = (k / M) * totalLen;
+        while (segIdx < pts.length - 2 && cumLen[segIdx + 1] < targetDist) {
+          segIdx++;
+        }
+        const segStart = cumLen[segIdx];
+        const segEnd = cumLen[segIdx + 1];
+        const segSpan = segEnd - segStart;
+        const alpha = segSpan > 1e-9 ? (targetDist - segStart) / segSpan : 0;
+
+        const x = pts[segIdx].x + alpha * (pts[segIdx + 1].x - pts[segIdx].x);
+        const y = pts[segIdx].y + alpha * (pts[segIdx + 1].y - pts[segIdx].y);
+
+        resampled[k] = { x, y };
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+
+      const cx = (minX + maxX) / 2;
+      const cy = (minY + maxY) / 2;
+      const span = Math.max(maxX - minX, maxY - minY, 1e-6) / 2;
+
+      for (let k = 0; k < M; k++) {
+        resampled[k].x = (resampled[k].x - cx) / span;
+        resampled[k].y = (resampled[k].y - cy) / span;
+      }
+
+      return resampled;
+    }
+
+    // ============================================================================
+    // 3. BUILT-IN PRESETS GENERATOR
+    // ============================================================================
+    function generatePresetPoints(presetKey, M) {
+      const pts = [];
+      if (presetKey === 'heart') {
+        state.shapeName = '爱心 (HEART)';
+        for (let i = 0; i < M; i++) {
+          const t = (i / M) * 2 * Math.PI;
+          const x = 16 * Math.pow(Math.sin(t), 3);
+          const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+          pts.push({ x, y });
+        }
+        return resampleClosedPolyline(pts, M);
+      }
+
+      if (presetKey === 'star') {
+        state.shapeName = '五角星 (STAR)';
+        const spikes = 5;
+        const outerR = 1.0;
+        const innerR = 0.42;
+        const vertices = [];
+        for (let i = 0; i < spikes * 2; i++) {
+          const r = i % 2 === 0 ? outerR : innerR;
+          const angle = (i * Math.PI) / spikes - Math.PI / 2;
+          vertices.push({ x: r * Math.cos(angle), y: r * Math.sin(angle) });
+        }
+        return resampleClosedPolyline(vertices, M);
+      }
+
+      if (presetKey === 'butterfly') {
+        state.shapeName = '蝴蝶曲线 (BUTTERFLY)';
+        for (let i = 0; i < M; i++) {
+          const t = (i / M) * 2 * Math.PI;
+          const rad = Math.exp(Math.cos(t)) - 2 * Math.cos(4 * t) - Math.pow(Math.sin(t / 12), 5);
+          pts.push({
+            x: Math.sin(t) * rad,
+            y: -Math.cos(t) * rad
+          });
+        }
+        return resampleClosedPolyline(pts, M);
+      }
+
+      if (presetKey === 'lissajous') {
+        state.shapeName = '利萨如 (LISSAJOUS)';
+        for (let i = 0; i < M; i++) {
+          const t = (i / M) * 2 * Math.PI;
+          pts.push({
+            x: Math.sin(3 * t + Math.PI / 4),
+            y: Math.sin(4 * t)
+          });
+        }
+        return resampleClosedPolyline(pts, M);
+      }
+
+      if (presetKey === 'astroid') {
+        state.shapeName = '星形线 (ASTROID)';
+        for (let i = 0; i < M; i++) {
+          const t = (i / M) * 2 * Math.PI;
+          pts.push({
+            x: Math.pow(Math.cos(t), 3),
+            y: Math.pow(Math.sin(t), 3)
+          });
+        }
+        return resampleClosedPolyline(pts, M);
+      }
+
+      if (presetKey === 'pi') {
+        state.shapeName = '圆周率符号 (PI)';
+        const piVertices = [
+          [-0.75, -0.55], [0.75, -0.55], [0.75, -0.32], [0.42, -0.32],
+          [0.42, 0.45],   [0.45, 0.58],  [0.58, 0.62],  [0.58, 0.78],
+          [0.32, 0.78],   [0.18, 0.65],  [0.18, -0.32], [-0.18, -0.32],
+          [-0.25, 0.52],  [-0.35, 0.78], [-0.60, 0.78], [-0.46, 0.45],
+          [-0.40, -0.32], [-0.75, -0.32]
+        ].map(([x, y]) => ({ x, y }));
+        return resampleClosedPolyline(piVertices, M);
+      }
+
+      return [];
+    }
+
+    // ============================================================================
+    // 4. RECONSTRUCTION & ANIMATION PIPELINE (SUPPORTS BOTH COMPLEX & ORTHOGONAL)
+    // ============================================================================
+    function evaluateFourierAtTime(t, N) {
+      const twoPiT = 2 * Math.PI * t;
+
+      if (state.epicycleMode === 'orthogonal') {
+        let x = state.dcTerm.re;
+        let y = state.dcTerm.im;
+        const limitX = Math.min(N, state.harmonicsX.length);
+        const limitY = Math.min(N, state.harmonicsY.length);
+
+        // Top Epicycle Chain computes x(t) via horizontal cosine projection
+        for (let i = 0; i < limitX; i++) {
+          const hx = state.harmonicsX[i];
+          const angleX = hx.freq * twoPiT + hx.phase;
+          x += hx.amp * Math.cos(angleX);
+        }
+
+        // Left Epicycle Chain computes y(t) via vertical sine projection
+        for (let i = 0; i < limitY; i++) {
+          const hy = state.harmonicsY[i];
+          const angleY = hy.freq * twoPiT + hy.phase;
+          y += hy.amp * Math.sin(angleY);
+        }
+
+        return { x, y };
+      }
+
+      // Default: Complex Single-Chain Mode
+      let x = state.dcTerm.re;
+      let y = state.dcTerm.im;
+      const limit = Math.min(N, state.harmonics.length);
+
+      for (let i = 0; i < limit; i++) {
+        const h = state.harmonics[i];
+        const angle = h.freq * twoPiT + h.phase;
+        x += h.amp * Math.cos(angle);
+        y += h.amp * Math.sin(angle);
+      }
+      return { x, y };
+    }
+
+    function syncCircleControlsRange(resetCirclesToDefault = false) {
+      const maxPossible = getMaxSelectableCircles();
+      const sliderCircles = document.getElementById('slider-circles');
+      const inputCircles = document.getElementById('input-circles');
+      const labelMax = document.getElementById('label-max-circles');
+
+      sliderCircles.max = maxPossible;
+      inputCircles.max = maxPossible;
+      labelMax.textContent = `/ ${maxPossible}`;
+
+      if (resetCirclesToDefault) {
+        state.numCircles = Math.min(256, maxPossible);
+      } else {
+        state.numCircles = Math.min(state.numCircles, maxPossible);
+      }
+
+      sliderCircles.value = state.numCircles;
+      inputCircles.value = state.numCircles;
+    }
+
+    function rebuildCurrentContourAndFFT(sampledPts, resetCirclesToDefault = false) {
+      state.sampledPoints = sampledPts;
+      computeFFT(sampledPts);
+      syncCircleControlsRange(resetCirclesToDefault);
+      resetAnimationCycle();
+      updateReadoutUI();
+      drawSpectrumChart();
+    }
+
+    function resetAnimationCycle() {
+      state.t = 0;
+      state.trail = [];
+      state.pauseHoldTimer = 0;
+      const startPt = evaluateFourierAtTime(0, state.numCircles);
+      state.trail.push(startPt);
+    }
+
+    function updateCircleQuickButtonsUI() {
+      const activeN = state.numCircles;
+      document.querySelectorAll('.circle-quick-btn').forEach(btn => {
+        const btnVal = parseInt(btn.getAttribute('data-circle-set'), 10);
+        const isActive = btnVal === activeN;
+        btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        if (isActive) {
+          btn.className =
+            'circle-quick-btn px-2 py-1 rounded bg-sky-500/20 text-sky-600 dark:text-sky-300 border border-sky-500/50 font-semibold text-[11px] font-mono shadow-sm shadow-sky-500/10 transition';
+        } else {
+          btn.className =
+            'circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/30 hover:bg-sky-500/10 text-[11px] font-mono transition';
+        }
+      });
+    }
+
+    function updateReadoutUI() {
+      const { rmsErrorPercent, fidelityPercent } = computeErrorMetrics(state.numCircles);
+      const maxTerms = getMaxSelectableCircles();
+      const activeN = Math.min(state.numCircles, maxTerms);
+      const shownCount = Math.min(activeN, state.maxShownCircles);
+
+      updateNumericalExpansionStrings();
+      updateCircleQuickButtonsUI();
+
+      if (state.epicycleMode === 'orthogonal') {
+        document.getElementById('top-bar-circles').textContent = `正交本轮: ${activeN}×2 组`;
+        document.getElementById('terms-used-readout').textContent =
+          `X/Y 各显示 ${shownCount} 个本轮 · 各参与计算 ${activeN} 个本轮 (共 ${activeN * 2} 个圆)`;
+      } else {
+        document.getElementById('top-bar-circles').textContent = `本轮数量: ${activeN}`;
+        document.getElementById('terms-used-readout').textContent =
+          `已显示 ${shownCount} 个本轮 · 参与计算 ${activeN} 个本轮`;
+      }
+
+      document.getElementById('top-bar-rms').textContent = `相对 RMS 误差: ${rmsErrorPercent.toFixed(4)}%`;
+      document.getElementById('fidelity-badge').textContent = `能量还原度: ${fidelityPercent.toFixed(2)}%`;
+    }
+
+    // Switch between Complex Mode and Orthogonal Dual-Epicycle Projection Mode
+    function setEpicycleMode(newMode) {
+      if (newMode !== 'complex' && newMode !== 'orthogonal') return;
+      state.epicycleMode = newMode;
+
+      const btnComplex = document.getElementById('btn-mode-complex');
+      const btnOrtho = document.getElementById('btn-mode-orthogonal');
+      const badgePill = document.getElementById('mode-badge-pill');
+      const descText = document.getElementById('mode-desc-text');
+      const stageBtn = document.getElementById('btn-stage-mode-toggle');
+      const stageIcon = document.getElementById('stage-mode-icon');
+      const stageLabel = document.getElementById('stage-mode-label');
+      const circlesTitle = document.getElementById('label-circles-title');
+      const headerFormula = document.getElementById('header-formula-badge');
+      const specTitle = document.getElementById('spectrum-card-title');
+      const specDesc = document.getElementById('spectrum-card-desc');
+
+      if (newMode === 'orthogonal') {
+        btnOrtho.className = 'py-2.5 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 bg-emerald-500 text-white shadow-sm shadow-emerald-500/30';
+        btnComplex.className = 'py-2.5 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-sky-500 dark:hover:text-sky-300';
+        badgePill.textContent = '正交双级数 X(t) ⊥ Y(t)';
+        badgePill.className = 'text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30';
+        descText.innerHTML = '当前为<strong>正交双圆环投影模式</strong>：将横坐标 $x(t)$ 与纵坐标 $y(t)$ 拆分为两个独立的实数傅里叶级数，正上方本轮组计算 $x(t)$ 并向下垂直投射，正左方本轮组计算 $y(t)$ 并向右水平投射，在右下角交汇作画。';
+
+        stageBtn.className = 'px-2.5 h-7 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 border border-sky-500/40 text-sky-300 flex items-center justify-center gap-1.5 text-xs font-medium transition';
+        stageIcon.textContent = '🌀';
+        stageLabel.textContent = '切换: 复数单链模式';
+        circlesTitle.textContent = '每组正交本轮数量';
+
+        if (headerFormula) {
+          headerFormula.innerHTML = `
+            <span class="text-sky-400">x<sub>N</sub>(t) = x<sub>0</sub> + ∑ R<sub>x,k</sub> cos(2πkt+φ<sub>x,k</sub>)</span>
+            <span class="text-slate-300 dark:text-slate-700">⊥</span>
+            <span class="text-emerald-400">y<sub>N</sub>(t) = y<sub>0</sub> + ∑ R<sub>y,k</sub> sin(2πkt+φ<sub>y,k</sub>)</span>
+          `;
+        }
+        specTitle.innerHTML = '<span>📊 实时正交双通道实数频谱图 (Orthogonal Spectrum R<sub>x,k</sub> &amp; R<sub>y,k</sub>)</span>';
+        specDesc.innerHTML = '横轴为正频率 k ≥ 1，纵轴并列展示上方水平级数振幅 <span class="text-sky-400 font-semibold">R<sub>x,k</sub> (青蓝)</span> 与左方垂直级数振幅 <span class="text-emerald-400 font-semibold">R<sub>y,k</sub> (翠绿)</span>。';
+      } else {
+        btnComplex.className = 'py-2.5 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 bg-sky-500 text-white shadow-sm shadow-sky-500/30';
+        btnOrtho.className = 'py-2.5 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-sky-500 dark:hover:text-sky-300';
+        badgePill.textContent = '复平面单链 c_k';
+        badgePill.className = 'text-[11px] font-mono px-2 py-0.5 rounded bg-sky-500/15 text-sky-600 dark:text-sky-300 border border-sky-500/30';
+        descText.innerHTML = '当前为<strong>复数单链模式</strong>：将 $(x(t), y(t))$ 视为复数 $z(t) = x(t) + i y(t)$，由单一旋转本轮链首尾相接直接描绘轨迹。点击上方「正交双环投影」可拆分为上方 $X(t)$ 与左方 $Y(t)$ 两组实数级数正交交汇作画。';
+
+        stageBtn.className = 'px-2.5 h-7 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 flex items-center justify-center gap-1.5 text-xs font-medium transition';
+        stageIcon.textContent = '📐';
+        stageLabel.textContent = '切换: 正交双环投影';
+        circlesTitle.textContent = '计算本轮数量';
+
+        if (headerFormula) {
+          headerFormula.innerHTML = `
+            <span>z<sub>N</sub>(t) = ∑<sub>k∈K<sub>N</sub></sub> c<sub>k</sub> e<sup>2πikt</sup></span>
+            <span class="text-slate-300 dark:text-slate-700">|</span>
+            <span class="text-slate-500 dark:text-slate-400">c<sub>k</sub> = (1/M) ∑ z<sub>n</sub> e<sup>-2πikn/M</sup></span>
+          `;
+        }
+        specTitle.innerHTML = '<span>📊 实时复数傅里叶频谱图 (Frequency Spectrum |c<sub>k</sub>|)</span>';
+        specDesc.innerHTML = '横轴为旋转频率 k（负频率顺时针旋转，正频率逆时针旋转），纵轴为圆环半径 |c<sub>k</sub>|。亮蓝色代表当前参与绘图的本轮，暗灰色为已截断的高频项。';
+      }
+
+      // Reset camera pan/zoom so the new layout is centered
+      state.camZoom = 1.0;
+      state.camPanX = 0;
+      state.camPanY = 0;
+
+      syncCircleControlsRange(false);
+      resetAnimationCycle();
+      updateReadoutUI();
+      drawSpectrumChart();
+      setStatusMessage(
+        newMode === 'orthogonal'
+          ? `📐 已切换至「正交双圆环投影模式」：上方 X(t) 级数 + 左方 Y(t) 级数 → 右下角正交交汇作画`
+          : `🌀 已切换至「复数单链模式」：单条复平面旋转向量链直接作画`
+      );
+    }
+
+    // ============================================================================
+    // 5. 9:16 ULTRA-HD CANVAS RENDERER (EPICYCLES + ORTHOGONAL PROJECTION + HUD)
+    // ============================================================================
+    const epicycleCanvas = document.getElementById('epicycle-canvas');
+    const ctx = epicycleCanvas.getContext('2d', { alpha: false });
+    const spectrumCanvas = document.getElementById('spectrum-canvas');
+    const sCtx = spectrumCanvas.getContext('2d');
+
+    function applyVideoResolutionBuffer() {
+      epicycleCanvas.width = state.videoWidth;
+      epicycleCanvas.height = state.videoHeight;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      const badge = document.getElementById('res-pill-badge');
+      if (badge) {
+        badge.textContent = `9:16 · ${state.videoWidth}×${state.videoHeight}`;
+      }
+    }
+
+    function resizeCanvases() {
+      applyVideoResolutionBuffer();
+
+      const dpr = window.devicePixelRatio || 1;
+      const sRect = spectrumCanvas.parentElement.getBoundingClientRect();
+      spectrumCanvas.width = Math.max(1, Math.floor(sRect.width * dpr));
+      spectrumCanvas.height = Math.max(1, Math.floor(sRect.height * dpr));
+
+      drawSpectrumChart();
+    }
+
+    window.addEventListener('resize', resizeCanvases);
+
+    function drawSpectrumChart() {
+      const dpr = window.devicePixelRatio || 1;
+      const W = spectrumCanvas.width;
+      const H = spectrumCanvas.height;
+      sCtx.clearRect(0, 0, W, H);
+
+      const isDark = document.documentElement.classList.contains('dark');
+      const padBottom = 18 * dpr;
+      const padTop = 8 * dpr;
+      const plotH = H - padBottom - padTop;
+
+      if (state.epicycleMode === 'orthogonal') {
+        const orthoItems = state.orthoByFreq;
+        if (!orthoItems || orthoItems.length === 0) return;
+
+        const activeCount = Math.min(state.numCircles, state.harmonicsX.length);
+        const minActiveAmpX = activeCount > 0 ? state.harmonicsX[activeCount - 1].amp : Infinity;
+        const minActiveAmpY = activeCount > 0 ? state.harmonicsY[activeCount - 1].amp : Infinity;
+
+        const maxBins = Math.min(90, orthoItems.length);
+        let maxAmp = 1e-6;
+        for (let i = 0; i < maxBins; i++) {
+          if (orthoItems[i].ampX > maxAmp) maxAmp = orthoItems[i].ampX;
+          if (orthoItems[i].ampY > maxAmp) maxAmp = orthoItems[i].ampY;
+        }
+
+        const groupStep = W / maxBins;
+        const subBarW = Math.max(1.0 * dpr, groupStep * 0.38);
+
+        for (let i = 0; i < maxBins; i++) {
+          const it = orthoItems[i];
+          const groupX = i * groupStep + groupStep * 0.12;
+
+          // X(t) bar (Cyan)
+          const normX = state.spectrumLogScale
+            ? Math.log10(1 + (it.ampX / maxAmp) * 999) / 3
+            : it.ampX / maxAmp;
+          const bhX = Math.max(1.5 * dpr, normX * plotH);
+          const isActX = it.ampX >= minActiveAmpX && activeCount > 0;
+          sCtx.fillStyle = isActX ? '#38bdf8' : (isDark ? 'rgba(56, 189, 248, 0.20)' : 'rgba(56, 189, 248, 0.35)');
+          sCtx.fillRect(groupX, H - padBottom - bhX, subBarW, bhX);
+
+          // Y(t) bar (Emerald)
+          const normY = state.spectrumLogScale
+            ? Math.log10(1 + (it.ampY / maxAmp) * 999) / 3
+            : it.ampY / maxAmp;
+          const bhY = Math.max(1.5 * dpr, normY * plotH);
+          const isActY = it.ampY >= minActiveAmpY && activeCount > 0;
+          sCtx.fillStyle = isActY ? '#34d399' : (isDark ? 'rgba(52, 211, 153, 0.20)' : 'rgba(52, 211, 153, 0.35)');
+          sCtx.fillRect(groupX + subBarW + 1 * dpr, H - padBottom - bhY, subBarW, bhY);
+        }
+
+        sCtx.fillStyle = isDark ? '#94a3b8' : '#64748b';
+        sCtx.font = `${10 * dpr}px "JetBrains Mono", monospace`;
+        sCtx.textAlign = 'left';
+        sCtx.fillText('k = 1 (基频)', 8 * dpr, H - 4 * dpr);
+        sCtx.textAlign = 'center';
+        sCtx.fillText('■ Rx,k (上方水平级数)   ■ Ry,k (左方垂直级数)', W / 2, H - 4 * dpr);
+        sCtx.textAlign = 'right';
+        sCtx.fillText(`k = +${maxBins}`, W - 8 * dpr, H - 4 * dpr);
+        return;
+      }
+
+      // Complex Mode Spectrum
+      const items = state.harmonicsByFreq;
+      if (!items || items.length === 0) return;
+
+      const activeCount = Math.min(state.numCircles, state.harmonics.length);
+      const minActiveAmp = activeCount > 0 ? state.harmonics[activeCount - 1].amp : Infinity;
+
+      const halfWindow = Math.min(120, Math.floor(items.length / 2));
+      const centerIdx = items.findIndex(it => it.freq === 0);
+      if (centerIdx === -1) return;
+
+      const startIdx = Math.max(0, centerIdx - halfWindow);
+      const endIdx = Math.min(items.length - 1, centerIdx + halfWindow);
+      const count = endIdx - startIdx + 1;
+
+      let maxAmp = 1e-6;
+      for (let i = startIdx; i <= endIdx; i++) {
+        if (items[i].freq !== 0 && items[i].amp > maxAmp) {
+          maxAmp = items[i].amp;
+        }
+      }
+
+      const barStep = W / count;
+      const barWidth = Math.max(1.2 * dpr, barStep * 0.72);
+
+      const zeroX = (centerIdx - startIdx + 0.5) * barStep;
+      sCtx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.18)' : 'rgba(100, 116, 139, 0.2)';
+      sCtx.lineWidth = 1 * dpr;
+      sCtx.beginPath();
+      sCtx.moveTo(zeroX, 0);
+      sCtx.lineTo(zeroX, H - padBottom);
+      sCtx.stroke();
+
+      for (let i = startIdx; i <= endIdx; i++) {
+        const it = items[i];
+        if (it.freq === 0) continue;
+
+        let normH = 0;
+        if (state.spectrumLogScale) {
+          const logVal = Math.log10(1 + (it.amp / maxAmp) * 999);
+          normH = logVal / 3;
+        } else {
+          normH = it.amp / maxAmp;
+        }
+
+        const bh = Math.max(1.5 * dpr, normH * plotH);
+        const bx = (i - startIdx + 0.5) * barStep - barWidth / 2;
+        const by = H - padBottom - bh;
+
+        const isActive = it.amp >= minActiveAmp && activeCount > 0;
+        if (isActive) {
+          sCtx.fillStyle = '#38bdf8';
+        } else {
+          sCtx.fillStyle = isDark ? 'rgba(148, 163, 184, 0.22)' : 'rgba(148, 163, 184, 0.45)';
+        }
+        sCtx.fillRect(bx, by, barWidth, bh);
+      }
+
+      sCtx.fillStyle = isDark ? '#94a3b8' : '#64748b';
+      sCtx.font = `${10 * dpr}px "JetBrains Mono", monospace`;
+      sCtx.textAlign = 'center';
+      sCtx.fillText('k = 0', zeroX, H - 4 * dpr);
+      sCtx.textAlign = 'left';
+      sCtx.fillText(`k = -${halfWindow} (顺时针)`, 8 * dpr, H - 4 * dpr);
+      sCtx.textAlign = 'right';
+      sCtx.fillText(`k = +${halfWindow} (逆时针)`, W - 8 * dpr, H - 4 * dpr);
+    }
+
+    function renderEpicycleFrame() {
+      const W = epicycleCanvas.width;
+      const H = epicycleCanvas.height;
+      // vScale normalizes all stroke widths and typography against a 540x960 reference 9:16 stage
+      const vScale = W / 540;
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      // Deep dark navy-black background matching the video
+      ctx.fillStyle = '#05070b';
+      ctx.fillRect(0, 0, W, H);
+
+      // Subtle radial ambient glow in the center of the 9:16 stage for visual depth
+      const bgGrad = ctx.createRadialGradient(W * 0.5, H * 0.5, W * 0.05, W * 0.5, H * 0.5, W * 0.65);
+      bgGrad.addColorStop(0, 'rgba(14, 28, 54, 0.32)');
+      bgGrad.addColorStop(1, 'rgba(5, 7, 11, 0)');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, W, H);
+
+      if (state.harmonics.length === 0) return;
+
+      const twoPiT = 2 * Math.PI * state.t;
+      const centerScreenX = W / 2;
+      const centerScreenY = state.showVideoHud ? H * 0.505 : H * 0.5;
+
+      // Live curve coordinates (in normalized [-1, 1] curve space for HUD display)
+      let hudCurveX = 0;
+      let hudCurveY = 0;
+
+      if (state.epicycleMode === 'orthogonal') {
+        // ====================================================================
+        // ORTHOGONAL DUAL-EPICYCLE PROJECTION MODE RENDERER
+        // Top Chain -> X(t), Left Chain -> Y(t), intersecting at Bottom-Right
+        // ====================================================================
+        const baseScale = W * (state.showVideoHud ? 0.178 : 0.205);
+        const Ox = ORTHO_LAYOUT.drawOffsetX;
+        const Oy = ORTHO_LAYOUT.drawOffsetY;
+        const topOriginX = Ox + state.dcTerm.re;
+        const topOriginY = ORTHO_LAYOUT.topChainCenterY;
+        const leftOriginX = ORTHO_LAYOUT.leftChainCenterX;
+        const leftOriginY = Oy + state.dcTerm.im;
+
+        const activeLimitX = Math.min(state.numCircles, state.harmonicsX.length);
+        const shownLimitX = Math.min(activeLimitX, state.maxShownCircles);
+        const activeLimitY = Math.min(state.numCircles, state.harmonicsY.length);
+        const shownLimitY = Math.min(activeLimitY, state.maxShownCircles);
+
+        // 1. Evaluate Top Epicycle Chain (X-series)
+        let curTopX = topOriginX;
+        let curTopY = topOriginY;
+        const chainTop = new Array(shownLimitX);
+        for (let i = 0; i < activeLimitX; i++) {
+          const hx = state.harmonicsX[i];
+          const angleX = hx.freq * twoPiT + hx.phase;
+          const nextX = curTopX + hx.amp * Math.cos(angleX);
+          const nextY = curTopY + hx.amp * Math.sin(angleX);
+          if (i < shownLimitX) {
+            chainTop[i] = { cx: curTopX, cy: curTopY, nx: nextX, ny: nextY, r: hx.amp };
+          }
+          curTopX = nextX;
+          curTopY = nextY;
+        }
+        const topTipX = curTopX; // equals Ox + x(t)
+        const topTipY = curTopY;
+
+        // 2. Evaluate Left Epicycle Chain (Y-series)
+        let curLeftX = leftOriginX;
+        let curLeftY = leftOriginY;
+        const chainLeft = new Array(shownLimitY);
+        for (let i = 0; i < activeLimitY; i++) {
+          const hy = state.harmonicsY[i];
+          const angleY = hy.freq * twoPiT + hy.phase;
+          const nextX = curLeftX + hy.amp * Math.cos(angleY);
+          const nextY = curLeftY + hy.amp * Math.sin(angleY);
+          if (i < shownLimitY) {
+            chainLeft[i] = { cx: curLeftX, cy: curLeftY, nx: nextX, ny: nextY, r: hy.amp };
+          }
+          curLeftX = nextX;
+          curLeftY = nextY;
+        }
+        const leftTipX = curLeftX;
+        const leftTipY = curLeftY; // equals Oy + y(t)
+
+        // Intersection Pen Tip in Bottom-Right Drawing Area
+        const penTipX = topTipX;
+        const penTipY = leftTipY;
+
+        hudCurveX = penTipX - Ox;
+        hudCurveY = penTipY - Oy;
+
+        ctx.save();
+        if (state.followTip) {
+          const zoom = state.followZoom;
+          ctx.translate(centerScreenX, centerScreenY);
+          ctx.scale(baseScale * zoom, baseScale * zoom);
+          ctx.translate(-penTipX, -penTipY);
+        } else {
+          ctx.translate(centerScreenX + state.camPanX * vScale, centerScreenY + state.camPanY * vScale);
+          ctx.scale(baseScale * state.camZoom, baseScale * state.camZoom);
+        }
+
+        const invScale = 1 / (baseScale * (state.followTip ? state.followZoom : state.camZoom));
+
+        // Subtle Quadrant Framing Guides & Axis Labels
+        if (state.showProjectionLines) {
+          ctx.save();
+          // Drawing Zone frame in bottom-right
+          ctx.strokeStyle = 'rgba(51, 65, 85, 0.45)';
+          ctx.lineWidth = 1.0 * vScale * invScale;
+          ctx.strokeRect(Ox - 1.12, Oy - 1.12, 2.24, 2.24);
+
+          // Center crosshairs for Top Chain, Left Chain, and Drawing Area
+          ctx.strokeStyle = 'rgba(51, 65, 85, 0.35)';
+          ctx.beginPath();
+          // Top chain vertical center axis
+          ctx.moveTo(topOriginX, topOriginY - 1.05);
+          ctx.lineTo(topOriginX, topOriginY + 1.05);
+          // Left chain horizontal center axis
+          ctx.moveTo(leftOriginX - 1.05, leftOriginY);
+          ctx.lineTo(leftOriginX + 1.05, leftOriginY);
+          ctx.stroke();
+
+          // Top-Left Schematic Corner Box (X(t) ⊥ Y(t) indicator)
+          const cornerX = leftOriginX;
+          const cornerY = topOriginY;
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.22)';
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.55)';
+          ctx.beginPath();
+          ctx.arc(cornerX, cornerY, 0.72, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.stroke();
+
+          // Orthogonal axis arrows inside top-left indicator
+          ctx.strokeStyle = '#38bdf8';
+          ctx.lineWidth = 1.5 * vScale * invScale;
+          ctx.beginPath();
+          ctx.moveTo(cornerX - 0.42, cornerY);
+          ctx.lineTo(cornerX + 0.48, cornerY);
+          ctx.stroke();
+
+          ctx.strokeStyle = '#34d399';
+          ctx.beginPath();
+          ctx.moveTo(cornerX, cornerY - 0.42);
+          ctx.lineTo(cornerX, cornerY + 0.48);
+          ctx.stroke();
+
+          // Labels for the three zones
+          const labelFontPx = 10.5 * vScale * invScale;
+          ctx.font = `600 ${labelFontPx}px Inter, "JetBrains Mono", sans-serif`;
+          ctx.textAlign = 'center';
+
+          ctx.fillStyle = 'rgba(56, 189, 248, 0.88)';
+          ctx.fillText('上方水平本轮组 X(t)', Ox, topOriginY - 1.08);
+
+          ctx.fillStyle = 'rgba(52, 211, 153, 0.88)';
+          ctx.fillText('左方垂直本轮组 Y(t)', leftOriginX, Oy - 1.18);
+
+          ctx.fillStyle = 'rgba(226, 232, 240, 0.65)';
+          ctx.fillText('正交交汇作画区 (X, Y)', Ox, Oy + 1.26);
+          ctx.restore();
+        }
+
+        // Optional Original Contour Ghost Path in Bottom-Right Drawing Area
+        if (state.showOriginal && state.sampledPoints.length > 1) {
+          ctx.strokeStyle = 'rgba(148, 163, 184, 0.25)';
+          ctx.lineWidth = 1.3 * vScale * invScale;
+          ctx.beginPath();
+          for (let i = 0; i < state.sampledPoints.length; i++) {
+            const p = state.sampledPoints[i];
+            if (i === 0) ctx.moveTo(Ox + p.x, Oy + p.y);
+            else ctx.lineTo(Ox + p.x, Oy + p.y);
+          }
+          ctx.closePath();
+          ctx.stroke();
+        }
+
+        // Draw Top Epicycle Circles (Cyan tint) & Left Epicycle Circles (Emerald tint)
+        if (state.showCircles) {
+          ctx.lineWidth = 1.15 * vScale * invScale;
+
+          // Top X-Chain Circles
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.34)';
+          for (let i = 0; i < shownLimitX; i++) {
+            const c = chainTop[i];
+            ctx.beginPath();
+            ctx.arc(c.cx, c.cy, c.r, 0, 2 * Math.PI);
+            ctx.stroke();
+          }
+
+          // Left Y-Chain Circles
+          ctx.strokeStyle = 'rgba(52, 211, 153, 0.34)';
+          for (let i = 0; i < shownLimitY; i++) {
+            const c = chainLeft[i];
+            ctx.beginPath();
+            ctx.arc(c.cx, c.cy, c.r, 0, 2 * Math.PI);
+            ctx.stroke();
+          }
+        }
+
+        // Draw Rotating Radius Vectors for Top & Left Chains
+        if (state.showRadii) {
+          ctx.lineWidth = 1.2 * vScale * invScale;
+
+          if (shownLimitX > 0) {
+            ctx.strokeStyle = 'rgba(125, 211, 252, 0.62)';
+            ctx.beginPath();
+            ctx.moveTo(chainTop[0].cx, chainTop[0].cy);
+            for (let i = 0; i < shownLimitX; i++) {
+              ctx.lineTo(chainTop[i].nx, chainTop[i].ny);
+            }
+            if (activeLimitX > shownLimitX) {
+              ctx.lineTo(topTipX, topTipY);
+            }
+            ctx.stroke();
+          }
+
+          if (shownLimitY > 0) {
+            ctx.strokeStyle = 'rgba(110, 231, 183, 0.62)';
+            ctx.beginPath();
+            ctx.moveTo(chainLeft[0].cx, chainLeft[0].cy);
+            for (let i = 0; i < shownLimitY; i++) {
+              ctx.lineTo(chainLeft[i].nx, chainLeft[i].ny);
+            }
+            if (activeLimitY > shownLimitY) {
+              ctx.lineTo(leftTipX, leftTipY);
+            }
+            ctx.stroke();
+          }
+        }
+
+        // Draw Orthogonal Dashed Projection Lines from Top Tip & Left Tip to Intersection Pen Tip
+        if (state.showProjectionLines) {
+          ctx.save();
+          const dashLen = 6 * vScale * invScale;
+          const gapLen = 4.5 * vScale * invScale;
+          ctx.setLineDash([dashLen, gapLen]);
+          ctx.lineWidth = 1.65 * vScale * invScale;
+
+          // Vertical Projection Line from Top X-Chain Tip straight down to Pen Tip
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.82)';
+          ctx.beginPath();
+          ctx.moveTo(topTipX, topTipY);
+          ctx.lineTo(penTipX, penTipY);
+          ctx.stroke();
+
+          // Horizontal Projection Line from Left Y-Chain Tip straight right to Pen Tip
+          ctx.strokeStyle = 'rgba(52, 211, 153, 0.82)';
+          ctx.beginPath();
+          ctx.moveTo(leftTipX, leftTipY);
+          ctx.lineTo(penTipX, penTipY);
+          ctx.stroke();
+
+          ctx.restore();
+        }
+
+        // Drawn Pen Trail in Bottom-Right Drawing Area
+        if (state.trail.length > 1) {
+          const isHighDetail = state.numCircles >= 8;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+
+          ctx.beginPath();
+          for (let i = 0; i < state.trail.length; i++) {
+            const pt = state.trail[i];
+            if (i === 0) ctx.moveTo(Ox + pt.x, Oy + pt.y);
+            else ctx.lineTo(Ox + pt.x, Oy + pt.y);
+          }
+
+          ctx.strokeStyle = isHighDetail ? 'rgba(56, 189, 248, 0.28)' : 'rgba(255, 255, 255, 0.25)';
+          ctx.lineWidth = 5.0 * vScale * invScale;
+          ctx.stroke();
+
+          ctx.strokeStyle = isHighDetail ? '#38bdf8' : '#ffffff';
+          ctx.lineWidth = 2.4 * vScale * invScale;
+          ctx.stroke();
+        }
+
+        // Glowing Dots on Top Tip, Left Tip, and Intersection Pen Tip
+        // Top Chain Tip Dot (Cyan)
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.45)';
+        ctx.beginPath();
+        ctx.arc(topTipX, topTipY, 5.2 * vScale * invScale, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.fillStyle = '#e0f2fe';
+        ctx.beginPath();
+        ctx.arc(topTipX, topTipY, 2.8 * vScale * invScale, 0, 2 * Math.PI);
+        ctx.fill();
+
+        // Left Chain Tip Dot (Emerald)
+        ctx.fillStyle = 'rgba(52, 211, 153, 0.45)';
+        ctx.beginPath();
+        ctx.arc(leftTipX, leftTipY, 5.2 * vScale * invScale, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.fillStyle = '#d1fae5';
+        ctx.beginPath();
+        ctx.arc(leftTipX, leftTipY, 2.8 * vScale * invScale, 0, 2 * Math.PI);
+        ctx.fill();
+
+        // Intersection Pen Tip Dot (Bright White + Cyan/Emerald Halo)
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.52)';
+        ctx.beginPath();
+        ctx.arc(penTipX, penTipY, 6.8 * vScale * invScale, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(penTipX, penTipY, 3.6 * vScale * invScale, 0, 2 * Math.PI);
+        ctx.fill();
+
+        ctx.restore();
+      } else {
+        // ====================================================================
+        // COMPLEX SINGLE-CHAIN EPICYCLE MODE RENDERER
+        // ====================================================================
+        const baseScale = W * (state.showVideoHud ? 0.34 : 0.40);
+        const activeLimit = Math.min(state.numCircles, state.harmonics.length);
+        const shownLimit = Math.min(activeLimit, state.maxShownCircles);
+
+        let curX = state.dcTerm.re;
+        let curY = state.dcTerm.im;
+
+        const chainCenters = new Array(shownLimit);
+        for (let i = 0; i < activeLimit; i++) {
+          const h = state.harmonics[i];
+          const angle = h.freq * twoPiT + h.phase;
+          const nextX = curX + h.amp * Math.cos(angle);
+          const nextY = curY + h.amp * Math.sin(angle);
+          if (i < shownLimit) {
+            chainCenters[i] = {
+              cx: curX,
+              cy: curY,
+              nx: nextX,
+              ny: nextY,
+              r: h.amp
+            };
+          }
+          curX = nextX;
+          curY = nextY;
+        }
+
+        const tipX = curX;
+        const tipY = curY;
+        hudCurveX = tipX;
+        hudCurveY = tipY;
+
+        ctx.save();
+        if (state.followTip) {
+          const zoom = state.followZoom;
+          ctx.translate(centerScreenX, centerScreenY);
+          ctx.scale(baseScale * zoom, baseScale * zoom);
+          ctx.translate(-tipX, -tipY);
+        } else {
+          ctx.translate(centerScreenX + state.camPanX * vScale, centerScreenY + state.camPanY * vScale);
+          ctx.scale(baseScale * state.camZoom, baseScale * state.camZoom);
+        }
+
+        const invScale = 1 / (baseScale * (state.followTip ? state.followZoom : state.camZoom));
+
+        // 1. Optional Original Contour Ghost Path
+        if (state.showOriginal && state.sampledPoints.length > 1) {
+          ctx.strokeStyle = 'rgba(148, 163, 184, 0.25)';
+          ctx.lineWidth = 1.3 * vScale * invScale;
+          ctx.beginPath();
+          for (let i = 0; i < state.sampledPoints.length; i++) {
+            const p = state.sampledPoints[i];
+            if (i === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+          }
+          ctx.closePath();
+          ctx.stroke();
+        }
+
+        // 2. Epicycle Circles
+        if (state.showCircles) {
+          ctx.strokeStyle = 'rgba(148, 178, 222, 0.30)';
+          ctx.lineWidth = 1.15 * vScale * invScale;
+          for (let i = 0; i < shownLimit; i++) {
+            const c = chainCenters[i];
+            ctx.beginPath();
+            ctx.arc(c.cx, c.cy, c.r, 0, 2 * Math.PI);
+            ctx.stroke();
+          }
+        }
+
+        // 3. Rotating Radius Vectors
+        if (state.showRadii && shownLimit > 0) {
+          ctx.strokeStyle = 'rgba(226, 232, 240, 0.48)';
+          ctx.lineWidth = 1.2 * vScale * invScale;
+          ctx.beginPath();
+          ctx.moveTo(chainCenters[0].cx, chainCenters[0].cy);
+          for (let i = 0; i < shownLimit; i++) {
+            ctx.lineTo(chainCenters[i].nx, chainCenters[i].ny);
+          }
+          if (activeLimit > shownLimit) {
+            ctx.lineTo(tipX, tipY);
+          }
+          ctx.stroke();
+        }
+
+        // 4. Drawn Pen Trail
+        if (state.trail.length > 1) {
+          const isHighDetail = state.numCircles >= 8;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+
+          ctx.beginPath();
+          for (let i = 0; i < state.trail.length; i++) {
+            const pt = state.trail[i];
+            if (i === 0) ctx.moveTo(pt.x, pt.y);
+            else ctx.lineTo(pt.x, pt.y);
+          }
+
+          ctx.strokeStyle = isHighDetail ? 'rgba(56, 189, 248, 0.28)' : 'rgba(255, 255, 255, 0.25)';
+          ctx.lineWidth = 5.0 * vScale * invScale;
+          ctx.stroke();
+
+          ctx.strokeStyle = isHighDetail ? '#38bdf8' : '#ffffff';
+          ctx.lineWidth = 2.4 * vScale * invScale;
+          ctx.stroke();
+        }
+
+        // 5. Glowing White Pen Tip Dot
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.45)';
+        ctx.beginPath();
+        ctx.arc(tipX, tipY, 6.2 * vScale * invScale, 0, 2 * Math.PI);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(tipX, tipY, 3.4 * vScale * invScale, 0, 2 * Math.PI);
+        ctx.fill();
+
+        ctx.restore();
+      }
+
+      // 6. 9:16 Portrait HUD: Top Numerical Expansion Box & Bottom Readouts
+      if (state.showVideoHud) {
+        const { rmsErrorPercent } = computeErrorMetrics(state.numCircles);
+        const isOrtho = state.epicycleMode === 'orthogonal';
+
+        ctx.save();
+
+        // --- TOP HUD: Real-Time Numerical Series Expansion of Current Shape ---
+        const modeTag = isOrtho ? '正交双环投影' : '复数单链';
+        const headerLine = `${state.shapeName} [${modeTag}] · 实时笔尖 (${hudCurveX.toFixed(2)}, ${(-hudCurveY).toFixed(2)})`;
+        const lineX = state.expansionFormulaX;
+        const lineY = state.expansionFormulaY;
+
+        let formulaFontPx = Math.round(12.5 * vScale);
+        ctx.font = `500 ${formulaFontPx}px "JetBrains Mono", monospace`;
+        const maxLineWidth = Math.max(ctx.measureText(lineX).width, ctx.measureText(lineY).width);
+        const maxAllowedW = W * 0.88;
+        if (maxLineWidth > maxAllowedW && maxLineWidth > 0) {
+          formulaFontPx = Math.max(Math.round(9 * vScale), Math.floor(formulaFontPx * (maxAllowedW / maxLineWidth)));
+          ctx.font = `500 ${formulaFontPx}px "JetBrains Mono", monospace`;
+        }
+
+        const boxPadX = 16 * vScale;
+        const boxPadY = 12 * vScale;
+        const lineGap = Math.round(formulaFontPx * 1.55);
+        const contentW = Math.min(
+          W * 0.92,
+          Math.max(ctx.measureText(lineX).width, ctx.measureText(lineY).width, ctx.measureText(headerLine).width) + boxPadX * 2
+        );
+        const boxH = boxPadY * 2 + lineGap * 2.85;
+        const boxX = (W - contentW) / 2;
+        const boxY = H * 0.055;
+
+        // Translucent dark HUD panel behind the live numerical expansion
+        ctx.fillStyle = 'rgba(10, 15, 26, 0.82)';
+        ctx.strokeStyle = isOrtho ? 'rgba(52, 211, 153, 0.35)' : 'rgba(56, 189, 248, 0.32)';
+        ctx.lineWidth = 1.2 * vScale;
+        ctx.beginPath();
+        if (typeof ctx.roundRect === 'function') {
+          ctx.roundRect(boxX, boxY, contentW, boxH, 12 * vScale);
+        } else {
+          ctx.rect(boxX, boxY, contentW, boxH);
+        }
+        ctx.fill();
+        ctx.stroke();
+
+        // Line 1: Shape Name & Live Coordinates Header
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = `600 ${Math.max(Math.round(11 * vScale), formulaFontPx - Math.round(1 * vScale))}px Inter, "JetBrains Mono", sans-serif`;
+        ctx.fillText(headerLine, W / 2, boxY + boxPadY + formulaFontPx * 0.85);
+
+        // Line 2: x_N(t) Numerical Expansion
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = `500 ${formulaFontPx}px "JetBrains Mono", monospace`;
+        ctx.fillText(lineX, W / 2, boxY + boxPadY + formulaFontPx * 0.85 + lineGap);
+
+        // Line 3: y_N(t) Numerical Expansion
+        ctx.fillStyle = isOrtho ? '#34d399' : '#7dd3fc';
+        ctx.font = `500 ${formulaFontPx}px "JetBrains Mono", monospace`;
+        ctx.fillText(lineY, W / 2, boxY + boxPadY + formulaFontPx * 0.85 + lineGap * 2);
+
+        // --- BOTTOM HUD: Localized Circles & Relative RMS Error Readouts ---
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#7dd3fc';
+        ctx.font = `600 ${Math.round(25 * vScale)}px Inter, system-ui, sans-serif`;
+        if (isOrtho) {
+          ctx.fillText(`正交本轮 : ${state.numCircles} × 2 组`, W / 2, H * 0.845);
+        } else {
+          ctx.fillText(`本轮数量 : ${state.numCircles}`, W / 2, H * 0.845);
+        }
+
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = `500 ${Math.round(16 * vScale)}px "JetBrains Mono", Inter, sans-serif`;
+        ctx.fillText(`相对 RMS 误差 : ${rmsErrorPercent.toFixed(4)}%`, W / 2, H * 0.885);
+
+        ctx.fillStyle = 'rgba(203, 213, 225, 0.78)';
+        ctx.font = `400 ${Math.round(12 * vScale)}px Inter, system-ui, sans-serif`;
+        const shownInfo = isOrtho
+          ? (state.numCircles > state.maxShownCircles
+              ? `X/Y 各显示 ${state.maxShownCircles} 个本轮 · 各参与计算 ${state.numCircles} 个本轮`
+              : `上方 X(t) 与左方 Y(t) 各完整显示 ${state.numCircles} 个正交本轮`)
+          : (state.numCircles > state.maxShownCircles
+              ? `已显示 ${state.maxShownCircles} 个本轮 · 参与计算 ${state.numCircles} 个本轮`
+              : `已完整显示全部 ${state.numCircles} 个旋转本轮`);
+        ctx.fillText(shownInfo, W / 2, H * 0.922);
+
+        ctx.restore();
+      }
+    }
+
+    // Returns the active progression sequence [1, 2, 4, 8, 32, 128, 256, 1024] clamped to available harmonics
+    function getValidAutoSteps() {
+      const maxTerms = getMaxSelectableCircles();
+      const valid = VIDEO_AUTO_STEPS.filter(n => n <= maxTerms);
+      return valid.length > 0 ? valid : [maxTerms];
+    }
+
+    function setAutoStepUI(enabled) {
+      state.autoStepEnabled = enabled;
+      const dot = document.getElementById('autostep-dot');
+      const status = document.getElementById('autostep-status');
+      if (enabled) {
+        const steps = getValidAutoSteps();
+        dot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-ping';
+        status.textContent = `${state.autoStepIndex + 1}/${steps.length} · N=${steps[state.autoStepIndex] || state.numCircles}`;
+        status.className = 'font-mono text-[11px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300';
+      } else {
+        dot.className = 'w-2 h-2 rounded-full bg-slate-400';
+        status.textContent = 'OFF';
+        status.className = 'font-mono text-[11px] px-1.5 py-0.5 rounded bg-slate-900/40';
+      }
+    }
+
+    // Main RequestAnimationFrame Loop
+    let lastFrameTime = performance.now();
+    function animationLoop(now) {
+      const dt = Math.min(0.05, (now - lastFrameTime) / 1000);
+      lastFrameTime = now;
+
+      if (state.isPlaying) {
+        if (state.pauseHoldTimer > 0) {
+          state.pauseHoldTimer -= dt;
+          if (state.pauseHoldTimer <= 0) {
+            if (state.isRecording && state.recordMode === 'cycle') {
+              stopAnimationRecording();
+              resetAnimationCycle();
+            } else if (state.isRecording && state.recordMode === 'autostep') {
+              const validSteps = getValidAutoSteps();
+              if (state.autoStepIndex >= validSteps.length - 1) {
+                stopAnimationRecording();
+                setAutoStepUI(false);
+                resetAnimationCycle();
+              } else {
+                advanceAutoStep();
+              }
+            } else if (state.autoStepEnabled) {
+              advanceAutoStep();
+            } else {
+              resetAnimationCycle();
+            }
+          }
+        } else {
+          const cycleDuration = 3.2 / state.speed;
+          const prevT = state.t;
+          const nextT = Math.min(1.0, prevT + dt / cycleDuration);
+
+          const subSteps = Math.max(4, Math.ceil((nextT - prevT) * state.sampleCount));
+          for (let s = 1; s <= subSteps; s++) {
+            const interpT = prevT + ((nextT - prevT) * s) / subSteps;
+            state.trail.push(evaluateFourierAtTime(interpT, state.numCircles));
+          }
+
+          state.t = nextT;
+          document.getElementById('cycle-progress-label').textContent = `t = ${state.t.toFixed(3)}`;
+
+          if (state.isRecording) {
+            if (state.recordMode === 'autostep') {
+              const validSteps = getValidAutoSteps();
+              const stageNum = state.autoStepIndex + 1;
+              const totalStages = validSteps.length;
+              const overallPct = Math.min(
+                100,
+                Math.round(((state.autoStepIndex + state.t) / totalStages) * 100)
+              );
+              document.getElementById('record-btn-text').textContent =
+                `正在录制第 ${stageNum}/${totalStages} 关 (N=${state.numCircles}) · 总进度 ${overallPct}% (点击可提前保存)`;
+              document.getElementById('header-record-label').textContent =
+                `录制中 ${stageNum}/${totalStages} (${overallPct}%)`;
+            } else if (state.recordMode === 'cycle') {
+              const pct = Math.round(state.t * 100);
+              document.getElementById('record-btn-text').textContent =
+                `正在录制 9:16 单周期 (${pct}%)... 点击可提前完成`;
+              document.getElementById('header-record-label').textContent = `录制中 ${pct}%`;
+            }
+          }
+
+          if (state.t >= 1.0) {
+            state.trail.push(evaluateFourierAtTime(0, state.numCircles));
+            state.pauseHoldTimer = 0.55;
+            playCycleChime(Math.min(1, Math.log2(state.numCircles + 1) / 11));
+          }
+        }
+      }
+
+      renderEpicycleFrame();
+      requestAnimationFrame(animationLoop);
+    }
+
+    function advanceAutoStep() {
+      const validSteps = getValidAutoSteps();
+      state.autoStepIndex = (state.autoStepIndex + 1) % validSteps.length;
+      const nextN = validSteps[state.autoStepIndex];
+      setCircleCount(nextN);
+      if (state.autoStepEnabled) {
+        setAutoStepUI(true);
+      }
+    }
+
+    function setCircleCount(newN) {
+      const maxTerms = getMaxSelectableCircles();
+      const clamped = Math.max(1, Math.min(maxTerms, Math.round(newN)));
+      state.numCircles = clamped;
+      document.getElementById('slider-circles').value = clamped;
+      document.getElementById('input-circles').value = clamped;
+      updateCircleQuickButtonsUI();
+      resetAnimationCycle();
+      updateReadoutUI();
+      drawSpectrumChart();
+    }
+
+    function ensureSampleCountFor1024() {
+      if (state.sampleCount < 2048) {
+        state.sampleCount = 2048;
+        document.getElementById('select-samples').value = '2048';
+        if (state.lastSvgMeta && state.lastSvgMeta.subpaths) {
+          const strategy = document.getElementById('svg-path-strategy').value;
+          const pts = stitchAndResampleSubpaths(state.lastSvgMeta.subpaths, state.sampleCount, strategy);
+          rebuildCurrentContourAndFFT(pts, false);
+        } else {
+          const pts = resampleClosedPolyline(state.sampledPoints, state.sampleCount);
+          rebuildCurrentContourAndFFT(pts, false);
+        }
+      }
+    }
+
+    // ============================================================================
+    // 6. EVENT LISTENERS & UI BINDINGS
+    // ============================================================================
+    function setStatusMessage(msg) {
+      document.getElementById('status-text').textContent = msg;
+    }
+
+    // Mode Switcher Buttons (Left Panel & Top Stage Bar)
+    document.getElementById('btn-mode-complex').addEventListener('click', () => {
+      setEpicycleMode('complex');
+    });
+    document.getElementById('btn-mode-orthogonal').addEventListener('click', () => {
+      setEpicycleMode('orthogonal');
+    });
+    document.getElementById('btn-stage-mode-toggle').addEventListener('click', () => {
+      setEpicycleMode(state.epicycleMode === 'complex' ? 'orthogonal' : 'complex');
+    });
+
+    // Presets Bar
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.getAttribute('data-preset');
+        document.querySelectorAll('.preset-btn').forEach(b => {
+          const isActive = b === btn;
+          b.className = isActive
+            ? 'preset-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-sky-500/15 text-sky-600 dark:text-sky-300 border border-sky-500/40 hover:bg-sky-500/25 transition flex items-center gap-1.5'
+            : 'preset-btn px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800/70 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/40 transition';
+        });
+        state.lastSvgMeta = null;
+        document.getElementById('svg-info-card').classList.add('hidden');
+        const pts = generatePresetPoints(key, state.sampleCount);
+        rebuildCurrentContourAndFFT(pts, false);
+        setStatusMessage(`已加载预设: ${state.shapeName} (${state.sampleCount} 采样点 · 9:16 竖屏 ${state.videoWidth}×${state.videoHeight})`);
+      });
+    });
+
+    // Robust File Reader with UTF-8 and GBK fallback
+    async function readSvgFileAsText(file) {
+      if (typeof file.arrayBuffer === 'function') {
+        const buffer = await file.arrayBuffer();
+        const utf8Decoder = new TextDecoder('utf-8', { fatal: false });
+        let text = utf8Decoder.decode(buffer);
+        if (text.includes('\uFFFD')) {
+          try {
+            const gbkDecoder = new TextDecoder('gbk', { fatal: false });
+            text = gbkDecoder.decode(buffer);
+          } catch (e) {
+            // Keep UTF-8 decoded text
+          }
+        }
+        return text;
+      }
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('无法读取本地文件。'));
+        reader.readAsText(file, 'utf-8');
+      });
+    }
+
+    async function handleSVGFileLoad(file) {
+      if (!file) return;
+      const overlay = document.getElementById('svg-loading-overlay');
+      const loadTitle = document.getElementById('loading-title');
+      const loadSub = document.getElementById('loading-subtitle');
+
+      const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+      const sizeStr = file.size >= 1024 * 1024
+        ? `${sizeMB} MB`
+        : `${(file.size / 1024).toFixed(1)} KB`;
+
+      overlay.classList.remove('hidden');
+      overlay.classList.add('flex');
+      loadTitle.textContent = `正在读取 ${file.name} (${sizeStr})...`;
+      loadSub.textContent = '无文件大小限制 · 正在解析 SVG 几何路径与变换矩阵';
+
+      await new Promise(r => setTimeout(r, 25));
+
+      try {
+        const text = await readSvgFileAsText(file);
+        await parseAndApplySVGText(text, file.name, sizeStr);
+      } catch (err) {
+        console.error('SVG Import Error:', err);
+        setStatusMessage(`❌ 解析错误: ${err.message}`);
+      } finally {
+        overlay.classList.add('hidden');
+        overlay.classList.remove('flex');
+      }
+    }
+
+    async function parseAndApplySVGText(svgText, fileName = 'pasted.svg', sizeStr = '文本输入') {
+      let result;
+      try {
+        result = extractSubpathsFromSVGString(svgText, fileName, sizeStr);
+      } catch (vectorErr) {
+        if (/<image[\s>]/i.test(svgText)) {
+          result = await extractContourFromRasterSVG(svgText, fileName, sizeStr);
+        } else {
+          throw vectorErr;
+        }
+      }
+
+      state.lastSvgMeta = result;
+      state.shapeName = fileName.replace(/\.svg$/i, '').toUpperCase();
+
+      const strategy = document.getElementById('svg-path-strategy').value;
+      const pts = stitchAndResampleSubpaths(result.subpaths, state.sampleCount, strategy);
+
+      if (!pts || pts.length === 0) {
+        throw new Error('路径重采样为空，请检查 SVG 是否包含有效坐标。');
+      }
+
+      state.camZoom = 1.0;
+      state.camPanX = 0;
+      state.camPanY = 0;
+
+      const infoCard = document.getElementById('svg-info-card');
+      infoCard.classList.remove('hidden');
+      infoCard.classList.add('flex');
+      document.getElementById('info-filename').textContent = fileName;
+      document.getElementById('info-filesize').textContent = `${sizeStr} · ${result.elapsedMs} ms`;
+      document.getElementById('info-subpaths').textContent = `${result.subpaths.length} 段子路径 · 周长 ${result.totalLength}`;
+
+      rebuildCurrentContourAndFFT(pts, false);
+      setStatusMessage(`✅ 成功导入 SVG: ${fileName} (${result.subpaths.length} 子路径, ${state.sampleCount} 采样点)`);
+    }
+
+    const svgFileInput = document.getElementById('svg-file-input');
+    const svgDropzone = document.getElementById('svg-dropzone');
+
+    svgDropzone.addEventListener('click', (e) => {
+      e.preventDefault();
+      svgFileInput.value = '';
+      svgFileInput.click();
+    });
+
+    svgDropzone.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        svgFileInput.value = '';
+        svgFileInput.click();
+      }
+    });
+
+    svgFileInput.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) {
+        handleSVGFileLoad(file);
+      }
+      e.target.value = '';
+    });
+
+    document.getElementById('svg-path-strategy').addEventListener('change', (e) => {
+      if (state.lastSvgMeta && state.lastSvgMeta.subpaths) {
+        const pts = stitchAndResampleSubpaths(state.lastSvgMeta.subpaths, state.sampleCount, e.target.value);
+        rebuildCurrentContourAndFFT(pts, false);
+      }
+    });
+
+    ['dragenter', 'dragover'].forEach(evtName => {
+      window.addEventListener(evtName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+        svgDropzone.classList.add('border-sky-400', 'bg-sky-500/10');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(evtName => {
+      window.addEventListener(evtName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        svgDropzone.classList.remove('border-sky-400', 'bg-sky-500/10');
+      });
+    });
+
+    window.addEventListener('drop', (e) => {
+      const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (file) {
+        handleSVGFileLoad(file);
+      }
+    });
+
+    document.getElementById('btn-toggle-svg-paste').addEventListener('click', () => {
+      const box = document.getElementById('svg-paste-box');
+      box.classList.toggle('hidden');
+      box.classList.toggle('flex');
+    });
+
+    document.getElementById('btn-parse-raw-svg').addEventListener('click', async () => {
+      const raw = document.getElementById('svg-raw-textarea').value.trim();
+      if (!raw) return;
+      try {
+        await parseAndApplySVGText(raw, 'pasted_code.svg', `${(raw.length / 1024).toFixed(1)} KB`);
+      } catch (err) {
+        setStatusMessage(`❌ 解析失败: ${err.message}`);
+      }
+    });
+
+    // Canvas Pointer Interactions (Normalized to 540x960 virtual stage units)
+    const canvasWrapper = document.getElementById('canvas-wrapper');
+
+    function getPointerVirtualPos(e) {
+      const rect = epicycleCanvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const scaleToVirtual = 540 / Math.max(1, rect.width);
+      return {
+        x: (clientX - rect.left) * scaleToVirtual,
+        y: (clientY - rect.top) * scaleToVirtual
+      };
+    }
+
+    canvasWrapper.addEventListener('mousedown', (e) => {
+      const pos = getPointerVirtualPos(e);
+      state.isDraggingCanvas = true;
+      state.dragStartX = pos.x - state.camPanX;
+      state.dragStartY = pos.y - state.camPanY;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (state.isDraggingCanvas) {
+        const pos = getPointerVirtualPos(e);
+        state.camPanX = pos.x - state.dragStartX;
+        state.camPanY = pos.y - state.dragStartY;
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      state.isDraggingCanvas = false;
+    });
+
+    canvasWrapper.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) {
+        const pos = getPointerVirtualPos(e);
+        state.isDraggingCanvas = true;
+        state.dragStartX = pos.x - state.camPanX;
+        state.dragStartY = pos.y - state.camPanY;
+      }
+    }, { passive: true });
+
+    canvasWrapper.addEventListener('touchmove', (e) => {
+      if (state.isDraggingCanvas && e.touches.length === 1) {
+        const pos = getPointerVirtualPos(e);
+        state.camPanX = pos.x - state.dragStartX;
+        state.camPanY = pos.y - state.dragStartY;
+      }
+    }, { passive: true });
+
+    canvasWrapper.addEventListener('touchend', () => {
+      state.isDraggingCanvas = false;
+    });
+
+    canvasWrapper.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.12 : 0.89;
+      state.camZoom = Math.max(0.25, Math.min(20, state.camZoom * factor));
+    }, { passive: false });
+
+    document.getElementById('btn-zoom-in').addEventListener('click', () => {
+      state.camZoom = Math.min(20, state.camZoom * 1.25);
+    });
+    document.getElementById('btn-zoom-out').addEventListener('click', () => {
+      state.camZoom = Math.max(0.25, state.camZoom / 1.25);
+    });
+    document.getElementById('btn-reset-view').addEventListener('click', () => {
+      state.camZoom = 1.0;
+      state.camPanX = 0;
+      state.camPanY = 0;
+      state.followTip = false;
+      document.getElementById('chk-follow-tip').checked = false;
+    });
+
+    // Harmonics (Circles) Slider & Numeric Input
+    document.getElementById('slider-circles').addEventListener('input', (e) => {
+      setCircleCount(parseInt(e.target.value, 10));
+    });
+
+    document.getElementById('input-circles').addEventListener('change', (e) => {
+      setCircleCount(parseInt(e.target.value, 10) || 1);
+    });
+
+    document.querySelectorAll('.circle-quick-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const setVal = btn.getAttribute('data-circle-set');
+        const stepVal = btn.getAttribute('data-circle-step');
+        if (setVal === 'max') {
+          setCircleCount(getMaxSelectableCircles());
+        } else if (setVal) {
+          const targetN = parseInt(setVal, 10);
+          if (targetN >= 1024 || targetN > getMaxSelectableCircles()) {
+            ensureSampleCountFor1024();
+          }
+          setCircleCount(targetN);
+        } else if (stepVal) {
+          setCircleCount(state.numCircles + parseInt(stepVal, 10));
+        }
+      });
+    });
+
+    // Sample Resolution Selector
+    document.getElementById('select-samples').addEventListener('change', (e) => {
+      state.sampleCount = parseInt(e.target.value, 10);
+      if (state.lastSvgMeta && state.lastSvgMeta.subpaths) {
+        const strategy = document.getElementById('svg-path-strategy').value;
+        const pts = stitchAndResampleSubpaths(state.lastSvgMeta.subpaths, state.sampleCount, strategy);
+        rebuildCurrentContourAndFFT(pts, false);
+      } else {
+        const pts = resampleClosedPolyline(state.sampledPoints, state.sampleCount);
+        rebuildCurrentContourAndFFT(pts, false);
+      }
+      setStatusMessage(`已切换 FFT 采样精度: ${state.sampleCount} 点`);
+    });
+
+    // Max Shown Circles Selector
+    document.getElementById('select-shown-circles').addEventListener('change', (e) => {
+      state.maxShownCircles = parseInt(e.target.value, 10);
+      updateReadoutUI();
+    });
+
+    // 9:16 Video Resolution Selector (1080P / 2K / 4K)
+    document.getElementById('select-video-res').addEventListener('change', (e) => {
+      const key = parseInt(e.target.value, 10) || 1080;
+      const preset = VIDEO_RES_PRESETS[key] || VIDEO_RES_PRESETS[1080];
+      state.videoWidth = preset.width;
+      state.videoHeight = preset.height;
+      state.videoBitrate = preset.bitrate;
+      applyVideoResolutionBuffer();
+      renderEpicycleFrame();
+      setStatusMessage(`📐 已切换 9:16 竖屏超清画布分辨率: ${preset.label}`);
+    });
+
+    // Playback Controls
+    document.getElementById('btn-play-pause').addEventListener('click', () => {
+      state.isPlaying = !state.isPlaying;
+      document.getElementById('play-icon').textContent = state.isPlaying ? '⏸' : '▶';
+      document.getElementById('play-label').textContent = state.isPlaying ? '暂停动画 (Pause)' : '继续播放 (Play)';
+    });
+
+    document.getElementById('btn-reset-cycle').addEventListener('click', () => {
+      resetAnimationCycle();
+    });
+
+    // Video Auto-Step 1 -> 1024 Mode Toggle
+    document.getElementById('btn-autostep').addEventListener('click', () => {
+      if (!state.autoStepEnabled) {
+        ensureSampleCountFor1024();
+        state.autoStepIndex = 0;
+        const validSteps = getValidAutoSteps();
+        setCircleCount(validSteps[0]);
+        setAutoStepUI(true);
+        state.isPlaying = true;
+        document.getElementById('play-icon').textContent = '⏸';
+        document.getElementById('play-label').textContent = '暂停动画 (Pause)';
+        setStatusMessage(`🎬 已开启递增演示: 依次演示 N = ${validSteps.join(' → ')}`);
+      } else {
+        setAutoStepUI(false);
+        setStatusMessage('已关闭递增演示模式');
+      }
+    });
+
+    document.getElementById('select-record-mode').addEventListener('change', (e) => {
+      state.recordMode = e.target.value;
+      if (!state.isRecording) {
+        updateRecordingUI(false);
+      }
+    });
+
+    // Speed Slider
+    document.getElementById('slider-speed').addEventListener('input', (e) => {
+      state.speed = parseFloat(e.target.value);
+      document.getElementById('label-speed').textContent = `${state.speed.toFixed(2)}x`;
+    });
+
+    // Checkboxes
+    document.getElementById('chk-show-circles').addEventListener('change', (e) => {
+      state.showCircles = e.target.checked;
+    });
+    document.getElementById('chk-show-radii').addEventListener('change', (e) => {
+      state.showRadii = e.target.checked;
+    });
+    document.getElementById('chk-show-original').addEventListener('change', (e) => {
+      state.showOriginal = e.target.checked;
+    });
+    document.getElementById('chk-video-hud').addEventListener('change', (e) => {
+      state.showVideoHud = e.target.checked;
+    });
+    document.getElementById('chk-show-projection').addEventListener('change', (e) => {
+      state.showProjectionLines = e.target.checked;
+    });
+    document.getElementById('chk-follow-tip').addEventListener('change', (e) => {
+      state.followTip = e.target.checked;
+    });
+    document.getElementById('select-follow-zoom').addEventListener('change', (e) => {
+      state.followZoom = parseFloat(e.target.value);
+    });
+
+    // Spectrum Scale Toggle
+    document.getElementById('btn-spectrum-scale').addEventListener('click', (e) => {
+      state.spectrumLogScale = !state.spectrumLogScale;
+      e.currentTarget.textContent = state.spectrumLogScale ? '纵轴: 对数刻度 (Log)' : '纵轴: 线性刻度 (Linear)';
+      drawSpectrumChart();
+    });
+
+    // Sound Toggle
+    document.getElementById('btn-sound-toggle').addEventListener('click', () => {
+      state.soundEnabled = !state.soundEnabled;
+      document.getElementById('sound-icon').textContent = state.soundEnabled ? '🔊' : '🔇';
+      document.getElementById('sound-label').textContent = state.soundEnabled ? '周期音效: 开' : '周期音效: 关';
+      if (state.soundEnabled) playCycleChime(0.5);
+    });
+
+    // Export 9:16 Ultra-HD PNG Snapshot
+    document.getElementById('btn-export-png').addEventListener('click', () => {
+      renderEpicycleFrame();
+      const link = document.createElement('a');
+      const modePrefix = state.epicycleMode === 'orthogonal' ? 'ortho' : 'complex';
+      link.download = `fourier-9x16-${modePrefix}-${state.videoWidth}x${state.videoHeight}-${state.shapeName.toLowerCase()}-${state.numCircles}circles.png`;
+      link.href = epicycleCanvas.toDataURL('image/png');
+      link.click();
+      setStatusMessage(`📷 已导出 9:16 超清 PNG (${state.videoWidth}×${state.videoHeight})`);
+    });
+
+    // ============================================================================
+    // 9:16 ULTRA-HD VIDEO ANIMATION RECORDER (60 FPS + High Profile H.264 / VP9)
+    // ============================================================================
+    function detectSupportedVideoMime() {
+      const candidates = [
+        { mime: 'video/mp4;codecs="avc1.640033"', ext: 'mp4' },
+        { mime: 'video/mp4;codecs="avc1.64002a"', ext: 'mp4' },
+        { mime: 'video/mp4;codecs=avc1', ext: 'mp4' },
+        { mime: 'video/mp4', ext: 'mp4' },
+        { mime: 'video/webm;codecs=vp9', ext: 'webm' },
+        { mime: 'video/webm;codecs=vp8', ext: 'webm' },
+        { mime: 'video/webm', ext: 'webm' }
+      ];
+      if (typeof MediaRecorder === 'undefined') return null;
+      for (const item of candidates) {
+        if (!MediaRecorder.isTypeSupported || MediaRecorder.isTypeSupported(item.mime)) {
+          return item;
+        }
+      }
+      return { mime: '', ext: 'webm' };
+    }
+
+    function updateRecordingUI(recording) {
+      const btnMain = document.getElementById('btn-download-anim');
+      const dotMain = document.getElementById('record-btn-dot');
+      const txtMain = document.getElementById('record-btn-text');
+      const btnHeader = document.getElementById('btn-header-record');
+      const iconHeader = document.getElementById('header-record-icon');
+      const lblHeader = document.getElementById('header-record-label');
+      const modeVal = document.getElementById('select-record-mode').value || 'autostep';
+      const resSelect = document.getElementById('select-video-res');
+
+      if (resSelect) resSelect.disabled = recording;
+
+      if (recording) {
+        btnMain.className = 'w-full py-2.5 px-3 rounded-lg bg-rose-500 hover:bg-rose-600 text-white font-semibold text-xs transition flex items-center justify-center gap-2 shadow-sm shadow-rose-500/30';
+        dotMain.className = 'w-2 h-2 rounded-full bg-white animate-ping';
+        if (modeVal === 'autostep') {
+          txtMain.textContent = '正在录制 9:16 超清 1→1024 全过程... 点击可提前保存';
+        } else if (modeVal === 'cycle') {
+          txtMain.textContent = '正在录制 9:16 单周期动画 (0%)... 点击可提前保存';
+        } else {
+          txtMain.textContent = '正在 9:16 超清录制中... 点击停止并下载视频';
+        }
+
+        btnHeader.className = 'px-2.5 py-1.5 rounded-lg text-xs font-medium border border-rose-500/60 bg-rose-500/20 text-rose-500 dark:text-rose-300 hover:bg-rose-500/30 flex items-center gap-1.5 transition';
+        iconHeader.textContent = '⏹';
+        lblHeader.textContent = '停止并保存';
+      } else {
+        btnMain.className = 'w-full py-2.5 px-3 rounded-lg bg-gradient-to-r from-emerald-500 to-sky-500 hover:from-emerald-600 hover:to-sky-600 text-white font-semibold text-xs transition flex items-center justify-center gap-2 shadow-sm shadow-sky-500/20';
+        dotMain.className = 'w-2 h-2 rounded-full bg-white';
+        if (modeVal === 'autostep') {
+          txtMain.textContent = '一键录制 9:16 超清 1→1024 全过程视频';
+        } else if (modeVal === 'cycle') {
+          txtMain.textContent = '录制并下载 9:16 当前本轮单周期视频';
+        } else {
+          txtMain.textContent = '开始手动录制 9:16 超清动画 (60 FPS)';
+        }
+
+        btnHeader.className = 'px-2.5 py-1.5 rounded-lg text-xs font-medium border border-sky-500/40 bg-sky-500/15 text-sky-600 dark:text-sky-300 hover:bg-sky-500/25 flex items-center gap-1.5 transition';
+        iconHeader.textContent = '🎥';
+        lblHeader.textContent = '下载 9:16 超清视频';
+      }
+    }
+
+    function startAnimationRecording() {
+      if (state.isRecording) return;
+
+      const formatInfo = detectSupportedVideoMime();
+      if (!formatInfo || typeof epicycleCanvas.captureStream !== 'function') {
+        setStatusMessage('❌ 当前浏览器环境不支持 Canvas 视频流录制');
+        return;
+      }
+
+      const resKey = parseInt(document.getElementById('select-video-res').value, 10) || 1080;
+      const resPreset = VIDEO_RES_PRESETS[resKey] || VIDEO_RES_PRESETS[1080];
+      state.videoWidth = resPreset.width;
+      state.videoHeight = resPreset.height;
+      state.videoBitrate = resPreset.bitrate;
+      applyVideoResolutionBuffer();
+
+      state.recordMode = document.getElementById('select-record-mode').value || 'autostep';
+      state.recordedChunks = [];
+      state.recordMimeType = formatInfo.mime;
+      state.recordFileExt = formatInfo.ext;
+
+      if (state.recordMode === 'autostep') {
+        ensureSampleCountFor1024();
+        state.autoStepIndex = 0;
+        const validSteps = getValidAutoSteps();
+        setCircleCount(validSteps[0]);
+        setAutoStepUI(true);
+      } else if (state.recordMode === 'cycle') {
+        resetAnimationCycle();
+      }
+
+      if (!state.isPlaying) {
+        state.isPlaying = true;
+        document.getElementById('play-icon').textContent = '⏸';
+        document.getElementById('play-label').textContent = '暂停动画 (Pause)';
+      }
+
+      renderEpicycleFrame();
+
+      const stream = epicycleCanvas.captureStream(60);
+      const options = { videoBitsPerSecond: state.videoBitrate };
+      if (state.recordMimeType) {
+        options.mimeType = state.recordMimeType;
+      }
+
+      try {
+        state.mediaRecorder = new MediaRecorder(stream, options);
+      } catch (errHighProfile) {
+        try {
+          state.mediaRecorder = new MediaRecorder(stream, { videoBitsPerSecond: 25000000 });
+        } catch (errFallback) {
+          state.mediaRecorder = new MediaRecorder(stream);
+        }
+      }
+
+      state.mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          state.recordedChunks.push(e.data);
+        }
+      };
+
+      state.mediaRecorder.onstop = () => {
+        const blobType = state.recordMimeType || 'video/webm';
+        const blob = new Blob(state.recordedChunks, { type: blobType });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        const safeName = (state.shapeName || 'shape').toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5_-]+/gi, '-');
+        const modeTag = state.epicycleMode === 'orthogonal' ? 'ortho' : 'complex';
+        const suffix = state.recordMode === 'autostep'
+          ? '1-to-1024-progression'
+          : `${state.numCircles}circles`;
+        link.download = `fourier-9x16-${modeTag}-${state.videoWidth}x${state.videoHeight}-${safeName}-${suffix}.${state.recordFileExt}`;
+        link.href = url;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+        state.isRecording = false;
+        updateRecordingUI(false);
+        setStatusMessage(`✅ 9:16 超清竖屏视频已导出: ${link.download}`);
+      };
+
+      state.mediaRecorder.start(100);
+      state.isRecording = true;
+      updateRecordingUI(true);
+
+      const mbpsLabel = Math.round(state.videoBitrate / 1000000);
+      if (state.recordMode === 'autostep') {
+        const validSteps = getValidAutoSteps();
+        setStatusMessage(
+          `🔴 正在录制 9:16 超清 (${state.videoWidth}×${state.videoHeight} · ${mbpsLabel}Mbps) 递增全过程 (${validSteps.join(' → ')})...`
+        );
+      } else if (state.recordMode === 'cycle') {
+        setStatusMessage(
+          `🔴 正在录制 9:16 超清 (${state.videoWidth}×${state.videoHeight} · ${mbpsLabel}Mbps) 单周期动画...`
+        );
+      } else {
+        setStatusMessage(`🔴 正在录制 9:16 超清 (${state.videoWidth}×${state.videoHeight}) 动画，再次点击即可保存下载...`);
+      }
+    }
+
+    function stopAnimationRecording() {
+      if (!state.isRecording || !state.mediaRecorder) return;
+      if (state.mediaRecorder.state !== 'inactive') {
+        state.mediaRecorder.stop();
+      }
+    }
+
+    function toggleAnimationRecording() {
+      if (state.isRecording) {
+        stopAnimationRecording();
+      } else {
+        startAnimationRecording();
+      }
+    }
+
+    document.getElementById('btn-download-anim').addEventListener('click', toggleAnimationRecording);
+    document.getElementById('btn-header-record').addEventListener('click', toggleAnimationRecording);
+
+    // Dark / Light Theme Toggle
+    document.getElementById('btn-theme-toggle').addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      drawSpectrumChart();
+    });
+
+    // ============================================================================
+    // 7. INITIALIZE ON WINDOW LOAD
+    // ============================================================================
+    window.onload = function () {
+      resizeCanvases();
+      const initialPts = generatePresetPoints('heart', state.sampleCount);
+      rebuildCurrentContourAndFFT(initialPts, true);
+      requestAnimationFrame(animationLoop);
+    };
+  </script>
+</body>
+</html>
