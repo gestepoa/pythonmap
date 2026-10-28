@@ -44,6 +44,10 @@
             --axis-ring-shadow: rgba(251, 191, 36, 0.6);
             --frame-border: rgba(56, 189, 248, 0.65);
             --frame-mask: rgba(2, 6, 23, 0.52);
+            --legend-glass-bg: rgba(15, 23, 42, 0.76);
+            --legend-solid-bg: rgba(15, 23, 42, 0.96);
+            --legend-border: rgba(148, 163, 184, 0.28);
+            --legend-item-hover: rgba(51, 65, 85, 0.45);
         }
 
         body.light-theme {
@@ -77,6 +81,10 @@
             --axis-ring-shadow: rgba(255, 255, 255, 0.9);
             --frame-border: rgba(2, 132, 199, 0.75);
             --frame-mask: rgba(15, 23, 42, 0.25);
+            --legend-glass-bg: rgba(255, 255, 255, 0.82);
+            --legend-solid-bg: rgba(255, 255, 255, 0.98);
+            --legend-border: rgba(100, 116, 139, 0.3);
+            --legend-item-hover: rgba(226, 232, 240, 0.75);
         }
 
         body {
@@ -84,7 +92,7 @@
             padding: 0;
             overflow: hidden;
             background-color: var(--bg-body);
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
             color: var(--text-primary);
             user-select: none;
             transition: background-color 0.35s ease, color 0.35s ease;
@@ -149,8 +157,7 @@
         }
 
         /* 中心十字准星标记 */
-        #axis-guide::after {
-            content: '';
+        #axis-crosshair {
             position: absolute;
             top: 50%;
             left: 50%;
@@ -160,6 +167,7 @@
             border-radius: 50%;
             transform: translate(-50%, -50%);
             box-shadow: 0 0 8px var(--axis-ring-shadow);
+            pointer-events: none;
         }
 
         /* 主题自适应面板与组件样式 */
@@ -207,6 +215,271 @@
             border-color: var(--badge-border);
         }
 
+        /* 地球下方交互式图例容器样式 */
+        #globe-legend-wrapper {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 12;
+            max-width: 92vw;
+            transition: box-shadow 0.2s ease;
+        }
+
+        .legend-card-glass {
+            background: var(--legend-glass-bg);
+            border: 1px solid var(--legend-border);
+            backdrop-filter: blur(12px);
+            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.35);
+        }
+
+        .legend-card-solid {
+            background: var(--legend-solid-bg);
+            border: 1px solid var(--legend-border);
+            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.45);
+        }
+
+        .legend-card-minimal {
+            background: transparent;
+            border: 1px solid transparent;
+            box-shadow: none;
+        }
+        #globe-legend-wrapper:hover .legend-card-minimal {
+            border-color: var(--legend-border);
+            background: rgba(15, 23, 42, 0.22);
+            backdrop-filter: blur(4px);
+        }
+
+        /* 图例顶部悬浮辅助操作栏（仅鼠标移入图例时显现） */
+        #legend-floating-toolbar {
+            opacity: 0;
+            pointer-events: none;
+            transform: translate(-50%, 4px);
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+        #globe-legend-wrapper:hover #legend-floating-toolbar,
+        #globe-legend-wrapper.editing-active #legend-floating-toolbar {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translate(-50%, 0);
+        }
+
+        /* 图例内部添加按钮在非悬停时半透明弱化，录制时隐藏 */
+        .legend-add-pill {
+            opacity: 0.35;
+            transition: opacity 0.2s ease, background-color 0.2s ease, transform 0.15s ease;
+        }
+        #globe-legend-wrapper:hover .legend-add-pill {
+            opacity: 1;
+        }
+        body.is-recording #legend-floating-toolbar,
+        body.is-recording .legend-add-pill,
+        body.is-recording .legend-item-actions,
+        body.is-recording .legend-resize-handle {
+            display: none !important;
+        }
+
+        /* 拖拽调整宽高时禁用过渡动画以保证 60fps 丝滑跟手 */
+        #globe-legend-wrapper.resizing-active #globe-legend-card {
+            transition: none !important;
+            border-color: #38bdf8 !important;
+            box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.45), 0 12px 32px -6px rgba(0, 0, 0, 0.5);
+        }
+        #globe-legend-wrapper.resizing-active #legend-floating-toolbar {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translate(-50%, 0);
+        }
+
+        /* 图例区域四边与四角拖拽调整大小手柄 */
+        .legend-resize-handle {
+            position: absolute;
+            z-index: 20;
+            opacity: 0;
+            transition: opacity 0.2s ease, background-color 0.15s ease;
+        }
+        #globe-legend-wrapper:hover .legend-resize-handle,
+        #globe-legend-wrapper.resizing-active .legend-resize-handle {
+            opacity: 1;
+        }
+        /* 左右宽边手柄 */
+        .legend-resize-e {
+            top: 10px;
+            bottom: 10px;
+            right: -5px;
+            width: 10px;
+            cursor: ew-resize;
+        }
+        .legend-resize-w {
+            top: 10px;
+            bottom: 10px;
+            left: -5px;
+            width: 10px;
+            cursor: ew-resize;
+        }
+        /* 上下高边手柄 */
+        .legend-resize-n {
+            left: 10px;
+            right: 10px;
+            top: -5px;
+            height: 10px;
+            cursor: ns-resize;
+        }
+        .legend-resize-s {
+            left: 10px;
+            right: 10px;
+            bottom: -5px;
+            height: 10px;
+            cursor: ns-resize;
+        }
+        /* 四角双向拉伸手柄 */
+        .legend-resize-se,
+        .legend-resize-sw,
+        .legend-resize-ne,
+        .legend-resize-nw {
+            width: 14px;
+            height: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .legend-resize-se { right: -5px; bottom: -5px; cursor: nwse-resize; }
+        .legend-resize-sw { left: -5px; bottom: -5px; cursor: nesw-resize; }
+        .legend-resize-ne { right: -5px; top: -5px; cursor: nesw-resize; }
+        .legend-resize-nw { left: -5px; top: -5px; cursor: nwse-resize; }
+
+        /* 手柄视觉指示点/短线 */
+        .legend-resize-e::after,
+        .legend-resize-w::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 3px;
+            height: 22px;
+            border-radius: 999px;
+            background: rgba(56, 189, 248, 0.55);
+        }
+        .legend-resize-n::after,
+        .legend-resize-s::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 22px;
+            height: 3px;
+            border-radius: 999px;
+            background: rgba(56, 189, 248, 0.55);
+        }
+        .legend-resize-se::after,
+        .legend-resize-sw::after,
+        .legend-resize-ne::after,
+        .legend-resize-nw::after {
+            content: '';
+            width: 7px;
+            height: 7px;
+            border-radius: 2px;
+            background: #38bdf8;
+            box-shadow: 0 0 6px rgba(56, 189, 248, 0.8);
+        }
+        .legend-resize-handle:hover::after {
+            background: #38bdf8;
+            transform: translate(-50%, -50%) scale(1.15);
+        }
+        .legend-resize-se:hover::after,
+        .legend-resize-sw:hover::after,
+        .legend-resize-ne:hover::after,
+        .legend-resize-nw:hover::after {
+            transform: scale(1.25);
+        }
+
+        /* 自定义图例内部滚动条（当用户将高度调得较小时） */
+        #legend-items-scroll-area::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        #legend-items-scroll-area::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        #legend-items-scroll-area::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.35);
+            border-radius: 9999px;
+        }
+
+        /* 单个图例项交互态 */
+        .legend-item-row {
+            position: relative;
+            transition: background-color 0.15s ease;
+        }
+        .legend-item-row:hover {
+            background-color: var(--legend-item-hover);
+        }
+        .legend-item-actions {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.15s ease;
+        }
+        .legend-item-row:hover .legend-item-actions {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* 图例文字输入框右侧专属拖拽延长手柄 */
+        .legend-input-resize-handle {
+            width: 8px;
+            height: 18px;
+            cursor: ew-resize;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.15s ease, background-color 0.15s ease;
+            border-radius: 3px;
+            flex-shrink: 0;
+            user-select: none;
+        }
+        .legend-item-row:hover .legend-input-resize-handle,
+        .legend-item-row.input-resizing .legend-input-resize-handle {
+            opacity: 1;
+        }
+        .legend-input-resize-handle::after {
+            content: '';
+            width: 2px;
+            height: 11px;
+            border-left: 1px solid rgba(56, 189, 248, 0.85);
+            border-right: 1px solid rgba(56, 189, 248, 0.85);
+        }
+        .legend-input-resize-handle:hover,
+        .legend-item-row.input-resizing .legend-input-resize-handle {
+            background: rgba(56, 189, 248, 0.22);
+        }
+
+        /* 图例文本输入框自适应无感外观 */
+        .legend-label-input {
+            background: transparent;
+            color: var(--text-primary);
+            border: 1px solid transparent;
+            border-radius: 5px;
+            outline: none;
+            transition: border-color 0.15s ease, background-color 0.15s ease;
+        }
+        .legend-label-input:hover {
+            border-color: rgba(148, 163, 184, 0.35);
+        }
+        .legend-label-input:focus,
+        .legend-item-row.input-resizing .legend-label-input {
+            border-color: #38bdf8;
+            background: rgba(15, 23, 42, 0.35);
+        }
+        body.light-theme .legend-label-input:focus,
+        body.light-theme .legend-item-row.input-resizing .legend-label-input {
+            background: rgba(255, 255, 255, 0.85);
+        }
+        body.is-recording .legend-input-resize-handle {
+            display: none !important;
+        }
+
         /* 录制红点闪烁动画 */
         @keyframes pulse-dot {
             0%, 100% { opacity: 1; transform: scale(1); }
@@ -238,7 +511,84 @@
     </div>
 
     <!-- 中心中轴线辅助线与中心准星 -->
-    <div id="axis-guide"></div>
+    <div id="axis-guide">
+        <div id="axis-crosshair"></div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- 地球模型正下方：可自由定制颜色小方块与文字说明的交互式图例区域               -->
+    <!-- ========================================================================= -->
+    <div id="globe-legend-wrapper">
+        <!-- 悬浮顶部迷你控制条（支持上下拖拽位置、快捷添加色块、切换列数、显示与重置宽高） -->
+        <div id="legend-floating-toolbar" class="theme-panel absolute -top-9 left-1/2 flex items-center gap-1.5 px-2.5 py-1 rounded-full border shadow-lg backdrop-blur-md whitespace-nowrap text-[11px]">
+            <span id="legend-drag-handle" title="按住上下拖动图例位置" class="cursor-ns-resize px-1.5 py-0.5 rounded hover:bg-sky-500/20 text-sky-400 font-semibold flex items-center gap-1">
+                <span>↕</span><span>位置</span>
+            </span>
+            <span class="opacity-30">|</span>
+            <button id="btnToolbarAddLegend" class="px-1.5 py-0.5 rounded hover:bg-sky-500/20 text-emerald-400 font-medium cursor-pointer transition-colors">
+                + 添加方块
+            </button>
+            <span class="opacity-30">|</span>
+            <button id="btnToolbarCycleLayout" title="点击切换图例排列列数" class="px-1.5 py-0.5 rounded hover:bg-sky-500/20 theme-text-sec cursor-pointer transition-colors">
+                排列: <span id="toolbar-layout-label" class="text-sky-400 font-mono">双列</span>
+            </button>
+            <span class="opacity-30">|</span>
+            <span id="toolbar-size-label" title="直接拖拽图例边缘或四角可自由调整宽高" class="px-1 font-mono text-[10px] theme-text-muted">
+                宽高: 自适应
+            </span>
+            <button id="btnToolbarResetSize" title="恢复图例自动适应宽高" class="hidden px-1.5 py-0.5 rounded bg-sky-500/20 hover:bg-sky-500/30 text-sky-400 font-medium cursor-pointer transition-colors">
+                ↺ 自适应
+            </button>
+        </div>
+
+        <!-- 图例主体卡片（支持拖拽四边与四角自由调整长宽大小） -->
+        <div id="globe-legend-card" class="legend-card-glass relative flex flex-col justify-center rounded-2xl px-4 py-3 transition-all duration-200 box-border">
+            <!-- 四边与四角拖拽调整大小手柄 -->
+            <div class="legend-resize-handle legend-resize-n" data-resize-dir="n" title="上下拖拽调整图例高度"></div>
+            <div class="legend-resize-handle legend-resize-s" data-resize-dir="s" title="上下拖拽调整图例高度"></div>
+            <div class="legend-resize-handle legend-resize-e" data-resize-dir="e" title="左右拖拽调整图例宽度"></div>
+            <div class="legend-resize-handle legend-resize-w" data-resize-dir="w" title="左右拖拽调整图例宽度"></div>
+            <div class="legend-resize-handle legend-resize-se" data-resize-dir="se" title="拖拽角点同时调整图例宽与高"></div>
+            <div class="legend-resize-handle legend-resize-sw" data-resize-dir="sw" title="拖拽角点同时调整图例宽与高"></div>
+            <div class="legend-resize-handle legend-resize-ne" data-resize-dir="ne" title="拖拽角点同时调整图例宽与高"></div>
+            <div class="legend-resize-handle legend-resize-nw" data-resize-dir="nw" title="拖拽角点同时调整图例宽与高"></div>
+
+            <!-- 可选的图例标题栏 -->
+            <div id="legend-title-wrap" class="flex items-center justify-center mb-2 pb-1.5 border-b border-slate-500/20 shrink-0 w-full">
+                <input id="legend-title-input" type="text" value="世界地图填色图例说明" placeholder="输入图例标题..."
+                    class="legend-label-input text-center font-semibold tracking-wide px-2 py-0.5 w-full max-w-full text-xs" />
+            </div>
+
+            <!-- 图例项列表容器（支持自由增删颜色方块 + 输入说明文字） -->
+            <div id="legend-items-scroll-area" class="w-full flex-1 flex items-center justify-center overflow-y-auto overflow-x-hidden">
+                <div id="legend-items-container" class="grid grid-cols-2 gap-x-4 gap-y-2 items-center w-full">
+                    <!-- 由 JS 动态渲染每个颜色方块与后方文字输入框 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 颜色小方块专属调色弹窗（支持 16 种预设地图填色 + 自由拾色器 + HEX 色值输入） -->
+    <div id="color-picker-popover" class="theme-panel fixed z-40 hidden w-60 p-3 rounded-2xl border shadow-2xl backdrop-blur-xl">
+        <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-500/20">
+            <span class="text-xs font-semibold theme-title">设置小方块颜色</span>
+            <button id="btnCloseColorPopover" class="theme-text-muted hover:text-rose-400 text-xs px-1 cursor-pointer">✕</button>
+        </div>
+        <!-- 预设色板网格 -->
+        <div id="color-preset-grid" class="grid grid-cols-8 gap-1.5 mb-2.5">
+            <!-- JS 注入 16 种高辨识度地图常用配色 -->
+        </div>
+        <!-- 自定义拾色与 HEX 输入 -->
+        <div class="flex items-center gap-2 pt-1 border-t border-slate-500/20">
+            <label class="relative flex items-center justify-center w-8 h-7 rounded-lg overflow-hidden border border-slate-400/40 cursor-pointer shrink-0" title="打开系统自由调色盘">
+                <input type="color" id="native-color-picker" class="absolute inset-0 w-12 h-12 -top-2 -left-2 cursor-pointer opacity-0">
+                <span id="native-color-preview" class="w-full h-full block"></span>
+            </label>
+            <input type="text" id="hex-color-input" maxlength="7" placeholder="#38BDF8"
+                class="theme-input flex-1 px-2 py-1 border rounded-lg text-xs font-mono uppercase focus:outline-none focus:border-sky-500">
+            <span class="theme-text-muted text-[10px]">自由选色</span>
+        </div>
+    </div>
 
     <!-- 右上角醒目：亮版 / 暗版主题切换悬浮按钮 -->
     <div class="fixed top-4 right-4 z-20 flex items-center gap-2">
@@ -343,10 +693,119 @@
             </div>
         </div>
 
-        <!-- 3. 旋转动画控制 -->
+        <!-- 3. 地球下方图例设计（新增模块） -->
+        <div class="theme-divider pb-3.5 mb-3.5 border-b">
+            <div class="flex items-center justify-between mb-2">
+                <span class="theme-title text-xs font-semibold">3. 地球下方图例设计</span>
+                <div class="flex items-center gap-2">
+                    <label class="theme-text-sec inline-flex items-center gap-1 text-[11px] cursor-pointer" title="在地球下方显示或隐藏图例区域">
+                        <input type="checkbox" id="toggleLegendVisible" checked class="rounded border-slate-400 text-sky-500 focus:ring-0 cursor-pointer">
+                        <span>显示图例</span>
+                    </label>
+                    <label class="theme-text-sec inline-flex items-center gap-1 text-[11px] cursor-pointer" title="开启后，导出的视频也会在地球下方包含该图例">
+                        <input type="checkbox" id="toggleLegendRecord" checked class="rounded border-slate-400 text-emerald-500 focus:ring-0 cursor-pointer">
+                        <span>录制入视频</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 快捷添加小方块与标题开关 -->
+            <div class="grid grid-cols-2 gap-2 mb-2.5">
+                <button id="btnAddLegendItem" class="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-xs font-medium text-white shadow transition-all cursor-pointer flex items-center justify-center gap-1">
+                    <span>＋</span><span>添加颜色小方块</span>
+                </button>
+                <button id="btnToggleLegendTitle" class="theme-btn-sec px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer">
+                    隐藏/显示标题
+                </button>
+            </div>
+
+            <!-- 排版列数与卡片风格 -->
+            <div class="grid grid-cols-2 gap-2 mb-2">
+                <div>
+                    <label class="theme-text-muted text-[10px] block mb-1">图例排列方式</label>
+                    <select id="selectLegendLayout" class="theme-input w-full px-2 py-1 border rounded-lg text-xs cursor-pointer focus:outline-none focus:border-sky-500">
+                        <option value="2-col" selected>双列规整对齐</option>
+                        <option value="auto">流式横向排列</option>
+                        <option value="3-col">三列紧凑对齐</option>
+                        <option value="1-col">单列垂直排列</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="theme-text-muted text-[10px] block mb-1">外观与方块样式</label>
+                    <div class="flex gap-1">
+                        <select id="selectLegendBgStyle" class="theme-input flex-1 px-1.5 py-1 border rounded-lg text-xs cursor-pointer focus:outline-none focus:border-sky-500">
+                            <option value="glass" selected>毛玻璃</option>
+                            <option value="minimal">纯透底</option>
+                            <option value="solid">实色底</option>
+                        </select>
+                        <select id="selectSwatchShape" title="小方块形状" class="theme-input w-16 px-1 py-1 border rounded-lg text-xs cursor-pointer focus:outline-none focus:border-sky-500">
+                            <option value="rounded" selected>圆角</option>
+                            <option value="square">直角</option>
+                            <option value="circle">圆形</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 图例区域长宽手动调节与自适应开关 -->
+            <div class="p-2.5 rounded-xl bg-slate-500/10 border border-slate-500/20 space-y-1.5 mt-2">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="theme-text-sec text-[11px] font-semibold">📐 图例区长宽尺寸</span>
+                    <button id="btnResetLegendSize" class="text-[10px] px-2 py-0.5 rounded bg-sky-500/15 hover:bg-sky-500/25 text-sky-400 font-medium transition-colors cursor-pointer">
+                        ↺ 恢复自适应长宽
+                    </button>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label for="rangeLegendWidth" class="theme-text-sec text-[11px] w-16 shrink-0">图例宽度:</label>
+                    <input type="range" id="rangeLegendWidth" min="180" max="860" step="4" value="420"
+                        class="flex-1 h-1.5 bg-slate-500/30 rounded-lg appearance-none cursor-pointer accent-sky-500">
+                    <span id="valLegendWidth" class="text-[11px] font-mono text-sky-400 w-12 text-right">自适应</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label for="rangeLegendHeight" class="theme-text-sec text-[11px] w-16 shrink-0">图例高度:</label>
+                    <input type="range" id="rangeLegendHeight" min="56" max="420" step="4" value="110"
+                        class="flex-1 h-1.5 bg-slate-500/30 rounded-lg appearance-none cursor-pointer accent-sky-500">
+                    <span id="valLegendHeight" class="text-[11px] font-mono text-sky-400 w-12 text-right">自适应</span>
+                </div>
+                <div class="flex items-center gap-2 pt-1 border-t border-slate-500/15">
+                    <label for="rangeLegendInputWidth" class="theme-text-sec text-[11px] w-16 shrink-0" title="统一调整文字输入框长度，同时保持图例外框尺寸固定不变">文字框长:</label>
+                    <input type="range" id="rangeLegendInputWidth" min="50" max="600" step="2" value="150"
+                        class="flex-1 h-1.5 bg-slate-500/30 rounded-lg appearance-none cursor-pointer accent-sky-500">
+                    <span id="valLegendInputWidth" class="text-[11px] font-mono text-sky-400 w-12 text-right">自适应</span>
+                </div>
+            </div>
+
+            <!-- 尺寸缩放、垂直位置与地球上下微调 -->
+            <div class="space-y-1.5 mt-2.5">
+                <div class="flex items-center gap-2">
+                    <label for="rangeLegendScale" class="theme-text-sec text-[11px] w-16 shrink-0">内容字号:</label>
+                    <input type="range" id="rangeLegendScale" min="0.75" max="1.45" step="0.05" value="1.0"
+                        class="flex-1 h-1.5 bg-slate-500/30 rounded-lg appearance-none cursor-pointer accent-sky-500">
+                    <span id="valLegendScale" class="text-[11px] font-mono text-sky-400 w-10 text-right">100%</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label for="rangeLegendBottom" class="theme-text-sec text-[11px] w-16 shrink-0">图例位置:</label>
+                    <input type="range" id="rangeLegendBottom" min="2" max="38" step="1" value="8"
+                        class="flex-1 h-1.5 bg-slate-500/30 rounded-lg appearance-none cursor-pointer accent-sky-500">
+                    <span id="valLegendBottom" class="text-[11px] font-mono text-sky-400 w-10 text-right">8%</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label for="rangeGlobeOffsetY" class="theme-text-sec text-[11px] w-16 shrink-0" title="当图例较多时，可将地球适当上移以留出下方空间">地球上移:</label>
+                    <input type="range" id="rangeGlobeOffsetY" min="-10" max="20" step="1" value="6"
+                        class="flex-1 h-1.5 bg-slate-500/30 rounded-lg appearance-none cursor-pointer accent-sky-500">
+                    <span id="valGlobeOffsetY" class="text-[11px] font-mono text-sky-400 w-10 text-right">+6%</span>
+                </div>
+            </div>
+
+            <p class="theme-text-muted text-[11px] mt-2 leading-relaxed">
+                💡 直接<strong>拖拽文字框右侧竖线</strong>或使用<strong>文字框长滑块</strong>可调整文字框长度（调整时<strong>图例外框将自动保持固定</strong>）；拖拽图例四边可调整外框大小。
+            </p>
+        </div>
+
+        <!-- 4. 旋转动画控制 -->
         <div class="theme-divider pb-3.5 mb-3.5 border-b">
             <div class="flex items-center justify-between mb-2.5">
-                <span class="theme-title text-xs font-semibold">3. 旋转动画控制</span>
+                <span class="theme-title text-xs font-semibold">4. 旋转动画控制</span>
                 <span id="rotation-state-badge" class="theme-text-muted text-[11px]">已暂停</span>
             </div>
 
@@ -381,10 +840,10 @@
             </div>
         </div>
 
-        <!-- 4. 录制与导出动画（含长宽比与清晰度设置） -->
+        <!-- 5. 录制与导出动画（含长宽比与清晰度设置） -->
         <div>
             <div class="flex items-center justify-between mb-2.5">
-                <span class="theme-title text-xs font-semibold">4. 录制与导出设置</span>
+                <span class="theme-title text-xs font-semibold">5. 录制与导出设置</span>
                 <div class="flex items-center gap-2">
                     <label class="theme-text-sec inline-flex items-center gap-1 text-[11px] cursor-pointer" title="在屏幕上显示录制长宽比辅助参考框">
                         <input type="checkbox" id="toggleFrameGuide" checked class="rounded border-slate-400 text-sky-500 focus:ring-0 cursor-pointer">
@@ -437,14 +896,14 @@
             </div>
 
             <p id="recordHint" class="theme-text-muted text-[11px] mt-2 leading-relaxed">
-                默认以 9:16 竖屏高清录制。点击“开始录制”将从设定起点旋转满一周（360°）后自动完成。
+                默认以 9:16 竖屏高清录制。点击“开始录制”将从设定起点旋转满一周（360°）并连同下方图例一并合成导出。
             </p>
         </div>
     </div>
 
     <!-- 底部操作说明提示栏 -->
-    <div id="instructions" class="theme-panel fixed bottom-4 left-1/2 -translate-x-1/2 z-10 px-4 py-1.5 rounded-full border text-xs pointer-events-none whitespace-nowrap shadow-lg backdrop-blur-md">
-        拖拽设定起始视角 · 滚轮缩放 · 虚线框为视频导出画幅范围
+    <div id="instructions" class="theme-panel fixed bottom-2.5 left-1/2 -translate-x-1/2 z-10 px-4 py-1 rounded-full border text-[11px] pointer-events-none whitespace-nowrap shadow-lg backdrop-blur-md opacity-80">
+        拖拽地球设定起点 · 点击地球下方图例小方块可换色与输入说明 · 虚线框为视频画幅
     </div>
 
     <!-- WebGL 渲染容器 -->
@@ -512,7 +971,7 @@
         const lightBgTexture = createSceneBackgroundTexture(true);
         scene.background = darkBgTexture;
 
-        // 相机设置：基础垂直视野 BASE_FOV = 45°，当画幅变窄（如 9:16 竖屏）时自动扩展垂直视野以保证地球完整居中不裁切
+        // 相机设置：基础垂直视野 BASE_FOV = 45°
         const BASE_FOV = 45;
         const camera = new THREE.PerspectiveCamera(BASE_FOV, window.innerWidth / window.innerHeight, 0.1, 1000);
         const INITIAL_DISTANCE = 15;
@@ -526,15 +985,6 @@
             }
             return BASE_FOV;
         }
-
-        // 更新主交互相机的视野与比例（兼顾当前窗口比例与所选录制画幅框，确保地球在安全框内大小合适）
-        function updateInteractiveCameraProjection() {
-            const windowAspect = window.innerWidth / window.innerHeight;
-            camera.aspect = windowAspect;
-            camera.fov = getAdaptiveFov(windowAspect);
-            camera.updateProjectionMatrix();
-        }
-        updateInteractiveCameraProjection();
 
         // 渲染器设置：开启 preserveDrawingBuffer: true 以支持 canvas 视频流捕捉与录制
         const renderer = new THREE.WebGLRenderer({
@@ -716,7 +1166,741 @@
             showToast(isLightMode ? '已切换为亮版背景模式' : '已切换为暗版深空模式');
         });
 
-        // === 4. 地图贴图上传与恢复默认逻辑 ===
+        // === 4. 地球下方可交互图例系统（自由添加小方块、自定义上色、输入文字说明、高清录制合成） ===
+        const PRESET_MAP_COLORS = [
+            '#ef4444', '#f97316', '#f59e0b', '#eab308',
+            '#84cc16', '#10b981', '#06b6d4', '#38bdf8',
+            '#3b82f6', '#6366f1', '#8b5cf6', '#d946ef',
+            '#ec4899', '#f43f5e', '#14b8a6', '#94a3b8'
+        ];
+
+        const legendState = {
+            visible: true,
+            includeInRecord: true,
+            showTitle: true,
+            title: '世界地图填色图例说明',
+            layout: '2-col',       // 'auto' | '2-col' | '3-col' | '1-col'
+            bgStyle: 'glass',      // 'glass' | 'minimal' | 'solid'
+            swatchShape: 'rounded',// 'rounded' | 'square' | 'circle'
+            scale: 1.0,            // 0.75 ~ 1.45
+            customWidth: null,     // null 为自适应宽度，数字为手动指定的宽度 (px)
+            customHeight: null,    // null 为自适应高度，数字为手动指定的高度 (px)
+            customInputWidth: null,// null 为随字数自适应，数字为统一设定的文字框宽度 (px)
+            bottomPercent: 8,      // 距离画幅框底部的百分比 (2% ~ 38%)
+            globeOffsetYPercent: 6,// 地球中心向上偏移百分比 (-10% ~ 20%)，为下方图例留出舒适空间
+            items: [
+                { id: 1, color: '#ef4444', label: '重点填色国家 / 地区 A', inputWidth: null },
+                { id: 2, color: '#f59e0b', label: '主要填色国家 / 地区 B', inputWidth: null },
+                { id: 3, color: '#10b981', label: '合作与发展国家 C', inputWidth: null },
+                { id: 4, color: '#38bdf8', label: '其他观察国家 / 地区 D', inputWidth: null }
+            ],
+            nextId: 5
+        };
+
+        const legendWrapper = document.getElementById('globe-legend-wrapper');
+        const legendCard = document.getElementById('globe-legend-card');
+        const legendTitleWrap = document.getElementById('legend-title-wrap');
+        const legendTitleInput = document.getElementById('legend-title-input');
+        const legendItemsContainer = document.getElementById('legend-items-container');
+        const toolbarLayoutLabel = document.getElementById('toolbar-layout-label');
+        const toolbarSizeLabel = document.getElementById('toolbar-size-label');
+        const btnToolbarResetSize = document.getElementById('btnToolbarResetSize');
+        const rangeLegendWidth = document.getElementById('rangeLegendWidth');
+        const valLegendWidth = document.getElementById('valLegendWidth');
+        const rangeLegendHeight = document.getElementById('rangeLegendHeight');
+        const valLegendHeight = document.getElementById('valLegendHeight');
+        const rangeLegendInputWidth = document.getElementById('rangeLegendInputWidth');
+        const valLegendInputWidth = document.getElementById('valLegendInputWidth');
+
+        // 调色弹窗相关 DOM
+        const colorPopover = document.getElementById('color-picker-popover');
+        const colorPresetGrid = document.getElementById('color-preset-grid');
+        const nativeColorPicker = document.getElementById('native-color-picker');
+        const nativeColorPreview = document.getElementById('native-color-preview');
+        const hexColorInput = document.getElementById('hex-color-input');
+        let activeColorItemId = null;
+
+        // 测量文本像素宽度以使输入框完整展示文字（不设短上限截断）
+        const measureCanvas = document.createElement('canvas');
+        const measureCtx = measureCanvas.getContext('2d');
+        function computeInputPixelWidth(text, fontSizePx) {
+            measureCtx.font = `500 ${fontSizePx}px Inter, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif`;
+            const displayStr = text || '输入颜色说明...';
+            const measured = measureCtx.measureText(displayStr).width;
+            return Math.max(60, Math.ceil(measured + 14));
+        }
+
+        // 获取某一项文字框的目标像素宽度（优先使用单项手动宽度 -> 全局手动宽度 -> 文字自适应宽度）
+        function getItemTargetInputWidth(item, fontSizePx) {
+            if (typeof item.inputWidth === 'number' && item.inputWidth > 0) {
+                return item.inputWidth;
+            }
+            if (typeof legendState.customInputWidth === 'number' && legendState.customInputWidth > 0) {
+                return legendState.customInputWidth;
+            }
+            return computeInputPixelWidth(item.label, fontSizePx);
+        }
+
+        // 在调整文字框长度前，锁定当前图例外框的宽高尺寸，确保图例外框固定不动
+        function lockLegendOuterCardSizeIfNeeded() {
+            const rect = legendCard.getBoundingClientRect();
+            if (legendState.customWidth === null && rect.width > 0) {
+                legendState.customWidth = Math.round(rect.width);
+            }
+            if (legendState.customHeight === null && rect.height > 0) {
+                legendState.customHeight = Math.round(rect.height);
+            }
+            applyLegendDimensionsUI();
+        }
+
+        // 获取小方块圆角 class
+        function getSwatchShapeClass(shape) {
+            if (shape === 'circle') return 'rounded-full';
+            if (shape === 'square') return 'rounded-[2px]';
+            return 'rounded-md';
+        }
+
+        // 同步更新图例的手动宽高样式与面板/悬浮栏数值显示
+        function applyLegendDimensionsUI() {
+            if (legendState.customWidth !== null) {
+                const maxAllowedW = Math.round(window.innerWidth * 0.94);
+                const w = Math.max(160, Math.min(maxAllowedW, Math.round(legendState.customWidth)));
+                legendCard.style.width = `${w}px`;
+                rangeLegendWidth.value = Math.min(860, w);
+                valLegendWidth.textContent = `${w}px`;
+            } else {
+                legendCard.style.width = '';
+                valLegendWidth.textContent = '自适应';
+            }
+
+            if (legendState.customHeight !== null) {
+                const maxAllowedH = Math.round(window.innerHeight * 0.65);
+                const h = Math.max(52, Math.min(maxAllowedH, Math.round(legendState.customHeight)));
+                legendCard.style.height = `${h}px`;
+                rangeLegendHeight.value = Math.min(420, h);
+                valLegendHeight.textContent = `${h}px`;
+            } else {
+                legendCard.style.height = '';
+                valLegendHeight.textContent = '自适应';
+            }
+
+            if (legendState.customInputWidth !== null) {
+                rangeLegendInputWidth.value = Math.min(600, Math.round(legendState.customInputWidth));
+                valLegendInputWidth.textContent = `${Math.round(legendState.customInputWidth)}px`;
+            } else {
+                const hasIndividual = legendState.items.some(it => typeof it.inputWidth === 'number');
+                valLegendInputWidth.textContent = hasIndividual ? '自定义' : '自适应';
+            }
+
+            const hasCustomSize = legendState.customWidth !== null || legendState.customHeight !== null;
+            if (hasCustomSize) {
+                const rect = legendCard.getBoundingClientRect();
+                const wText = legendState.customWidth !== null ? `${Math.round(legendState.customWidth)}` : `${Math.round(rect.width)}(自)`;
+                const hText = legendState.customHeight !== null ? `${Math.round(legendState.customHeight)}` : `${Math.round(rect.height)}(自)`;
+                toolbarSizeLabel.textContent = `${wText}×${hText}px`;
+                btnToolbarResetSize.classList.remove('hidden');
+            } else {
+                toolbarSizeLabel.textContent = '宽高: 自适应';
+                btnToolbarResetSize.classList.add('hidden');
+            }
+        }
+
+        // 恢复图例自适应宽高与文字框自适应宽度
+        function resetLegendCustomSize() {
+            legendState.customWidth = null;
+            legendState.customHeight = null;
+            legendState.customInputWidth = null;
+            legendState.items.forEach(it => { it.inputWidth = null; });
+            applyLegendDimensionsUI();
+            renderLegendDOM();
+            showToast('已恢复图例区域与文字框自适应尺寸');
+        }
+
+        // 渲染预设 16 色网格
+        function initColorPresets() {
+            colorPresetGrid.innerHTML = '';
+            PRESET_MAP_COLORS.forEach(hex => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'w-5 h-5 rounded-md border border-white/25 shadow-sm hover:scale-110 active:scale-95 transition-transform cursor-pointer';
+                btn.style.backgroundColor = hex;
+                btn.title = hex.toUpperCase();
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    applyColorToActiveItem(hex);
+                });
+                colorPresetGrid.appendChild(btn);
+            });
+        }
+        initColorPresets();
+
+        // 打开针对某个图例小方块的调色盘
+        function openColorPopoverForItem(itemId, swatchEl) {
+            const item = legendState.items.find(it => it.id === itemId);
+            if (!item) return;
+            activeColorItemId = itemId;
+
+            nativeColorPicker.value = item.color;
+            nativeColorPreview.style.backgroundColor = item.color;
+            hexColorInput.value = item.color.toUpperCase();
+
+            colorPopover.classList.remove('hidden');
+            legendWrapper.classList.add('editing-active');
+
+            // 计算弹窗位置（优先显示在色块正上方，空间不足则显示在下方）
+            const rect = swatchEl.getBoundingClientRect();
+            const popW = 240;
+            const popH = 156;
+            let left = rect.left + rect.width / 2 - popW / 2;
+            left = Math.max(12, Math.min(window.innerWidth - popW - 12, left));
+
+            let top = rect.top - popH - 10;
+            if (top < 12) {
+                top = rect.bottom + 10;
+            }
+
+            colorPopover.style.left = `${Math.round(left)}px`;
+            colorPopover.style.top = `${Math.round(top)}px`;
+        }
+
+        function closeColorPopover() {
+            colorPopover.classList.add('hidden');
+            legendWrapper.classList.remove('editing-active');
+            activeColorItemId = null;
+        }
+
+        function applyColorToActiveItem(hexColor) {
+            if (activeColorItemId === null) return;
+            const item = legendState.items.find(it => it.id === activeColorItemId);
+            if (!item) return;
+
+            item.color = hexColor;
+            nativeColorPicker.value = hexColor;
+            nativeColorPreview.style.backgroundColor = hexColor;
+            hexColorInput.value = hexColor.toUpperCase();
+
+            // 实时更新 DOM 中对应小方块的背景色
+            const swatchBtn = legendItemsContainer.querySelector(`[data-swatch-id="${activeColorItemId}"]`);
+            if (swatchBtn) {
+                swatchBtn.style.backgroundColor = hexColor;
+            }
+        }
+
+        nativeColorPicker.addEventListener('input', (e) => {
+            applyColorToActiveItem(e.target.value);
+        });
+
+        hexColorInput.addEventListener('input', (e) => {
+            let val = e.target.value.trim();
+            if (!val.startsWith('#')) val = '#' + val;
+            if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+                applyColorToActiveItem(val.toLowerCase());
+            }
+        });
+
+        document.getElementById('btnCloseColorPopover').addEventListener('click', closeColorPopover);
+
+        // 点击页面空白处关闭调色弹窗
+        document.addEventListener('mousedown', (e) => {
+            if (!colorPopover.classList.contains('hidden')) {
+                if (!colorPopover.contains(e.target) && !e.target.closest('[data-swatch-id]')) {
+                    closeColorPopover();
+                }
+            }
+        });
+
+        // 渲染地球下方的图例 DOM 结构
+        function renderLegendDOM() {
+            // 1. 显隐控制
+            legendWrapper.style.display = legendState.visible ? 'block' : 'none';
+
+            // 2. 背景卡片风格
+            legendCard.classList.remove('legend-card-glass', 'legend-card-minimal', 'legend-card-solid');
+            if (legendState.bgStyle === 'minimal') {
+                legendCard.classList.add('legend-card-minimal');
+            } else if (legendState.bgStyle === 'solid') {
+                legendCard.classList.add('legend-card-solid');
+            } else {
+                legendCard.classList.add('legend-card-glass');
+            }
+
+            // 3. 标题显隐与字号缩放
+            const s = legendState.scale;
+            const titleFontPx = Math.round(13 * s);
+            const itemFontPx = Math.round(12 * s);
+            const swatchPx = Math.round(18 * s);
+
+            legendTitleWrap.style.display = legendState.showTitle ? 'flex' : 'none';
+            legendTitleInput.value = legendState.title;
+            legendTitleInput.style.fontSize = `${titleFontPx}px`;
+
+            // 4. 排列布局模式
+            legendItemsContainer.className = '';
+            const layoutNames = {
+                'auto': '流式',
+                '2-col': '双列',
+                '3-col': '三列',
+                '1-col': '单列'
+            };
+            toolbarLayoutLabel.textContent = layoutNames[legendState.layout] || '双列';
+
+            if (legendState.layout === 'auto') {
+                legendItemsContainer.className = 'flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 w-full';
+                if (legendState.customWidth === null) {
+                    legendItemsContainer.classList.add('max-w-[86vw]', 'sm:max-w-[640px]');
+                }
+            } else if (legendState.layout === '3-col') {
+                legendItemsContainer.className = 'grid grid-cols-2 sm:grid-cols-3 gap-x-2.5 gap-y-1.5 items-center w-full';
+            } else if (legendState.layout === '1-col') {
+                legendItemsContainer.className = 'flex flex-col items-start gap-y-1.5 w-full';
+            } else {
+                legendItemsContainer.className = 'grid grid-cols-2 gap-x-3 gap-y-1.5 items-center w-full';
+            }
+
+            // 5. 构建每个图例小方块与文字输入框（支持单独或批量拖拽文字框长度，同时外框保持固定）
+            legendItemsContainer.innerHTML = '';
+            const shapeClass = getSwatchShapeClass(legendState.swatchShape);
+
+            legendState.items.forEach((item) => {
+                const row = document.createElement('div');
+                row.className = 'legend-item-row flex items-center gap-1.5 px-1 py-0.5 rounded-lg min-w-0';
+
+                // 颜色小方块按钮
+                const swatchBtn = document.createElement('button');
+                swatchBtn.type = 'button';
+                swatchBtn.dataset.swatchId = item.id;
+                swatchBtn.title = '点击为该小方块上色';
+                swatchBtn.className = `${shapeClass} shrink-0 border border-white/30 shadow-sm cursor-pointer hover:scale-110 active:scale-95 transition-transform`;
+                swatchBtn.style.width = `${swatchPx}px`;
+                swatchBtn.style.height = `${swatchPx}px`;
+                swatchBtn.style.backgroundColor = item.color;
+
+                swatchBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openColorPopoverForItem(item.id, swatchBtn);
+                });
+
+                // 文字说明输入框（宽度完全可控，调节时不会撑大或缩小图例外框）
+                const textInput = document.createElement('input');
+                textInput.type = 'text';
+                textInput.value = item.label;
+                textInput.placeholder = '输入颜色说明...';
+                textInput.dataset.legendInputId = item.id;
+                textInput.className = 'legend-label-input font-medium px-1.5 py-0.5 min-w-[36px] shrink-0';
+                textInput.style.fontSize = `${itemFontPx}px`;
+                textInput.style.width = `${getItemTargetInputWidth(item, itemFontPx)}px`;
+
+                textInput.addEventListener('input', (e) => {
+                    item.label = e.target.value;
+                    // 若未手动固定该文字框长度，则随字数自适应，但首先锁定外框若已处于固定状态
+                    if (item.inputWidth === null && legendState.customInputWidth === null) {
+                        textInput.style.width = `${computeInputPixelWidth(item.label, itemFontPx)}px`;
+                    }
+                });
+
+                textInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        textInput.blur();
+                    }
+                });
+
+                // 文字输入框右侧专属「左右拖拽调节文字框长度」手柄（拖拽时自动锁定图例外框固定不变）
+                const inputResizeHandle = document.createElement('span');
+                inputResizeHandle.className = 'legend-input-resize-handle';
+                inputResizeHandle.title = '左右拖动调整此文字框长度（保持图例外框固定，双击恢复自动宽度）';
+
+                inputResizeHandle.addEventListener('mousedown', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    startInputBoxResize(e.clientX, item, textInput, row);
+                });
+                inputResizeHandle.addEventListener('touchstart', (e) => {
+                    if (e.touches.length === 1) {
+                        e.stopPropagation();
+                        startInputBoxResize(e.touches[0].clientX, item, textInput, row);
+                    }
+                }, { passive: true });
+
+                // 双击手柄恢复该文字框自动适应字数宽度（同样保持图例外框固定）
+                inputResizeHandle.addEventListener('dblclick', (e) => {
+                    e.stopPropagation();
+                    lockLegendOuterCardSizeIfNeeded();
+                    item.inputWidth = null;
+                    textInput.style.width = `${ getItemTargetInputWidth(item, itemFontPx) }px`;
+                    applyLegendDimensionsUI();
+                    showToast('已恢复该文字框自动宽度（图例外框保持固定）');
+                });
+
+                // 悬停时的快捷操作按钮组（删除）
+                const actionsWrap = document.createElement('div');
+                actionsWrap.className = 'legend-item-actions flex items-center shrink-0';
+
+                if (legendState.items.length > 1) {
+                    const delBtn = document.createElement('button');
+                    delBtn.type = 'button';
+                    delBtn.title = '删除此图例项';
+                    delBtn.textContent = '✕';
+                    delBtn.className = 'w-4 h-4 rounded flex items-center justify-center text-[10px] text-rose-400 hover:bg-rose-500/20 cursor-pointer';
+                    delBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        removeLegendItem(item.id);
+                    });
+                    actionsWrap.appendChild(delBtn);
+                }
+
+                row.appendChild(swatchBtn);
+                row.appendChild(textInput);
+                row.appendChild(inputResizeHandle);
+                row.appendChild(actionsWrap);
+                legendItemsContainer.appendChild(row);
+            });
+
+            // 6. 在图例末尾提供一个快捷 [+ 添加图例] 胶囊按钮
+            const addPill = document.createElement('button');
+            addPill.type = 'button';
+            addPill.title = '添加一个新的颜色小方块与说明';
+            addPill.className = 'legend-add-pill flex items-center gap-1.5 px-2 py-1 rounded-lg border border-dashed border-sky-400/50 hover:border-sky-400 hover:bg-sky-500/15 text-sky-400 text-[11px] font-medium cursor-pointer w-fit';
+            addPill.innerHTML = `<span class="w-3.5 h-3.5 rounded bg-sky-500/30 border border-sky-400 flex items-center justify-center text-[10px] leading-none">+</span><span>添加图例</span>`;
+            addPill.addEventListener('click', () => {
+                addNewLegendItem(true);
+            });
+            legendItemsContainer.appendChild(addPill);
+
+            applyLegendDimensionsUI();
+            updateLegendPositionOnScreen();
+        }
+
+        // 添加新的图例颜色方块
+        function addNewLegendItem(focusInput = false) {
+            const nextColor = PRESET_MAP_COLORS[legendState.items.length % PRESET_MAP_COLORS.length];
+            const newId = legendState.nextId++;
+            legendState.items.push({
+                id: newId,
+                color: nextColor,
+                label: `填色说明 ${legendState.items.length + 1}`,
+                inputWidth: legendState.customInputWidth
+            });
+            renderLegendDOM();
+
+            if (focusInput) {
+                const inputs = legendItemsContainer.querySelectorAll('.legend-label-input');
+                if (inputs.length > 0) {
+                    const lastInput = inputs[inputs.length - 1];
+                    lastInput.focus();
+                    lastInput.select();
+                }
+            }
+        }
+
+        // 删除指定图例项
+        function removeLegendItem(id) {
+            if (legendState.items.length <= 1) {
+                showToast('至少保留一个图例项，若无需图例可取消勾选“显示图例”');
+                return;
+            }
+            if (activeColorItemId === id) closeColorPopover();
+            legendState.items = legendState.items.filter(it => it.id !== id);
+            renderLegendDOM();
+        }
+
+        // 绑定图例标题输入与各项控制事件
+        legendTitleInput.addEventListener('input', (e) => {
+            legendState.title = e.target.value;
+        });
+
+        document.getElementById('toggleLegendVisible').addEventListener('change', (e) => {
+            legendState.visible = e.target.checked;
+            renderLegendDOM();
+        });
+
+        document.getElementById('toggleLegendRecord').addEventListener('change', (e) => {
+            legendState.includeInRecord = e.target.checked;
+            showToast(legendState.includeInRecord ? '已开启：录制视频时将包含下方图例' : '已关闭：录制视频仅包含纯净地球');
+        });
+
+        document.getElementById('btnAddLegendItem').addEventListener('click', () => {
+            addNewLegendItem(true);
+        });
+
+        document.getElementById('btnToolbarAddLegend').addEventListener('click', () => {
+            addNewLegendItem(true);
+        });
+
+        document.getElementById('btnToggleLegendTitle').addEventListener('click', () => {
+            legendState.showTitle = !legendState.showTitle;
+            renderLegendDOM();
+        });
+
+        const selectLegendLayout = document.getElementById('selectLegendLayout');
+        selectLegendLayout.addEventListener('change', (e) => {
+            legendState.layout = e.target.value;
+            renderLegendDOM();
+        });
+
+        document.getElementById('btnToolbarCycleLayout').addEventListener('click', () => {
+            const order = ['2-col', 'auto', '3-col', '1-col'];
+            const nextIdx = (order.indexOf(legendState.layout) + 1) % order.length;
+            legendState.layout = order[nextIdx];
+            selectLegendLayout.value = legendState.layout;
+            renderLegendDOM();
+        });
+
+        document.getElementById('selectLegendBgStyle').addEventListener('change', (e) => {
+            legendState.bgStyle = e.target.value;
+            renderLegendDOM();
+        });
+
+        document.getElementById('selectSwatchShape').addEventListener('change', (e) => {
+            legendState.swatchShape = e.target.value;
+            renderLegendDOM();
+        });
+
+        // 左侧面板：手动调整图例宽度与高度滑块及恢复自适应按钮
+        rangeLegendWidth.addEventListener('input', (e) => {
+            legendState.customWidth = parseFloat(e.target.value);
+            renderLegendDOM();
+        });
+
+        rangeLegendHeight.addEventListener('input', (e) => {
+            legendState.customHeight = parseFloat(e.target.value);
+            applyLegendDimensionsUI();
+        });
+
+        // 左侧面板：统一调整文字输入框长度滑块（调整文字框长度时，严格保持图例外框大小固定不变）
+        rangeLegendInputWidth.addEventListener('input', (e) => {
+            // 1. 先锁定当前图例外框的宽高，防止文字框变长或变短时引起图例外框缩放
+            lockLegendOuterCardSizeIfNeeded();
+
+            // 2. 更新所有文字输入框的长度
+            const newInputW = parseFloat(e.target.value);
+            legendState.customInputWidth = newInputW;
+            legendState.items.forEach(it => {
+                it.inputWidth = newInputW;
+            });
+
+            const inputs = legendItemsContainer.querySelectorAll('.legend-label-input');
+            inputs.forEach(inp => {
+                inp.style.width = `${newInputW}px`;
+            });
+            applyLegendDimensionsUI();
+        });
+
+        // 拖拽单个文字输入框右侧竖线手柄调整长度（保持图例外框固定）
+        let isResizingInputBox = false;
+        let activeInputItem = null;
+        let activeInputEl = null;
+        let activeInputRowEl = null;
+        let inputResizeStartX = 0;
+        let inputResizeStartW = 0;
+
+        function startInputBoxResize(clientX, item, inputEl, rowEl) {
+            // 关键：在开始拖拽文字框之前，立即将图例外框当前的像素宽高固定下来
+            lockLegendOuterCardSizeIfNeeded();
+
+            isResizingInputBox = true;
+            activeInputItem = item;
+            activeInputEl = inputEl;
+            activeInputRowEl = rowEl;
+            inputResizeStartX = clientX;
+            inputResizeStartW = inputEl.getBoundingClientRect().width;
+            rowEl.classList.add('input-resizing');
+            legendWrapper.classList.add('editing-active');
+        }
+
+        function moveInputBoxResize(clientX) {
+            if (!isResizingInputBox || !activeInputItem || !activeInputEl) return;
+            const dx = clientX - inputResizeStartX;
+            // 计算当前图例外框允许的最大内部文字框宽度，确保文字框不会把图例外框撑破
+            const cardRect = legendCard.getBoundingClientRect();
+            const maxInputW = Math.max(60, Math.round(cardRect.width - 72));
+            const newW = Math.max(40, Math.min(maxInputW, Math.round(inputResizeStartW + dx)));
+
+            activeInputItem.inputWidth = newW;
+            activeInputEl.style.width = `${newW}px`;
+            rangeLegendInputWidth.value = Math.min(600, newW);
+            valLegendInputWidth.textContent = `${newW}px`;
+        }
+
+        function stopInputBoxResize() {
+            if (isResizingInputBox) {
+                isResizingInputBox = false;
+                if (activeInputRowEl) activeInputRowEl.classList.remove('input-resizing');
+                legendWrapper.classList.remove('editing-active');
+                activeInputItem = null;
+                activeInputEl = null;
+                activeInputRowEl = null;
+            }
+        }
+
+        document.getElementById('btnResetLegendSize').addEventListener('click', resetLegendCustomSize);
+        btnToolbarResetSize.addEventListener('click', resetLegendCustomSize);
+
+        // 支持直接拖拽图例卡片的四边或四角手柄自由调整长宽大小（支持鼠标与触控）
+        let isResizingLegend = false;
+        let activeResizeDir = '';
+        let resizeStartX = 0;
+        let resizeStartY = 0;
+        let resizeStartW = 0;
+        let resizeStartH = 0;
+        let resizeStartBottomPercent = 8;
+
+        function startLegendResize(clientX, clientY, dir) {
+            isResizingLegend = true;
+            activeResizeDir = dir;
+            resizeStartX = clientX;
+            resizeStartY = clientY;
+            const rect = legendCard.getBoundingClientRect();
+            resizeStartW = rect.width;
+            resizeStartH = rect.height;
+            resizeStartBottomPercent = legendState.bottomPercent;
+            legendWrapper.classList.add('resizing-active');
+        }
+
+        function moveLegendResize(clientX, clientY) {
+            if (!isResizingLegend) return;
+            const dx = clientX - resizeStartX;
+            const dy = clientY - resizeStartY;
+            const maxAllowedW = Math.round(window.innerWidth * 0.94);
+            const maxAllowedH = Math.round(window.innerHeight * 0.65);
+
+            // 水平方向调节宽度（因为图例水平居中，边缘移动 dx 对应总宽度变化 2 * dx，使边缘 1:1 跟随鼠标）
+            const prevHadCustomW = legendState.customWidth !== null;
+            if (activeResizeDir.includes('e')) {
+                legendState.customWidth = Math.max(160, Math.min(maxAllowedW, Math.round(resizeStartW + dx * 2)));
+            } else if (activeResizeDir.includes('w')) {
+                legendState.customWidth = Math.max(160, Math.min(maxAllowedW, Math.round(resizeStartW - dx * 2)));
+            }
+
+            // 垂直方向调节高度
+            if (activeResizeDir.includes('n')) {
+                // 向上拖拽顶边：底边保持锚定，顶边 1:1 跟随鼠标
+                legendState.customHeight = Math.max(52, Math.min(maxAllowedH, Math.round(resizeStartH - dy)));
+            } else if (activeResizeDir.includes('s')) {
+                // 向下拖拽底边：改变高度的同时同步微调 bottomPercent，使顶边保持不动、底边跟随鼠标
+                const newH = Math.max(52, Math.min(maxAllowedH, Math.round(resizeStartH + dy)));
+                const actualDeltaH = newH - resizeStartH;
+                legendState.customHeight = newH;
+
+                const boxH = currentFrameBoxH || window.innerHeight * 0.88;
+                const deltaPercent = (actualDeltaH / boxH) * 100;
+                legendState.bottomPercent = Math.max(1, Math.min(45, resizeStartBottomPercent - deltaPercent));
+                rangeLegendBottom.value = Math.round(legendState.bottomPercent);
+                valLegendBottom.textContent = `${Math.round(legendState.bottomPercent)}%`;
+                updateLegendPositionOnScreen();
+            }
+
+            if (!prevHadCustomW && legendState.customWidth !== null) {
+                renderLegendDOM();
+            } else {
+                applyLegendDimensionsUI();
+            }
+        }
+
+        function stopLegendResize() {
+            if (isResizingLegend) {
+                isResizingLegend = false;
+                activeResizeDir = '';
+                legendWrapper.classList.remove('resizing-active');
+            }
+        }
+
+        document.querySelectorAll('.legend-resize-handle').forEach(handle => {
+            handle.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                startLegendResize(e.clientX, e.clientY, handle.dataset.resizeDir);
+            });
+            handle.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) {
+                    e.stopPropagation();
+                    startLegendResize(e.touches[0].clientX, e.touches[0].clientY, handle.dataset.resizeDir);
+                }
+            }, { passive: true });
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (isResizingLegend) {
+                moveLegendResize(e.clientX, e.clientY);
+            } else if (isResizingInputBox) {
+                moveInputBoxResize(e.clientX);
+            }
+        });
+        window.addEventListener('touchmove', (e) => {
+            if (e.touches.length === 1) {
+                if (isResizingLegend) {
+                    moveLegendResize(e.touches[0].clientX, e.touches[0].clientY);
+                } else if (isResizingInputBox) {
+                    moveInputBoxResize(e.touches[0].clientX);
+                }
+            }
+        }, { passive: true });
+        window.addEventListener('mouseup', () => {
+            stopLegendResize();
+            stopInputBoxResize();
+        });
+        window.addEventListener('touchend', () => {
+            stopLegendResize();
+            stopInputBoxResize();
+        });
+
+        const rangeLegendScale = document.getElementById('rangeLegendScale');
+        const valLegendScale = document.getElementById('valLegendScale');
+        rangeLegendScale.addEventListener('input', (e) => {
+            legendState.scale = parseFloat(e.target.value);
+            valLegendScale.textContent = `${Math.round(legendState.scale * 100)}%`;
+            renderLegendDOM();
+        });
+
+        const rangeLegendBottom = document.getElementById('rangeLegendBottom');
+        const valLegendBottom = document.getElementById('valLegendBottom');
+        rangeLegendBottom.addEventListener('input', (e) => {
+            legendState.bottomPercent = parseFloat(e.target.value);
+            valLegendBottom.textContent = `${Math.round(legendState.bottomPercent)}%`;
+            updateLegendPositionOnScreen();
+        });
+
+        const rangeGlobeOffsetY = document.getElementById('rangeGlobeOffsetY');
+        const valGlobeOffsetY = document.getElementById('valGlobeOffsetY');
+        rangeGlobeOffsetY.addEventListener('input', (e) => {
+            legendState.globeOffsetYPercent = parseFloat(e.target.value);
+            const sign = legendState.globeOffsetYPercent > 0 ? '+' : '';
+            valGlobeOffsetY.textContent = `${sign}${Math.round(legendState.globeOffsetYPercent)}%`;
+            updateAspectFrameAndCamera();
+        });
+
+        // 支持按住图例顶部 `↕ 拖动位置` 直接在屏幕上上下拖动调整位置
+        const legendDragHandle = document.getElementById('legend-drag-handle');
+        let isDraggingLegend = false;
+        let dragStartY = 0;
+        let dragStartBottomPercent = 8;
+
+        legendDragHandle.addEventListener('mousedown', (e) => {
+            isDraggingLegend = true;
+            dragStartY = e.clientY;
+            dragStartBottomPercent = legendState.bottomPercent;
+            legendWrapper.classList.add('editing-active');
+            e.preventDefault();
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isDraggingLegend) return;
+            const boxH = currentFrameBoxH || window.innerHeight * 0.88;
+            const deltaY = dragStartY - e.clientY;
+            const deltaPercent = (deltaY / boxH) * 100;
+            legendState.bottomPercent = Math.max(2, Math.min(42, Math.round(dragStartBottomPercent + deltaPercent)));
+            rangeLegendBottom.value = legendState.bottomPercent;
+            valLegendBottom.textContent = `${legendState.bottomPercent}%`;
+            updateLegendPositionOnScreen();
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (isDraggingLegend) {
+                isDraggingLegend = false;
+                legendWrapper.classList.remove('editing-active');
+            }
+        });
+
+        // === 5. 地图贴图上传与恢复默认逻辑 ===
         const uploadMapInput = document.getElementById('uploadMap');
         const btnRestoreDefaultMap = document.getElementById('btnRestoreDefaultMap');
 
@@ -752,6 +1936,7 @@
 
         // 中轴线、球面经纬网与录制画幅框显示开关
         const axisGuide = document.getElementById('axis-guide');
+        const axisCrosshair = document.getElementById('axis-crosshair');
         document.getElementById('toggleAxisLine').addEventListener('change', function(e) {
             axisGuide.style.display = e.target.checked ? 'block' : 'none';
         });
@@ -765,7 +1950,7 @@
             aspectFrameOverlay.style.display = e.target.checked ? 'block' : 'none';
         });
 
-        // === 5. 起始定位经纬度记忆 (anchorLon, anchorLat) 与双向同步 ===
+        // === 6. 起始定位经纬度记忆 (anchorLon, anchorLat) 与双向同步 ===
         const inputLon = document.getElementById('inputLon');
         const inputLat = document.getElementById('inputLat');
         const liveCoordBadge = document.getElementById('live-coord-badge');
@@ -910,7 +2095,7 @@
             showToast('已将起始定位归零至 (0° 本初子午线, 0° 赤道)');
         });
 
-        // === 6. 地球旋转动画控制 (开始 / 暂停 / 重新开始) ===
+        // === 7. 地球旋转动画控制 (开始 / 暂停 / 重新开始) ===
         let isRotating = false;
         let rotationSpeedDeg = 0.5;
 
@@ -963,39 +2148,37 @@
             speedVal.textContent = rotationSpeedDeg.toFixed(1) + '°';
         });
 
-        // === 7. 视频长宽比（默认 9:16）与清晰度选项配置、画幅参考框计算 ===
+        // === 8. 视频长宽比（默认 9:16）、画幅参考框计算与图例屏幕位置同步 ===
         const selectAspectRatio = document.getElementById('selectAspectRatio');
         const selectQuality = document.getElementById('selectQuality');
         const exportSpecLabel = document.getElementById('export-spec-label');
         const aspectFrameBadge = document.getElementById('aspect-frame-badge');
 
-        // 根据用户选择的长宽比和清晰度档位，计算精确的目标像素宽高（确保为偶数以兼容 H.264/VP9 编码器）与目标码率
+        let currentFrameBoxW = 400;
+        let currentFrameBoxH = 711;
+
         function getVideoExportConfig() {
-            const ratioStr = selectAspectRatio.value; // 如 "9:16"
+            const ratioStr = selectAspectRatio.value;
             const [rw, rh] = ratioStr.split(':').map(Number);
-            const baseShortEdge = parseInt(selectQuality.value, 10) || 1080; // 短边基准像素：720 / 1080 / 1440 / 2160
+            const baseShortEdge = parseInt(selectQuality.value, 10) || 1080;
 
             let width, height;
             if (rw <= rh) {
-                // 竖屏或方形（如 9:16 -> 1080x1920, 1:1 -> 1080x1080, 3:4 -> 1080x1440）
                 width = baseShortEdge;
                 height = Math.round((baseShortEdge * rh) / rw);
             } else {
-                // 横屏（如 16:9 -> 1920x1080, 4:3 -> 1440x1080）
                 height = baseShortEdge;
                 width = Math.round((baseShortEdge * rw) / rh);
             }
 
-            // 强制对齐到偶数像素，防止部分浏览器编码器报错
             width = width % 2 === 0 ? width : width + 1;
             height = height % 2 === 0 ? height : height + 1;
 
-            // 根据清晰度匹配高画质码率 (bps)
             const bitrateMap = {
-                720: 8000000,    // 8 Mbps
-                1080: 16000000,  // 16 Mbps
-                1440: 24000000,  // 24 Mbps
-                2160: 40000000   // 40 Mbps
+                720: 8000000,
+                1080: 16000000,
+                1440: 24000000,
+                2160: 40000000
             };
             const bitrate = bitrateMap[baseShortEdge] || 16000000;
 
@@ -1009,13 +2192,19 @@
             };
         }
 
-        // 更新屏幕上的画幅比例虚线参考框与规格文字，并同步调整相机视野使地球在 9:16 框内完整居中
+        // 将地球下方图例精准定位在安全画幅框内的底部对应百分比处
+        function updateLegendPositionOnScreen() {
+            const frameBottomGap = (window.innerHeight - currentFrameBoxH) / 2;
+            const bottomPx = frameBottomGap + (currentFrameBoxH * (legendState.bottomPercent / 100));
+            legendWrapper.style.bottom = `${Math.round(bottomPx)}px`;
+        }
+
+        // 更新屏幕上的画幅比例虚线参考框与相机视野（支持地球垂直偏移，使地球与下方图例构图均衡）
         function updateAspectFrameAndCamera() {
             const cfg = getVideoExportConfig();
             exportSpecLabel.textContent = `${cfg.width} × ${cfg.height} px · 60fps`;
             aspectFrameBadge.textContent = `${cfg.ratioStr} · ${cfg.width}×${cfg.height}`;
 
-            // 计算在当前浏览器视口内居中留白 8% 后的安全参考框尺寸
             const maxW = window.innerWidth * 0.90;
             const maxH = window.innerHeight * 0.88;
             let boxW = maxW;
@@ -1026,18 +2215,35 @@
                 boxW = boxH * cfg.aspect;
             }
 
+            currentFrameBoxW = boxW;
+            currentFrameBoxH = boxH;
+
             aspectFrameOverlay.style.width = `${Math.round(boxW)}px`;
             aspectFrameOverlay.style.height = `${Math.round(boxH)}px`;
 
-            // 让主视口相机也参考目标画幅比例调整缩放感，使屏幕预览框内的地球大小与最终导出视频完全一致
             const windowAspect = window.innerWidth / window.innerHeight;
             camera.aspect = windowAspect;
-            // 计算保证地球在屏幕上该参考框内完整显示的垂直 FOV
             const targetFovInBox = getAdaptiveFov(cfg.aspect);
             const targetRad = THREE.MathUtils.degToRad(targetFovInBox / 2);
             const heightRatio = window.innerHeight / boxH;
             camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(targetRad) * heightRatio));
+
+            // 使用相机镜头垂直偏移 (ViewOffset) 让地球无畸变上移，为下方图例留出空间
+            const offsetYPx = (legendState.globeOffsetYPercent / 100) * boxH;
+            camera.setViewOffset(
+                window.innerWidth,
+                window.innerHeight,
+                0,
+                offsetYPx,
+                window.innerWidth,
+                window.innerHeight
+            );
             camera.updateProjectionMatrix();
+
+            // 同步准星圆环高度
+            axisCrosshair.style.top = `calc(50% - ${Math.round(offsetYPx)}px)`;
+
+            updateLegendPositionOnScreen();
         }
 
         selectAspectRatio.addEventListener('change', () => {
@@ -1052,31 +2258,289 @@
             showToast(`已切换视频清晰度为 ${cfg.qualityLabel} (${cfg.width}×${cfg.height})`);
         });
 
-        // === 8. 专用离屏高分辨率渲染器与录制系统（保证导出视频精确为 9:16 等指定分辨率，不受浏览器窗口尺寸影响） ===
+        // === 9. 专用离屏高分辨率渲染器 + 图例 Canvas 矢量合成器 ===
         const btnRecord = document.getElementById('btnRecord');
         const btnExport = document.getElementById('btnExport');
         const recordStatus = document.getElementById('record-status');
         const recordTimer = document.getElementById('record-timer');
         const recordHint = document.getElementById('recordHint');
 
-        // 创建专用于视频录制的离屏渲染器与独立录制相机，避免录制时主屏幕画面变形或受窗口分辨率限制
         const recordRenderer = new THREE.WebGLRenderer({
             antialias: true,
             preserveDrawingBuffer: true
         });
-        recordRenderer.setPixelRatio(1); // 严格按目标像素 1:1 输出（如精确的 1080x1920）
+        recordRenderer.setPixelRatio(1);
         const recordCamera = new THREE.PerspectiveCamera(BASE_FOV, 9 / 16, 0.1, 1000);
 
-        // 将当前主相机的姿态同步给录制专用相机，并根据录制长宽比设置自适应 FOV
+        // 创建用于合成「3D 地球 + 下方高清图例」的离屏 2D 画布
+        const compositeCanvas = document.createElement('canvas');
+        const compositeCtx = compositeCanvas.getContext('2d');
+
+        // 辅助绘制圆角矩形
+        function fillRoundRect(ctx, x, y, w, h, r) {
+            const radius = Math.max(0, Math.min(r, w / 2, h / 2));
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.arcTo(x + w, y, x + w, y + h, radius);
+            ctx.arcTo(x + w, y + h, x, y + h, radius);
+            ctx.arcTo(x, y + h, x, y, radius);
+            ctx.arcTo(x, y, x + w, y, radius);
+            ctx.closePath();
+        }
+
+        // 在录制画布上高清绘制与屏幕一致的自定义图例
+        function drawLegendOnRecordCanvas(ctx, canvasW, canvasH) {
+            if (!legendState.visible || !legendState.includeInRecord || legendState.items.length === 0) return;
+
+            // 计算录制画布与屏幕参考框的精确比例尺
+            const ratio = canvasH / (currentFrameBoxH || 720);
+            const s = legendState.scale * ratio;
+
+            const padX = 18 * s;
+            const padY = 14 * s;
+            const swatchSize = 18 * s;
+            const swatchTextGap = 8 * s;
+            const colGap = 22 * s;
+            const rowGap = 11 * s;
+            const titleFontPx = Math.round(13 * s);
+            const itemFontPx = Math.round(12 * s);
+            const fontFamily = 'Inter, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif';
+
+            ctx.save();
+            ctx.font = `500 ${itemFontPx}px ${fontFamily}`;
+
+            const items = legendState.items;
+            const baseItemFontPx = Math.round(12 * legendState.scale);
+            const itemWidths = items.map(it => {
+                // 若用户手动调节了该文字框的长度，则在录制画布中也按对应的文字框长度进行排版与裁剪
+                const manualInputW = (typeof it.inputWidth === 'number' && it.inputWidth > 0)
+                    ? it.inputWidth * ratio
+                    : ((typeof legendState.customInputWidth === 'number' && legendState.customInputWidth > 0)
+                        ? legendState.customInputWidth * ratio
+                        : null);
+                const textW = manualInputW !== null
+                    ? manualInputW
+                    : ctx.measureText(it.label || '').width;
+                return swatchSize + swatchTextGap + textW;
+            });
+
+            // 根据布局模式计算每个图例项的相对坐标 (rx, ry)
+            let contentW = 0;
+            let contentH = 0;
+            const itemPositions = [];
+
+            if (legendState.layout === 'auto') {
+                const maxLineW = canvasW * 0.84;
+                let rows = [];
+                let curRow = [];
+                let curW = 0;
+
+                items.forEach((it, idx) => {
+                    const w = itemWidths[idx];
+                    if (curRow.length > 0 && curW + colGap + w > maxLineW) {
+                        rows.push({ indices: curRow, width: curW });
+                        curRow = [idx];
+                        curW = w;
+                    } else {
+                        if (curRow.length > 0) curW += colGap;
+                        curRow.push(idx);
+                        curW += w;
+                    }
+                });
+                if (curRow.length > 0) rows.push({ indices: curRow, width: curW });
+
+                contentW = Math.max(...rows.map(r => r.width), 80 * s);
+                contentH = rows.length * swatchSize + Math.max(0, rows.length - 1) * rowGap;
+
+                rows.forEach((r, rIdx) => {
+                    let startX = (contentW - r.width) / 2;
+                    const y = rIdx * (swatchSize + rowGap);
+                    r.indices.forEach(i => {
+                        itemPositions[i] = { x: startX, y };
+                        startX += itemWidths[i] + colGap;
+                    });
+                });
+            } else {
+                const cols = legendState.layout === '3-col' ? 3 : (legendState.layout === '1-col' ? 1 : 2);
+                const actualCols = Math.min(cols, items.length);
+                const numRows = Math.ceil(items.length / actualCols);
+                const colMaxWidths = new Array(actualCols).fill(0);
+
+                items.forEach((it, idx) => {
+                    const c = idx % actualCols;
+                    if (itemWidths[idx] > colMaxWidths[c]) {
+                        colMaxWidths[c] = itemWidths[idx];
+                    }
+                });
+
+                contentW = colMaxWidths.reduce((a, b) => a + b, 0) + Math.max(0, actualCols - 1) * colGap;
+                contentH = numRows * swatchSize + Math.max(0, numRows - 1) * rowGap;
+
+                items.forEach((it, idx) => {
+                    const r = Math.floor(idx / actualCols);
+                    const c = idx % actualCols;
+                    let x = 0;
+                    for (let k = 0; k < c; k++) x += colMaxWidths[k] + colGap;
+                    const y = r * (swatchSize + rowGap);
+                    itemPositions[idx] = { x, y };
+                });
+            }
+
+            // 计算标题尺寸
+            let titleBlockH = 0;
+            const hasTitle = legendState.showTitle && legendState.title.trim().length > 0;
+            if (hasTitle) {
+                ctx.font = `600 ${titleFontPx}px ${fontFamily}`;
+                const titleW = ctx.measureText(legendState.title.trim()).width + 20 * s;
+                if (titleW > contentW) contentW = titleW;
+                titleBlockH = titleFontPx + 14 * s;
+            }
+
+            const autoCardW = contentW + padX * 2;
+            const autoCardH = contentH + titleBlockH + padY * 2;
+
+            // 若用户手动调整了图例宽度或高度，则按比例尺精确映射到录制画布上
+            const cardW = legendState.customWidth !== null
+                ? legendState.customWidth * ratio
+                : autoCardW;
+            const cardH = legendState.customHeight !== null
+                ? legendState.customHeight * ratio
+                : autoCardH;
+
+            const cardX = (canvasW - cardW) / 2;
+            const bottomPx = canvasH * (legendState.bottomPercent / 100);
+            const cardY = canvasH - bottomPx - cardH;
+
+            // 若手动拉宽了图例且处于分列模式 (2-col / 3-col / 1-col)，让各列在手动设定的宽度内均匀展开
+            if (legendState.customWidth !== null && legendState.layout !== 'auto' && items.length > 0) {
+                const cols = legendState.layout === '3-col' ? 3 : (legendState.layout === '1-col' ? 1 : 2);
+                const actualCols = Math.min(cols, items.length);
+                const innerAvailW = Math.max(contentW, cardW - padX * 2);
+                const colSlotW = (innerAvailW - Math.max(0, actualCols - 1) * colGap) / actualCols;
+
+                items.forEach((it, idx) => {
+                    const r = Math.floor(idx / actualCols);
+                    const c = idx % actualCols;
+                    itemPositions[idx] = {
+                        x: c * (colSlotW + colGap),
+                        y: r * (swatchSize + rowGap)
+                    };
+                });
+                contentW = innerAvailW;
+            }
+
+            // 1) 绘制卡片背景与边框
+            if (legendState.bgStyle !== 'minimal') {
+                fillRoundRect(ctx, cardX, cardY, cardW, cardH, 16 * s);
+                if (isLightMode) {
+                    ctx.fillStyle = legendState.bgStyle === 'solid' ? 'rgba(255, 255, 255, 0.96)' : 'rgba(255, 255, 255, 0.84)';
+                    ctx.strokeStyle = 'rgba(100, 116, 139, 0.32)';
+                } else {
+                    ctx.fillStyle = legendState.bgStyle === 'solid' ? 'rgba(15, 23, 42, 0.95)' : 'rgba(15, 23, 42, 0.78)';
+                    ctx.strokeStyle = 'rgba(148, 163, 184, 0.28)';
+                }
+                ctx.fill();
+                ctx.lineWidth = Math.max(1, 1.2 * ratio);
+                ctx.stroke();
+            }
+
+            // 裁剪卡片区域，确保手动缩小时内部内容不会溢出卡片边界
+            ctx.save();
+            fillRoundRect(ctx, cardX, cardY, cardW, cardH, 16 * s);
+            ctx.clip();
+
+            const primaryTextColor = isLightMode ? '#0f172a' : '#f8fafc';
+
+            // 2) 绘制图例标题与分割线
+            let itemsAreaTop = cardY + padY;
+            if (hasTitle) {
+                ctx.font = `600 ${titleFontPx}px ${fontFamily}`;
+                ctx.fillStyle = primaryTextColor;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                ctx.fillText(legendState.title.trim(), canvasW / 2, cardY + padY);
+
+                const lineY = cardY + padY + titleFontPx + 6 * s;
+                ctx.beginPath();
+                ctx.moveTo(cardX + padX, lineY);
+                ctx.lineTo(cardX + cardW - padX, lineY);
+                ctx.strokeStyle = isLightMode ? 'rgba(100, 116, 139, 0.2)' : 'rgba(148, 163, 184, 0.2)';
+                ctx.lineWidth = Math.max(1, 1 * ratio);
+                ctx.stroke();
+
+                itemsAreaTop = cardY + padY + titleBlockH;
+            }
+
+            // 计算内容区在卡片内的水平与垂直居中起点（适配用户手动拉大或缩小的宽高）
+            const availItemsH = Math.max(contentH, (cardY + cardH - padY) - itemsAreaTop);
+            const itemsOriginX = cardX + (cardW - contentW) / 2;
+            const itemsOriginY = itemsAreaTop + (availItemsH - contentH) / 2;
+
+            // 3) 绘制每一个颜色小方块与文字说明
+            ctx.font = `500 ${itemFontPx}px ${fontFamily}`;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+
+            items.forEach((it, idx) => {
+                const pos = itemPositions[idx];
+                const sx = itemsOriginX + pos.x;
+                const sy = itemsOriginY + pos.y;
+
+                // 绘制颜色方块
+                let swRadius = 5 * s;
+                if (legendState.swatchShape === 'circle') swRadius = swatchSize / 2;
+                else if (legendState.swatchShape === 'square') swRadius = 2 * s;
+
+                ctx.save();
+                fillRoundRect(ctx, sx, sy, swatchSize, swatchSize, swRadius);
+                ctx.fillStyle = it.color || '#38bdf8';
+                ctx.fill();
+                ctx.lineWidth = Math.max(1, 1 * ratio);
+                ctx.strokeStyle = isLightMode ? 'rgba(15, 23, 42, 0.25)' : 'rgba(255, 255, 255, 0.35)';
+                ctx.stroke();
+                ctx.restore();
+
+                // 绘制方块后的说明文字（若手动设定了较短的文字框宽度，则按文字框宽度裁剪，与屏幕预览一致）
+                ctx.fillStyle = primaryTextColor;
+                if (legendState.bgStyle === 'minimal') {
+                    ctx.shadowColor = isLightMode ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.85)';
+                    ctx.shadowBlur = 4 * ratio;
+                } else {
+                    ctx.shadowBlur = 0;
+                }
+
+                const textX = sx + swatchSize + swatchTextGap;
+                const textBoxW = itemWidths[idx] - swatchSize - swatchTextGap;
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(textX, sy - 4 * ratio, textBoxW + 4 * ratio, swatchSize + 8 * ratio);
+                ctx.clip();
+                ctx.fillText(it.label || '', textX, sy + swatchSize / 2);
+                ctx.restore();
+            });
+
+            ctx.restore();
+            ctx.restore();
+        }
+
+        // 将当前主相机的姿态同步给录制专用相机，并将 3D 画面与图例一并绘制到复合画布
         function syncAndRenderRecordFrame(cfg) {
             recordCamera.position.copy(camera.position);
             recordCamera.quaternion.copy(camera.quaternion);
             recordCamera.up.copy(camera.up);
             recordCamera.aspect = cfg.aspect;
             recordCamera.fov = getAdaptiveFov(cfg.aspect);
+
+            const offsetYPx = (legendState.globeOffsetYPercent / 100) * cfg.height;
+            recordCamera.setViewOffset(cfg.width, cfg.height, 0, offsetYPx, cfg.width, cfg.height);
             recordCamera.updateProjectionMatrix();
 
             recordRenderer.render(scene, recordCamera);
+
+            // 合成到离屏 2D 画布
+            compositeCtx.clearRect(0, 0, cfg.width, cfg.height);
+            compositeCtx.drawImage(recordRenderer.domElement, 0, 0, cfg.width, cfg.height);
+            drawLegendOnRecordCanvas(compositeCtx, cfg.width, cfg.height);
         }
 
         let mediaRecorder = null;
@@ -1089,7 +2553,6 @@
         let recordStartTime = 0;
         let timerInterval = null;
 
-        // 检测当前浏览器支持的最佳视频编码格式 (优先 MP4，其次 WebM VP9/VP8)
         function getSupportedMimeType() {
             if (typeof MediaRecorder === 'undefined') return '';
             const types = [
@@ -1115,26 +2578,30 @@
         }
 
         function startRecording() {
-            if (!recordRenderer.domElement.captureStream) {
+            if (!compositeCanvas.captureStream) {
                 showToast('当前浏览器环境不支持 Canvas 视频流录制');
                 return;
             }
 
-            // 1. 获取当前选定的长宽比与清晰度配置（默认 9:16 · 1080x1920），配置离屏录制画布尺寸
+            closeColorPopover();
+            document.body.classList.add('is-recording');
+
+            // 1. 获取当前选定的长宽比与清晰度配置，初始化离屏 3D 画布与复合画布尺寸
             activeExportConfig = getVideoExportConfig();
             recordRenderer.setSize(activeExportConfig.width, activeExportConfig.height, false);
+            compositeCanvas.width = activeExportConfig.width;
+            compositeCanvas.height = activeExportConfig.height;
 
-            // 锁定录制期间的分辨率与比例下拉框，避免录制中途改变画布尺寸导致编码中断
             selectAspectRatio.disabled = true;
             selectQuality.disabled = true;
 
-            // 2. 复位到用户设定的起始经纬度 (anchorLon, anchorLat)，将旋转进度归零 (0°)，并立即渲染起始帧
+            // 2. 复位到用户设定的起始经纬度，将旋转进度归零，并立即渲染起始帧
             restartRotationFromAnchor();
             renderer.render(scene, camera);
             syncAndRenderRecordFrame(activeExportConfig);
 
             // 3. 初始化 60 FPS 视频流与对应清晰度码率的 MediaRecorder
-            const stream = recordRenderer.domElement.captureStream(60);
+            const stream = compositeCanvas.captureStream(60);
             recordedMimeType = getSupportedMimeType();
             const options = recordedMimeType
                 ? { mimeType: recordedMimeType, videoBitsPerSecond: activeExportConfig.bitrate }
@@ -1165,6 +2632,7 @@
                 btnExport.disabled = false;
                 selectAspectRatio.disabled = false;
                 selectQuality.disabled = false;
+                document.body.classList.remove('is-recording');
                 recordHint.textContent = `已完成 ${activeExportConfig.ratioStr} (${activeExportConfig.width}×${activeExportConfig.height}) 360° 录制！请点击“导出下载”。`;
             };
 
@@ -1195,6 +2663,7 @@
             isAutoRecordOneTurn = false;
             selectAspectRatio.disabled = false;
             selectQuality.disabled = false;
+            document.body.classList.remove('is-recording');
             if (timerInterval) clearInterval(timerInterval);
             btnRecord.textContent = '⏺ 开始录制';
             recordStatus.classList.add('hidden');
@@ -1231,13 +2700,14 @@
             showToast(`正在下载 ${cfg.ratioStr} (${cfg.width}×${cfg.height}) 视频文件 (.${ext})`);
         });
 
-        // === 9. 窗口尺寸自适应 ===
+        // === 10. 窗口尺寸自适应 ===
         window.addEventListener('resize', () => {
             renderer.setSize(window.innerWidth, window.innerHeight);
             updateAspectFrameAndCamera();
+            closeColorPopover();
         });
 
-        // === 10. 核心渲染循环 ===
+        // === 11. 核心渲染循环 ===
         function animate() {
             requestAnimationFrame(animate);
 
@@ -1285,14 +2755,15 @@
             // 渲染主屏幕交互视图
             renderer.render(scene, camera);
 
-            // 若正在录制，同步渲染高分辨率指定长宽比离屏画布
+            // 若正在录制，同步渲染高分辨率指定长宽比离屏画布与自定义图例
             if (isRecording && activeExportConfig) {
                 syncAndRenderRecordFrame(activeExportConfig);
             }
         }
 
-        // 在 window.onload 事件后初始化定位、画幅参考框并启动动画循环
+        // 在 window.onload 事件后初始化定位、图例、画幅参考框并启动动画循环
         window.onload = function() {
+            renderLegendDOM();
             updateAspectFrameAndCamera();
             setCenterLonLat(0, 0, true);
             animate();

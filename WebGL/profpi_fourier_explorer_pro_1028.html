@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>profpi · Fourier Explorer Pro — 傅里叶级数本轮绘图仪 (支持大型SVG导入)</title>
+  <title>profpi · Fourier Explorer Pro — 傅里叶级数本轮绘图仪 (多比例超清版 · 自由分区排版 · 正交双圆环投影 · 支持大型SVG导入)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -54,7 +54,7 @@
     input[type="range"]::-webkit-slider-runnable-track {
       height: 6px;
       border-radius: 999px;
-      background: rgba(148, 163, 184, 0.25);
+      background: rgba(148, 163, 184, 0.28);
     }
     .dark input[type="range"]::-webkit-slider-runnable-track {
       background: #1e293b;
@@ -62,17 +62,21 @@
     input[type="range"]::-webkit-slider-thumb {
       -webkit-appearance: none;
       appearance: none;
-      width: 16px;
-      height: 16px;
+      width: 15px;
+      height: 15px;
       border-radius: 50%;
-      background: #38bdf8;
-      margin-top: -5px;
-      box-shadow: 0 0 10px rgba(56, 189, 248, 0.65);
+      background: #0284c7;
+      margin-top: -4.5px;
+      box-shadow: 0 0 8px rgba(2, 132, 199, 0.5);
       transition: transform 0.15s ease, background-color 0.15s ease;
+    }
+    .dark input[type="range"]::-webkit-slider-thumb {
+      background: #38bdf8;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.65);
     }
     input[type="range"]::-webkit-slider-thumb:hover {
       transform: scale(1.15);
-      background: #7dd3fc;
+      background: #38bdf8;
     }
 
     .glass-panel {
@@ -110,14 +114,15 @@
               <span class="font-bold tracking-tight text-slate-900 dark:text-white text-sm sm:text-base">profpi</span>
               <span class="text-slate-400 dark:text-slate-600">/</span>
               <span class="font-semibold text-sky-600 dark:text-sky-400 text-sm sm:text-base">Fourier Explorer Pro</span>
+              <span id="header-ratio-badge" class="hidden md:inline-block text-[10px] font-mono px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/30">多比例自由排版 · 亮暗双主题</span>
             </div>
-            <p class="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">用旋转本轮绘制任意图形 · 支持无大小限制外部 SVG 导入</p>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">复数单链 &amp; 正交双环投影绘图 · 公式/动画/文字自由拖拽排版 · 无限制 SVG 导入</p>
           </div>
         </div>
       </div>
 
-      <!-- Center Formula Badge -->
-      <div class="hidden lg:flex items-center gap-3 px-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-[#111726] border border-slate-200/80 dark:border-slate-800 text-xs font-mono text-slate-700 dark:text-sky-300">
+      <!-- Center Formula Badge (Dynamic by Mode) -->
+      <div id="header-formula-badge" class="hidden xl:flex items-center gap-3 px-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-[#111726] border border-slate-200/80 dark:border-slate-800 text-xs font-mono text-slate-700 dark:text-sky-300">
         <span>z<sub>N</sub>(t) = ∑<sub>k∈K<sub>N</sub></sub> c<sub>k</sub> e<sup>2πikt</sup></span>
         <span class="text-slate-300 dark:text-slate-700">|</span>
         <span class="text-slate-500 dark:text-slate-400">c<sub>k</sub> = (1/M) ∑ z<sub>n</sub> e<sup>-2πikn/M</sup></span>
@@ -125,46 +130,47 @@
 
       <!-- Right Quick Actions -->
       <div class="flex items-center gap-2">
-        <!-- Sound Chime Toggle (like the video) -->
+        <!-- Sound Chime Toggle -->
         <button id="btn-sound-toggle" type="button" title="切换完成周期提示音 (Video Chime Sound)" class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900/80 hover:border-sky-500/50 flex items-center gap-1.5 transition">
           <span id="sound-icon">🔇</span>
           <span class="hidden sm:inline" id="sound-label">周期音效: 关</span>
         </button>
 
         <!-- Export Snapshot -->
-        <button id="btn-export-png" type="button" title="导出当前画布为高清 PNG" class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900/80 hover:border-sky-500/50 flex items-center gap-1.5 transition">
+        <button id="btn-export-png" type="button" title="导出当前画布为超清 PNG" class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900/80 hover:border-sky-500/50 flex items-center gap-1.5 transition">
           <span>📷</span>
-          <span class="hidden sm:inline">截图保存</span>
+          <span class="hidden sm:inline">超清截图</span>
         </button>
 
         <!-- Download Drawing Animation Video -->
-        <button id="btn-header-record" type="button" title="录制并下载完整绘图动画视频" class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-sky-500/40 bg-sky-500/15 text-sky-600 dark:text-sky-300 hover:bg-sky-500/25 flex items-center gap-1.5 transition">
+        <button id="btn-header-record" type="button" title="录制并下载超清绘图动画视频" class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-sky-500/40 bg-sky-500/15 text-sky-600 dark:text-sky-300 hover:bg-sky-500/25 flex items-center gap-1.5 transition">
           <span id="header-record-icon">🎥</span>
-          <span class="hidden sm:inline" id="header-record-label">下载绘图动画</span>
+          <span class="hidden sm:inline" id="header-record-label">下载超清视频</span>
         </button>
 
-        <!-- Dark/Light Theme Toggle -->
-        <button id="btn-theme-toggle" type="button" title="切换深色/浅色模式" class="p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900/80 hover:border-sky-500/50 text-slate-700 dark:text-slate-300 transition">
+        <!-- Dark/Light Theme Toggle (Applies to both UI and Animation Stage) -->
+        <button id="btn-theme-toggle" type="button" title="切换深色/浅色模式 (同步切换动画演示区亮暗配色)" class="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900/80 hover:border-sky-500/50 text-slate-700 dark:text-slate-300 flex items-center gap-1.5 text-xs font-medium transition">
           <svg id="icon-sun" class="w-4 h-4 hidden dark:block text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="5"></circle>
             <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
           </svg>
-          <svg id="icon-moon" class="w-4 h-4 block dark:hidden text-slate-700" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <svg id="icon-moon" class="w-4 h-4 block dark:hidden text-indigo-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
           </svg>
+          <span id="theme-mode-label" class="hidden md:inline">暗色舞台</span>
         </button>
       </div>
     </div>
   </header>
 
   <!-- Main Workspace -->
-  <main class="flex-1 max-w-[1600px] w-full mx-auto px-3 sm:px-6 py-4 flex flex-col gap-5">
+  <main class="flex-1 max-w-[1600px] w-full mx-auto px-3 sm:px-6 py-4 pb-6 flex flex-col gap-5">
 
     <!-- Top Preset Bar (Try a shape) -->
     <section class="bg-white dark:bg-[#0d1119] border border-slate-200 dark:border-[#1e2738] rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-sm">
       <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
         <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mr-1 flex items-center gap-1">
-          <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          <svg class="w-3.5 h-3.5 text-sky-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
           预设图形 (Presets):
         </span>
         <button data-preset="heart" class="preset-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-sky-500/15 text-sky-600 dark:text-sky-300 border border-sky-500/40 hover:bg-sky-500/25 transition flex items-center gap-1.5">
@@ -190,15 +196,155 @@
       <!-- Status Toast / Notification Pill -->
       <div id="status-toast" class="text-xs font-mono px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 flex items-center gap-2">
         <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-        <span id="status-text">已加载: 爱心轮廓 (2048 采样点)</span>
+        <span id="status-text">已加载: 爱心轮廓 (2048 采样点 · 9:16 竖屏 1080P)</span>
       </div>
     </section>
 
     <!-- Main 2-Column Interactive Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
 
-      <!-- LEFT COLUMN: Control Panel (4 cols on desktop) -->
-      <aside class="lg:col-span-4 flex flex-col gap-4">
+      <!-- LEFT COLUMN: Control Panel (5 cols on desktop) -->
+      <aside class="lg:col-span-5 flex flex-col gap-4">
+
+        <!-- Card 0: Drawing Mode Switcher (Complex Single-Chain vs Orthogonal Dual-Epicycle Projection) -->
+        <div class="bg-white dark:bg-[#0d1119] border border-slate-200 dark:border-[#1e2738] rounded-xl p-4 flex flex-col gap-3 shadow-sm">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+              绘图几何模式 (Epicycle Mode)
+            </h2>
+            <span id="mode-badge-pill" class="text-[11px] font-mono px-2 py-0.5 rounded bg-sky-500/15 text-sky-600 dark:text-sky-300 border border-sky-500/30">
+              复平面单链 c_k
+            </span>
+          </div>
+
+          <!-- 2-Button Segmented Switcher -->
+          <div class="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-100 dark:bg-[#080b11] border border-slate-200/80 dark:border-slate-800">
+            <button id="btn-mode-complex" type="button" class="py-2.5 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 bg-sky-500 text-white shadow-sm shadow-sky-500/30">
+              <span>🌀</span>
+              <span>复数单链模式</span>
+            </button>
+            <button id="btn-mode-orthogonal" type="button" class="py-2.5 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-sky-500 dark:hover:text-sky-300">
+              <span>📐</span>
+              <span>正交双环投影</span>
+            </button>
+          </div>
+
+          <p id="mode-desc-text" class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+            当前为<strong>复数单链模式</strong>：将 $(x(t), y(t))$ 视为复数 $z(t) = x(t) + i y(t)$，由单一旋转本轮链首尾相接直接描绘轨迹。点击上方「正交双环投影」可拆分为上方 $X(t)$ 与左方 $Y(t)$ 两组实数级数正交交汇作画。
+          </p>
+        </div>
+
+        <!-- NEW Card: Aspect Ratio & Free Zone Layout Studio (长宽比与分区自由排版模块) -->
+        <div class="bg-white dark:bg-[#0d1119] border border-slate-200 dark:border-[#1e2738] rounded-xl p-4 flex flex-col gap-3.5 shadow-sm">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-violet-500"></span>
+              画布比例与自由排版工作台 (Ratio &amp; Layout)
+            </h2>
+            <span id="layout-active-badge" class="text-[11px] font-mono px-2 py-0.5 rounded bg-violet-500/15 text-violet-600 dark:text-violet-300 border border-violet-500/30">
+              画布可直接拖拽三区
+            </span>
+          </div>
+
+          <!-- 1. Aspect Ratio Preset Buttons -->
+          <div class="flex flex-col gap-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-medium text-slate-700 dark:text-slate-200">动画演示区长宽比 (Aspect Ratio):</span>
+              <span id="ratio-dim-readout" class="font-mono text-[11px] text-sky-600 dark:text-sky-400 font-semibold">9:16 (1080×1920)</span>
+            </div>
+            <div class="grid grid-cols-6 gap-1.5">
+              <button type="button" data-ratio="9:16" class="ratio-preset-btn py-1.5 px-1 rounded-lg text-[11px] font-mono font-semibold bg-sky-500 text-white shadow-sm shadow-sky-500/20 transition">9:16</button>
+              <button type="button" data-ratio="3:4" class="ratio-preset-btn py-1.5 px-1 rounded-lg text-[11px] font-mono font-medium bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:border-sky-500/40 border border-transparent transition">3:4</button>
+              <button type="button" data-ratio="1:1" class="ratio-preset-btn py-1.5 px-1 rounded-lg text-[11px] font-mono font-medium bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:border-sky-500/40 border border-transparent transition">1:1</button>
+              <button type="button" data-ratio="4:3" class="ratio-preset-btn py-1.5 px-1 rounded-lg text-[11px] font-mono font-medium bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:border-sky-500/40 border border-transparent transition">4:3</button>
+              <button type="button" data-ratio="16:9" class="ratio-preset-btn py-1.5 px-1 rounded-lg text-[11px] font-mono font-medium bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:border-sky-500/40 border border-transparent transition">16:9</button>
+              <button type="button" data-ratio="custom" class="ratio-preset-btn py-1.5 px-1 rounded-lg text-[11px] font-medium bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:border-sky-500/40 border border-transparent transition">自定义</button>
+            </div>
+
+            <!-- Custom Ratio Inputs (Shown when Custom is clicked) -->
+            <div id="custom-ratio-box" class="hidden items-center justify-between gap-2 pt-1.5 px-2.5 py-2 rounded-lg bg-slate-50 dark:bg-[#090d14] border border-slate-200 dark:border-slate-800 text-xs">
+              <span class="text-slate-600 dark:text-slate-300 font-medium">自定义宽高比:</span>
+              <div class="flex items-center gap-1.5">
+                <input id="input-ratio-w" type="number" min="1" max="100" step="0.5" value="9" class="w-14 px-2 py-1 rounded bg-white dark:bg-[#131b29] border border-slate-200 dark:border-slate-700 font-mono text-xs text-center text-sky-600 dark:text-sky-400 font-bold" />
+                <span class="font-mono font-bold text-slate-400">:</span>
+                <input id="input-ratio-h" type="number" min="1" max="100" step="0.5" value="16" class="w-14 px-2 py-1 rounded bg-white dark:bg-[#131b29] border border-slate-200 dark:border-slate-700 font-mono text-xs text-center text-sky-600 dark:text-sky-400 font-bold" />
+                <button id="btn-apply-custom-ratio" type="button" class="px-2.5 py-1 rounded bg-sky-500 hover:bg-sky-600 text-white text-xs font-medium transition">应用</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Zone Selector Tabs (Move & Scale Formula Zone, Animation Zone, Text Caption Zone) -->
+          <div class="pt-2 border-t border-slate-200/70 dark:border-slate-800/80 flex flex-col gap-2.5">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-medium text-slate-700 dark:text-slate-200">选择要挪动/缩放的分区:</span>
+              <label class="flex items-center gap-1.5 cursor-pointer select-none text-[11px] text-violet-600 dark:text-violet-400 font-medium">
+                <input id="chk-canvas-drag-zones" type="checkbox" checked class="w-3.5 h-3.5 accent-violet-500 rounded" />
+                <span>允许在画布上直接鼠标拖拽各区</span>
+              </label>
+            </div>
+
+            <!-- 3-Zone Selector Pill Buttons -->
+            <div class="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-[#080b11] border border-slate-200/80 dark:border-slate-800 text-[11px]">
+              <button type="button" data-zone-tab="anim" class="zone-tab-btn py-1.5 px-2 rounded-lg font-semibold bg-violet-500 text-white shadow-sm transition truncate">🎯 动画区</button>
+              <button type="button" data-zone-tab="formula" class="zone-tab-btn py-1.5 px-2 rounded-lg font-medium text-slate-600 dark:text-slate-300 hover:text-violet-500 transition truncate">🧮 公式区 (5行)</button>
+              <button type="button" data-zone-tab="text" class="zone-tab-btn py-1.5 px-2 rounded-lg font-medium text-slate-600 dark:text-slate-300 hover:text-violet-500 transition truncate">📝 文字区</button>
+            </div>
+
+            <!-- Active Zone X / Y / Scale Sliders -->
+            <div class="bg-slate-50 dark:bg-[#090d14] border border-slate-200/80 dark:border-slate-800 rounded-xl p-3 flex flex-col gap-2.5 text-xs">
+              <div class="flex items-center justify-between">
+                <span id="zone-editor-title" class="font-semibold text-violet-600 dark:text-violet-300 flex items-center gap-1.5">
+                  🎯 当前调整：动画演示区 (Animation Zone)
+                </span>
+                <label id="zone-visible-wrapper" class="hidden items-center gap-1.5 cursor-pointer text-[11px] text-slate-600 dark:text-slate-300">
+                  <input id="chk-zone-visible" type="checkbox" checked class="w-3.5 h-3.5 accent-violet-500 rounded" />
+                  <span>显示该区</span>
+                </label>
+              </div>
+
+              <!-- Horizontal Position X -->
+              <div class="flex flex-col gap-1">
+                <div class="flex justify-between text-[11px]">
+                  <span class="text-slate-500 dark:text-slate-400">水平位置 (X 坐标):</span>
+                  <span id="label-zone-x" class="font-mono text-sky-600 dark:text-sky-400 font-semibold">50.0%</span>
+                </div>
+                <input id="slider-zone-x" type="range" min="5" max="95" step="0.5" value="50" class="w-full" />
+              </div>
+
+              <!-- Vertical Position Y -->
+              <div class="flex flex-col gap-1">
+                <div class="flex justify-between text-[11px]">
+                  <span class="text-slate-500 dark:text-slate-400">垂直位置 (Y 坐标):</span>
+                  <span id="label-zone-y" class="font-mono text-sky-600 dark:text-sky-400 font-semibold">50.5%</span>
+                </div>
+                <input id="slider-zone-y" type="range" min="4" max="96" step="0.5" value="50.5" class="w-full" />
+              </div>
+
+              <!-- Zone Scale -->
+              <div class="flex flex-col gap-1">
+                <div class="flex justify-between text-[11px]">
+                  <span class="text-slate-500 dark:text-slate-400">区域大小缩放 (Scale):</span>
+                  <span id="label-zone-scale" class="font-mono text-sky-600 dark:text-sky-400 font-semibold">100%</span>
+                </div>
+                <input id="slider-zone-scale" type="range" min="35" max="220" step="1" value="100" class="w-full" />
+              </div>
+
+              <!-- Quick Layout Presets & Reset -->
+              <div class="flex flex-wrap items-center justify-between gap-1.5 pt-1.5 border-t border-slate-200/70 dark:border-slate-800">
+                <div class="flex flex-wrap items-center gap-1">
+                  <span class="text-[11px] text-slate-400 mr-0.5">排版模板:</span>
+                  <button type="button" data-layout-preset="standard" class="layout-preset-btn px-2 py-1 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-violet-400 text-[11px] text-slate-700 dark:text-slate-200 transition">经典上中下</button>
+                  <button type="button" data-layout-preset="swap" class="layout-preset-btn px-2 py-1 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-violet-400 text-[11px] text-slate-700 dark:text-slate-200 transition">上文字下公式</button>
+                  <button type="button" data-layout-preset="side" class="layout-preset-btn px-2 py-1 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-violet-400 text-[11px] text-slate-700 dark:text-slate-200 transition">横屏左右分栏</button>
+                </div>
+                <button id="btn-reset-zone-layout" type="button" class="px-2 py-1 rounded bg-violet-500/15 hover:bg-violet-500/25 text-violet-600 dark:text-violet-300 border border-violet-500/30 text-[11px] font-medium transition">
+                  ↺ 复位三区位置
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <!-- Card 1: Dedicated SVG Import Module -->
         <div class="bg-white dark:bg-[#0d1119] border border-slate-200 dark:border-[#1e2738] rounded-xl p-4 flex flex-col gap-3.5 shadow-sm">
@@ -300,26 +446,26 @@
           <div class="flex flex-col gap-2">
             <div class="flex items-center justify-between">
               <label for="slider-circles" class="text-xs font-medium text-slate-700 dark:text-slate-200">
-                计算本轮数量 (<span class="font-mono text-sky-400">N</span>):
+                <span id="label-circles-title">计算本轮数量</span> (<span class="font-mono text-sky-500 dark:text-sky-400">N</span>):
               </label>
               <div class="flex items-center gap-1.5">
-                <input id="input-circles" type="number" min="1" max="4096" value="256" class="w-20 px-2 py-1 rounded bg-slate-100 dark:bg-[#090d14] border border-slate-200 dark:border-slate-700 font-mono text-xs text-right text-sky-600 dark:text-sky-400 font-bold focus:outline-none focus:border-sky-500" />
+                <input id="input-circles" type="number" min="1" max="4096" value="128" class="w-20 px-2 py-1 rounded bg-slate-100 dark:bg-[#090d14] border border-slate-200 dark:border-slate-700 font-mono text-xs text-right text-sky-600 dark:text-sky-400 font-bold focus:outline-none focus:border-sky-500" />
                 <span id="label-max-circles" class="text-xs font-mono text-slate-400">/ 2048</span>
               </div>
             </div>
 
-            <input id="slider-circles" type="range" min="1" max="2048" value="256" class="w-full" />
+            <input id="slider-circles" type="range" min="1" max="2048" value="128" class="w-full" />
 
-            <!-- Quick Step Buttons (aligned with 1, 2, 4, 8, 32, 128, 256, 1024) -->
+            <!-- Quick Step Buttons (Strictly aligned with 1, 2, 4, 8, 16, 32, 128, 1024) -->
             <div class="flex flex-wrap items-center justify-between gap-1 pt-1">
-              <button type="button" data-circle-set="1" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 hover:bg-sky-500/20 text-[11px] font-mono transition">1</button>
-              <button type="button" data-circle-set="2" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 hover:bg-sky-500/20 text-[11px] font-mono transition">2</button>
-              <button type="button" data-circle-set="4" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 hover:bg-sky-500/20 text-[11px] font-mono transition">4</button>
-              <button type="button" data-circle-set="8" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 hover:bg-sky-500/20 text-[11px] font-mono transition">8</button>
-              <button type="button" data-circle-set="32" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 hover:bg-sky-500/20 text-[11px] font-mono transition">32</button>
-              <button type="button" data-circle-set="128" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 hover:bg-sky-500/20 text-[11px] font-mono transition">128</button>
-              <button type="button" data-circle-set="256" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 hover:bg-sky-500/20 text-[11px] font-mono transition">256</button>
-              <button type="button" data-circle-set="1024" class="circle-quick-btn px-2 py-1 rounded bg-sky-500/20 text-sky-600 dark:text-sky-300 font-semibold text-[11px] font-mono transition">1024</button>
+              <button type="button" data-circle-set="1" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/30 hover:bg-sky-500/10 text-[11px] font-mono transition">1</button>
+              <button type="button" data-circle-set="2" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/30 hover:bg-sky-500/10 text-[11px] font-mono transition">2</button>
+              <button type="button" data-circle-set="4" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/30 hover:bg-sky-500/10 text-[11px] font-mono transition">4</button>
+              <button type="button" data-circle-set="8" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/30 hover:bg-sky-500/10 text-[11px] font-mono transition">8</button>
+              <button type="button" data-circle-set="16" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/30 hover:bg-sky-500/10 text-[11px] font-mono transition">16</button>
+              <button type="button" data-circle-set="32" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/30 hover:bg-sky-500/10 text-[11px] font-mono transition">32</button>
+              <button type="button" data-circle-set="128" class="circle-quick-btn px-2 py-1 rounded bg-sky-500/20 text-sky-600 dark:text-sky-300 border border-sky-500/50 font-semibold text-[11px] font-mono shadow-sm shadow-sky-500/10 transition">128</button>
+              <button type="button" data-circle-set="1024" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/30 hover:bg-sky-500/10 text-[11px] font-mono transition">1024</button>
             </div>
           </div>
 
@@ -338,10 +484,10 @@
             </div>
 
             <div class="flex flex-col gap-1">
-              <label for="select-shown-circles" class="text-slate-500 dark:text-slate-400 font-medium">画面最多渲染圆环:</label>
+              <label for="select-shown-circles" class="text-slate-500 dark:text-slate-400 font-medium">每组最多渲染圆环:</label>
               <select id="select-shown-circles" class="bg-slate-100 dark:bg-[#090d14] border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-sky-500">
                 <option value="64">前 64 个大圆</option>
-                <option value="128" selected>前 128 个圆 (视频同款)</option>
+                <option value="128" selected>前 128 个圆 (推荐)</option>
                 <option value="256">前 256 个圆</option>
                 <option value="512">前 512 个圆</option>
                 <option value="99999">显示全部圆环</option>
@@ -350,12 +496,12 @@
           </div>
         </div>
 
-        <!-- Card 3: Playback, Auto-Step (Video Mode) & Layer Toggles -->
+        <!-- Card 3: Playback, Auto-Step (1 -> 1024 Mode) & Ultra-HD Recording -->
         <div class="bg-white dark:bg-[#0d1119] border border-slate-200 dark:border-[#1e2738] rounded-xl p-4 flex flex-col gap-4 shadow-sm">
           <div class="flex items-center justify-between">
             <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
               <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
-              动画与视频递增演示 (Playback)
+              超清动画控制与视频录制 (Playback &amp; Export)
             </h2>
             <span id="cycle-progress-label" class="text-[11px] font-mono text-slate-400">t = 0.000</span>
           </div>
@@ -377,32 +523,45 @@
             <button id="btn-autostep" type="button" class="w-full py-2.5 px-3 rounded-lg border border-sky-500/40 bg-gradient-to-r from-sky-500/15 via-indigo-500/15 to-sky-500/15 hover:from-sky-500/25 hover:to-indigo-500/25 text-sky-600 dark:text-sky-300 font-semibold text-xs transition flex items-center justify-between">
               <span class="flex items-center gap-2">
                 <span id="autostep-dot" class="w-2 h-2 rounded-full bg-slate-400"></span>
-                <span>🎬 视频同款递增演示 (1 → 1024 自动闯关)</span>
+                <span>🎬 递增闯关演示 (1 → 1024 自动递增)</span>
               </span>
-              <span id="autostep-status" class="font-mono text-[11px] px-1.5 py-0.5 rounded bg-slate-900/40">OFF</span>
+              <span id="autostep-status" class="font-mono text-[11px] px-1.5 py-0.5 rounded bg-slate-200/70 dark:bg-slate-900/40 text-slate-600 dark:text-slate-300">OFF</span>
             </button>
             <div class="text-[11px] font-mono text-slate-500 dark:text-slate-400 px-1 flex items-center justify-between">
-              <span>闯关序列:</span>
-              <span class="text-sky-500 dark:text-sky-400">1 → 2 → 4 → 8 → 32 → 128 → 256 → 1024</span>
+              <span>递增序列:</span>
+              <span class="text-sky-600 dark:text-sky-400 font-semibold">1 → 2 → 4 → 8 → 16 → 32 → 128 → 1024</span>
             </div>
           </div>
 
-          <!-- Download Drawing Animation Panel -->
+          <!-- Ultra-HD Download Drawing Animation Panel -->
           <div class="p-3 rounded-xl bg-slate-50 dark:bg-[#090d14] border border-slate-200/80 dark:border-slate-800 flex flex-col gap-2.5">
             <div class="flex items-center justify-between text-xs gap-2">
               <span class="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 shrink-0">
+                <span>📐</span>
+                <span>输出清晰度档位:</span>
+              </span>
+              <select id="select-video-res" class="bg-white dark:bg-[#131b29] border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1 text-[11px] font-mono text-sky-600 dark:text-sky-300 font-semibold focus:outline-none focus:border-sky-500 w-full">
+                <option value="1080" selected>1080P 全高清基准 (短边 1080P · 30 Mbps)</option>
+                <option value="1440">2K 超清画质 (短边 1440P · 45 Mbps)</option>
+                <option value="2160">4K 极清大师级 (短边 2160P · 60 Mbps)</option>
+              </select>
+            </div>
+
+            <div class="flex items-center justify-between text-xs gap-2">
+              <span class="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 shrink-0">
                 <span>🎥</span>
-                <span>下载动画模式:</span>
+                <span>录制动画模式:</span>
               </span>
               <select id="select-record-mode" class="bg-white dark:bg-[#131b29] border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1 text-[11px] text-slate-700 dark:text-slate-200 focus:outline-none focus:border-sky-500 w-full">
-                <option value="autostep" selected>完整递增过程 (1 → 1024 全程共8关)</option>
+                <option value="autostep" selected>完整递增过程 (1→2→4→8→16→32→128→1024)</option>
                 <option value="cycle">仅当前本轮单周期 (0 → 100%)</option>
                 <option value="manual">手动控制开始/结束</option>
               </select>
             </div>
+
             <button id="btn-download-anim" type="button" class="w-full py-2.5 px-3 rounded-lg bg-gradient-to-r from-emerald-500 to-sky-500 hover:from-emerald-600 hover:to-sky-600 text-white font-semibold text-xs transition flex items-center justify-center gap-2 shadow-sm shadow-sky-500/20">
               <span id="record-btn-dot" class="w-2 h-2 rounded-full bg-white"></span>
-              <span id="record-btn-text">一键录制并下载 1→1024 全过程动画</span>
+              <span id="record-btn-text">一键录制 1→1024 全过程超清视频</span>
             </button>
           </div>
 
@@ -431,7 +590,13 @@
             </label>
             <label class="flex items-center gap-2 cursor-pointer select-none p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/50">
               <input id="chk-video-hud" type="checkbox" checked class="w-4 h-4 accent-sky-500 rounded" />
-              <span>显示数值展开与 HUD</span>
+              <span>显示公式区与文字区</span>
+            </label>
+            <label class="col-span-2 flex items-center justify-between cursor-pointer select-none p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/50">
+              <span class="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-medium">
+                <input id="chk-show-projection" type="checkbox" checked class="w-4 h-4 accent-emerald-500 rounded" />
+                <span>📐 显示正交双环投影虚线与坐标辅助框 (Orthogonal Guides)</span>
+              </span>
             </label>
             <label class="col-span-2 flex items-center justify-between cursor-pointer select-none p-1.5 rounded-lg bg-slate-50 dark:bg-[#090d14] border border-slate-200/60 dark:border-slate-800">
               <span class="flex items-center gap-2 font-medium text-sky-600 dark:text-sky-400">
@@ -449,57 +614,67 @@
         </div>
       </aside>
 
-      <!-- RIGHT COLUMN: Main Epicycle Canvas & Live Frequency Spectrum (8 cols on desktop) -->
-      <section class="lg:col-span-8 flex flex-col gap-4">
+      <!-- RIGHT COLUMN: Adaptive Stage & Live Frequency Spectrum (7 cols on desktop) -->
+      <section class="lg:col-span-7 flex flex-col gap-4 lg:sticky lg:top-20">
 
-        <!-- Main Visualization Canvas Card -->
-        <div class="relative bg-[#05070b] border border-slate-200 dark:border-[#1e2738] rounded-2xl overflow-hidden shadow-lg flex flex-col">
+        <!-- Main Showcase Card (Supports both Light Mode and Dark Mode seamlessly) -->
+        <div class="relative bg-white dark:bg-[#070a11] border border-slate-200 dark:border-[#1e2738] rounded-2xl overflow-hidden shadow-xl flex flex-col transition-colors duration-200">
 
-          <!-- Top Floating Toolbar over Canvas -->
-          <div class="absolute top-3 left-3 right-3 z-10 flex items-center justify-between pointer-events-none">
-            <div class="pointer-events-auto flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900/75 border border-slate-700/60 text-slate-200 text-xs font-mono glass-panel">
-              <span class="text-sky-400 font-semibold" id="top-bar-circles">本轮数量: 256</span>
-              <span class="text-slate-600">·</span>
+          <!-- Top Stage Control Bar -->
+          <div class="px-4 py-2.5 bg-slate-100/95 dark:bg-slate-900/95 border-b border-slate-200 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-2 transition-colors duration-200">
+            <div class="flex flex-wrap items-center gap-2 text-xs font-mono text-slate-700 dark:text-slate-200">
+              <span class="px-2 py-0.5 rounded bg-sky-500/15 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 font-semibold" id="res-pill-badge">9:16 · 1080×1920</span>
+              <span class="text-sky-600 dark:text-sky-400 font-semibold" id="top-bar-circles">正交圆周: 128×2 组</span>
+              <span class="text-slate-300 dark:text-slate-600">·</span>
               <span id="top-bar-rms">相对 RMS 误差: 0.3120%</span>
             </div>
 
-            <div class="pointer-events-auto flex items-center gap-1.5">
-              <button id="btn-zoom-in" type="button" title="放大画布" class="w-8 h-8 rounded-lg bg-slate-900/75 hover:bg-slate-800 border border-slate-700/60 text-slate-200 flex items-center justify-center text-sm font-mono transition">+</button>
-              <button id="btn-zoom-out" type="button" title="缩小画布" class="w-8 h-8 rounded-lg bg-slate-900/75 hover:bg-slate-800 border border-slate-700/60 text-slate-200 flex items-center justify-center text-sm font-mono transition">−</button>
-              <button id="btn-reset-view" type="button" title="重置平移与缩放视角" class="px-2.5 h-8 rounded-lg bg-slate-900/75 hover:bg-slate-800 border border-slate-700/60 text-slate-200 flex items-center justify-center text-xs transition">
+            <div class="flex items-center gap-1.5">
+              <!-- Quick One-Click Mode Switcher Button right above the Canvas -->
+              <button id="btn-stage-mode-toggle" type="button" title="在复数单链模式与正交双圆环投影模式之间切换" class="px-2.5 h-7 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-700 dark:text-emerald-300 flex items-center justify-center gap-1.5 text-xs font-medium transition">
+                <span id="stage-mode-icon">📐</span>
+                <span id="stage-mode-label">切换: 正交双环投影</span>
+              </button>
+
+              <button id="btn-zoom-in" type="button" title="放大动画区" class="w-7 h-7 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 flex items-center justify-center text-sm font-mono transition">+</button>
+              <button id="btn-zoom-out" type="button" title="缩小动画区" class="w-7 h-7 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 flex items-center justify-center text-sm font-mono transition">−</button>
+              <button id="btn-reset-view" type="button" title="重置平移与三区排版" class="px-2.5 h-7 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 flex items-center justify-center text-xs transition">
                 重置视角
               </button>
             </div>
           </div>
 
-          <!-- Interactive Canvas Container -->
-          <div id="canvas-wrapper" class="relative w-full h-[480px] sm:h-[580px] lg:h-[620px] select-none overflow-hidden cursor-grab active:cursor-grabbing">
-            <canvas id="epicycle-canvas" class="block w-full h-full"></canvas>
+          <!-- Centered Stage Area (Adapts to Light & Dark Theme and Dynamic Aspect Ratio) -->
+          <div id="stage-backdrop" class="w-full py-4 px-3 sm:px-6 flex items-center justify-center bg-gradient-to-b from-slate-100 via-slate-50 to-slate-100 dark:from-[#080c14] dark:via-[#05070b] dark:to-[#080c14] transition-colors duration-200">
+            <!-- Dynamic Aspect Ratio Canvas Wrapper -->
+            <div id="canvas-wrapper" style="aspect-ratio: 9 / 16; max-width: 468px;" class="relative w-full mx-auto rounded-2xl overflow-hidden border border-slate-300 dark:border-sky-500/30 shadow-[0_12px_40px_rgba(15,23,42,0.12)] dark:shadow-[0_0_50px_rgba(2,132,199,0.18)] bg-[#f8fafc] dark:bg-[#05070b] select-none cursor-grab active:cursor-grabbing transition-[max-width,background-color,border-color,box-shadow] duration-200">
+              <canvas id="epicycle-canvas" width="1080" height="1920" class="block w-full h-full"></canvas>
 
-            <!-- Loading Overlay for Huge 5MB+ SVG Parsing -->
-            <div id="svg-loading-overlay" class="hidden absolute inset-0 bg-slate-950/85 glass-panel z-20 flex-col items-center justify-center gap-3 text-center p-6">
-              <div class="w-10 h-10 border-3 border-sky-400 border-t-transparent rounded-full animate-spin"></div>
-              <p id="loading-title" class="text-sm font-semibold text-white">正在解析大型 SVG 矢量路径...</p>
-              <p id="loading-subtitle" class="text-xs font-mono text-sky-300">正在提取几何矩阵与执行快速傅里叶变换 (FFT)</p>
+              <!-- Loading Overlay for Huge 5MB+ SVG Parsing -->
+              <div id="svg-loading-overlay" class="hidden absolute inset-0 bg-white/90 dark:bg-slate-950/85 glass-panel z-20 flex-col items-center justify-center gap-3 text-center p-6">
+                <div class="w-10 h-10 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+                <p id="loading-title" class="text-sm font-semibold text-slate-900 dark:text-white">正在解析大型 SVG 矢量路径...</p>
+                <p id="loading-subtitle" class="text-xs font-mono text-sky-600 dark:text-sky-300">正在提取几何矩阵与执行快速傅里叶变换 (FFT)</p>
+              </div>
             </div>
           </div>
 
           <!-- Bottom Canvas Hint Bar -->
-          <div class="px-4 py-2 bg-slate-900/90 border-t border-slate-800/80 text-[11px] text-slate-400 flex flex-wrap items-center justify-between gap-2">
-            <span id="canvas-interaction-hint">💡 提示：支持鼠标滚轮缩放画布、按住左键拖拽平移视角；或直接将任意大小的 .svg 文件拖入画布。</span>
-            <span id="terms-used-readout" class="font-mono text-slate-300">已显示 128 个本轮 · 参与计算 256 个本轮</span>
+          <div class="px-4 py-2 bg-slate-100/95 dark:bg-slate-900/95 border-t border-slate-200 dark:border-slate-800/80 text-[11px] text-slate-600 dark:text-slate-400 flex flex-wrap items-center justify-between gap-2 transition-colors duration-200">
+            <span id="canvas-interaction-hint">💡 交互提示：直接在画布上按住「公式区」、「文字说明区」或「动画区」即可自由拖动位置，滚轮可缩放。</span>
+            <span id="terms-used-readout" class="font-mono text-slate-700 dark:text-slate-300">已显示 128 个本轮 · 参与计算 128 个本轮</span>
           </div>
         </div>
 
-        <!-- Live Frequency Spectrum Card (profpi style) -->
+        <!-- Live Frequency Spectrum Card -->
         <div class="bg-white dark:bg-[#0d1119] border border-slate-200 dark:border-[#1e2738] rounded-xl p-4 flex flex-col gap-3 shadow-sm">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-2">
+              <h3 id="spectrum-card-title" class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-2">
                 <span>📊 实时复数傅里叶频谱图 (Frequency Spectrum |c<sub>k</sub>|)</span>
               </h3>
-              <p class="text-[11px] text-slate-500 dark:text-slate-400">
-                横轴为旋转频率 $k$（负频率顺时针旋转，正频率逆时针旋转），纵轴为圆环半径 $|c_k|$。亮蓝色代表当前参与绘图的本轮，暗灰色为已截断的高频项。
+              <p id="spectrum-card-desc" class="text-[11px] text-slate-500 dark:text-slate-400">
+                横轴为旋转频率 k（负频率顺时针旋转，正频率逆时针旋转），纵轴为圆环半径 |c<sub>k</sub>|。亮蓝色代表当前参与绘图的本轮，暗灰色为已截断的高频项。
               </p>
             </div>
             <div class="flex items-center gap-2 text-xs">
@@ -517,85 +692,86 @@
       </section>
     </div>
 
-    <!-- Bottom Educational Cards (Modeled after profpi.com/tools/fourier-explorer/) -->
-    <section class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 pb-8">
-      <!-- Card 1 -->
-      <div class="bg-white dark:bg-[#0d1119] border border-slate-200 dark:border-[#1e2738] rounded-xl p-5 flex flex-col gap-2.5 shadow-sm">
-        <div class="flex items-center gap-2 text-sky-600 dark:text-sky-400 font-semibold text-sm">
-          <span class="w-6 h-6 rounded-md bg-sky-500/15 flex items-center justify-center font-mono text-xs">01</span>
-          <h4>运作原理 (What is actually happening)</h4>
-        </div>
-        <p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-          平面上的任意闭合轨迹都可以看作复平面上的周期函数 $z(t) = x(t) + i y(t)$。通过离散傅里叶变换（DFT/FFT），我们将这条曲线分解为许多旋转向量（本轮 $c_k e^{2\pi i k t}$）。每个圆有三个属性：<strong>半径</strong> $|c_k|$、<strong>旋转角速度</strong> $k$ 以及 <strong>初始角度</strong> $\arg(c_k)$。将所有向量首尾相接，最末端的笔尖就会复刻出原图形。
-        </p>
-      </div>
-
-      <!-- Card 2 -->
-      <div class="bg-white dark:bg-[#0d1119] border border-slate-200 dark:border-[#1e2738] rounded-xl p-5 flex flex-col gap-2.5 shadow-sm">
-        <div class="flex items-center gap-2 text-sky-600 dark:text-sky-400 font-semibold text-sm">
-          <span class="w-6 h-6 rounded-md bg-sky-500/15 flex items-center justify-center font-mono text-xs">02</span>
-          <h4>为什么截断仍能还原与 RMS 误差</h4>
-        </div>
-        <p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-          我们将所有频率项按半径 $|c_k|$ <strong>从大到小排序</strong>。排在最前面的大圆决定了图形的整体宏观轮廓（低频骨架），而排在后面的微小圆环则以极高的转速修补边角与海岸线锯齿（高频细节）。根据帕塞瓦尔定理（Parseval's theorem），相对均方根误差 $\text{相对 RMS 误差} = \sqrt{1 - \frac{\sum_{k \in K_N} |c_k|^2}{\sum_{k \neq 0} |c_k|^2}}$ 直观反映了未包含圆环的能量误差。
-        </p>
-      </div>
-
-      <!-- Card 3 -->
-      <div class="bg-white dark:bg-[#0d1119] border border-slate-200 dark:border-[#1e2738] rounded-xl p-5 flex flex-col gap-2.5 shadow-sm">
-        <div class="flex items-center gap-2 text-sky-600 dark:text-sky-400 font-semibold text-sm">
-          <span class="w-6 h-6 rounded-md bg-sky-500/15 flex items-center justify-center font-mono text-xs">03</span>
-          <h4>大型外部 SVG 解析与智能路径拼接</h4>
-        </div>
-        <p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-          普通在线工具通常限制文件大小或只支持单笔路径。本工具在本地浏览器内存中直接解析 <strong>5MB–20MB+ 的大型 SVG</strong>，自动展开嵌套矩阵变换（`getCTM`），拆分复合 `<path>` 中的所有 `M...` 子段，并使用<strong>贪心最近邻路径规划算法</strong>将散落的多段线条平滑串联为一笔画闭合回路。
-        </p>
-      </div>
-    </section>
-
   </main>
 
   <script>
     /**
      * ============================================================================
      * PROFPI · FOURIER EXPLORER PRO — CORE APPLICATION ENGINE
-     * Includes:
-     * 1. Radix-2 Cooley-Tukey Fast Fourier Transform (FFT) for instant 4096/8192 pts
-     * 2. Unrestricted Large SVG Parser (5MB–20MB+) with compound path splitter & CTM
-     * 3. Greedy Nearest-Neighbor Multi-Path Stitcher
-     * 4. Real-Time Numerical Expansion Formula HUD & Auto-Step 1->1024 Mode
+     * Optimizations Included:
+     * 1. Removed "正交交汇作画区(X,Y)" text from the animation drawing area.
+     * 2. Changed "正交本轮" text to "正交圆周".
+     * 3. Merged Orthogonal Corner Formula Box into the main Formula Zone so that
+     *    the Formula Zone displays 5 structured lines:
+     *    Line 1: 实时笔尖 (x, y)
+     *    Line 2: X(t) 的通项公式
+     *    Line 3: X(t) 的实际公式
+     *    Line 4: Y(t) 的通项公式
+     *    Line 5: Y(t) 的实际公式
      * ============================================================================
      */
 
-    // Custom 8-stage progression sequence of circle counts requested by user:
-    const VIDEO_AUTO_STEPS = [1, 2, 4, 8, 32, 128, 256, 1024];
+    // 1. 8-stage progression sequence of circle counts: 1, 2, 4, 8, 16, 32, 128, 1024
+    const VIDEO_AUTO_STEPS = [1, 2, 4, 8, 16, 32, 128, 1024];
+
+    // Resolution Quality Tiers (Base short-side pixels & Target Bitrate)
+    const VIDEO_QUALITY_TIERS = {
+      1080: { baseShortSide: 1080, bitrate: 30000000, label: '1080P' },
+      1440: { baseShortSide: 1440, bitrate: 45000000, label: '2K' },
+      2160: { baseShortSide: 2160, bitrate: 60000000, label: '4K' }
+    };
+
+    // Orthogonal Mode World Layout Constants
+    const ORTHO_LAYOUT = {
+      drawOffsetX: 0.92,
+      drawOffsetY: 0.92,
+      topChainCenterY: -1.22,
+      leftChainCenterX: -1.22
+    };
+
+    // Default Normalized Positions for the 3 Movable Zones (x, y in [0, 1] of canvas W, H; scale around 1.0)
+    const DEFAULT_ZONE_LAYOUT = {
+      anim: { x: 0.50, y: 0.52, scale: 1.0, visible: true, label: '🎯 动画演示区 (Animation Zone)' },
+      formula: { x: 0.50, y: 0.135, scale: 1.0, visible: true, label: '🧮 顶部五行公式区 (Formula Zone)' },
+      text: { x: 0.50, y: 0.885, scale: 1.0, visible: true, label: '📝 文字说明区 (Caption & Stats Zone)' }
+    };
 
     // --- Application State ---
     const state = {
       shapeName: '爱心 (HEART)',
-      rawSubpaths: [],           // Array of subpaths (each is array of {x, y}) before resampling
-      sampledPoints: [],         // Uniformly resampled M complex points [{x, y}]
-      sampleCount: 2048,         // Power of 2: 256, 512, 1024, 2048, 4096, 8192
-      harmonics: [],             // Sorted by amplitude descending: { freq, re, im, amp, phase }
-      harmonicsByFreq: [],       // Ordered by frequency k from -M/2 to +M/2 for Spectrum Chart
-      dcTerm: { re: 0, im: 0 },  // k = 0 center offset
-      totalVarianceEnergy: 1,    // Sum of |c_k|^2 for k != 0
+      epicycleMode: 'orthogonal', // 'complex' | 'orthogonal'
+      rawSubpaths: [],
+      sampledPoints: [],
+      sampleCount: 2048,
 
-      // Cached Real-Time Numerical Expansion Strings for Top Canvas Display
+      // Complex Mode Harmonics
+      harmonics: [],
+      harmonicsByFreq: [],
+
+      // Orthogonal Mode Real Harmonics (Top X-chain & Left Y-chain)
+      harmonicsX: [],
+      harmonicsY: [],
+      orthoByFreq: [],
+
+      dcTerm: { re: 0, im: 0 },
+      totalVarianceEnergy: 1,
+
+      // Cached General & Real-Time Numerical Expansion Strings
+      generalFormulaX: '',
+      generalFormulaY: '',
       expansionFormulaX: '',
       expansionFormulaY: '',
       expansionShownTerms: 0,
 
       // Controls
-      numCircles: 256,
+      numCircles: 128,
       maxShownCircles: 128,
       isPlaying: true,
       speed: 1.0,
-      t: 0,                      // Time parameter in [0, 1]
-      trail: [],                 // Drawn pen path [{x, y}]
-      fullPrecomputedCurve: [],  // Full reconstructed curve for current N
+      t: 0,
+      trail: [],
 
-      // Auto-Step (1 -> 1024 progression mode)
+      // Auto-Step (1 -> 2 -> 4 -> 8 -> 16 -> 32 -> 128 -> 1024 progression mode)
       autoStepEnabled: false,
       autoStepIndex: 0,
       pauseHoldTimer: 0,
@@ -605,22 +781,37 @@
       showRadii: true,
       showOriginal: false,
       showVideoHud: true,
+      showProjectionLines: true,
       followTip: false,
       followZoom: 6,
       spectrumLogScale: true,
       soundEnabled: false,
 
-      // Camera Pan/Zoom
-      camZoom: 1.0,
-      camPanX: 0,
-      camPanY: 0,
-      isDraggingCanvas: false,
-      dragStartX: 0,
-      dragStartY: 0,
+      // Aspect Ratio & Ultra-HD Canvas Resolution
+      aspectRatioKey: '9:16',
+      aspectW: 9,
+      aspectH: 16,
+      qualityTier: 1080,
+      videoWidth: 1080,
+      videoHeight: 1920,
+      videoBitrate: 30000000,
+
+      // Free Zone Layout Studio State
+      activeZoneTab: 'anim', // 'anim' | 'formula' | 'text'
+      allowDirectZoneDrag: true,
+      zones: JSON.parse(JSON.stringify(DEFAULT_ZONE_LAYOUT)),
+      zoneBounds: {
+        formula: null,
+        text: null
+      },
+      hoveredZone: null,
+      draggingZone: null,
+      dragOffsetNormX: 0,
+      dragOffsetNormY: 0,
 
       // Video Recording State
       isRecording: false,
-      recordMode: 'autostep',    // 'autostep' | 'cycle' | 'manual'
+      recordMode: 'autostep', // 'autostep' | 'cycle' | 'manual'
       mediaRecorder: null,
       recordedChunks: [],
       recordMimeType: '',
@@ -643,10 +834,8 @@
           audioCtx.resume();
         }
         const now = audioCtx.currentTime;
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        // Warm sine-triangle chime like the video
-        osc.type = 'sine';
+        const osc = new OscillatorNode(audioCtx, { type: 'sine' });
+        const gain = new GainNode(audioCtx);
         const baseFreq = 220 + stepRatio * 180;
         osc.frequency.setValueAtTime(baseFreq, now);
         gain.gain.setValueAtTime(0.001, now);
@@ -663,11 +852,9 @@
 
     // ============================================================================
     // 1. RADIX-2 COOLEY-TUKEY FAST FOURIER TRANSFORM (FFT)
-    // Computes 2048, 4096, or 8192 complex harmonics in < 3 milliseconds
     // ============================================================================
     function computeFFT(points) {
       const M = points.length;
-      // Ensure M is power of 2
       const re = new Float64Array(M);
       const im = new Float64Array(M);
       for (let i = 0; i < M; i++) {
@@ -721,7 +908,6 @@
         }
       }
 
-      // Normalize by 1/M and map indices to centered frequencies [-M/2, ..., M/2 - 1]
       const nonZeroHarmonics = [];
       const byFreq = [];
       let dcTerm = { re: re[0] / M, im: im[0] / M, freq: 0, amp: 0, phase: 0 };
@@ -745,27 +931,84 @@
         }
       }
 
-      // Sort by frequency ascending for spectrum chart
-      byFreq.sort((a, b) => a.freq - b.freq);
+      // Decompose into two independent Real Fourier Series for Orthogonal X(t) and Y(t) modes
+      const halfM = M >> 1;
+      const harmonicsX = [];
+      const harmonicsY = [];
+      const orthoByFreq = [];
 
-      // Sort non-zero harmonics by amplitude descending (largest epicycles first!)
+      for (let k = 1; k <= halfM; k++) {
+        const isNyquist = k === halfM;
+        const mult = isNyquist ? 1.0 : 2.0;
+        const energyWeight = isNyquist ? 1.0 : 0.5;
+
+        const ckRe = re[k] / M;
+        const ckIm = im[k] / M;
+        const cmkRe = re[M - k] / M;
+        const cmkIm = im[M - k] / M;
+
+        const xkRe = 0.5 * (ckRe + cmkRe);
+        const xkIm = 0.5 * (ckIm - cmkIm);
+        const ampX = mult * Math.hypot(xkRe, xkIm);
+        const phaseX = Math.atan2(xkIm, xkRe);
+        const energyX = energyWeight * ampX * ampX;
+
+        const ykRe = 0.5 * (ckIm + cmkIm);
+        const ykIm = 0.5 * (cmkRe - ckRe);
+        const ampY = mult * Math.hypot(ykRe, ykIm);
+        const cosPhaseY = Math.atan2(ykIm, ykRe);
+        const phaseY = Math.atan2(
+          Math.sin(cosPhaseY + Math.PI / 2),
+          Math.cos(cosPhaseY + Math.PI / 2)
+        );
+        const energyY = energyWeight * ampY * ampY;
+
+        const itemX = { freq: k, amp: ampX, phase: phaseX, energy: energyX };
+        const itemY = { freq: k, amp: ampY, phase: phaseY, cosPhase: cosPhaseY, energy: energyY };
+
+        harmonicsX.push(itemX);
+        harmonicsY.push(itemY);
+        orthoByFreq.push({ freq: k, ampX, ampY, energyX, energyY });
+      }
+
+      byFreq.sort((a, b) => a.freq - b.freq);
       nonZeroHarmonics.sort((a, b) => b.amp - a.amp);
+      harmonicsX.sort((a, b) => b.amp - a.amp);
+      harmonicsY.sort((a, b) => b.amp - a.amp);
 
       state.dcTerm = dcTerm;
       state.harmonics = nonZeroHarmonics;
       state.harmonicsByFreq = byFreq;
+      state.harmonicsX = harmonicsX;
+      state.harmonicsY = harmonicsY;
+      state.orthoByFreq = orthoByFreq;
       state.totalVarianceEnergy = Math.max(totalEnergy, 1e-12);
     }
 
-    // Compute Relative RMS Error and Fidelity for current N circles
-    // Matches the exact formula shown in the video: Relative RMS error = sqrt(1 - sum_{k in K_N} |c_k|^2 / sum_{k != 0} |c_k|^2)
+    function getMaxSelectableCircles() {
+      if (state.epicycleMode === 'orthogonal') {
+        return Math.max(1, state.harmonicsX.length);
+      }
+      return Math.max(1, state.harmonics.length);
+    }
+
     function computeErrorMetrics(N) {
-      const maxTerms = state.harmonics.length;
-      const count = Math.min(N, maxTerms);
       let capturedEnergy = 0;
-      for (let i = 0; i < count; i++) {
-        const a = state.harmonics[i].amp;
-        capturedEnergy += a * a;
+      if (state.epicycleMode === 'orthogonal') {
+        const countX = Math.min(N, state.harmonicsX.length);
+        const countY = Math.min(N, state.harmonicsY.length);
+        for (let i = 0; i < countX; i++) {
+          capturedEnergy += state.harmonicsX[i].energy;
+        }
+        for (let i = 0; i < countY; i++) {
+          capturedEnergy += state.harmonicsY[i].energy;
+        }
+      } else {
+        const count = Math.min(N, state.harmonics.length);
+        for (let i = 0; i < count; i++) {
+          const a = state.harmonics[i].amp;
+          capturedEnergy += a * a;
+        }
       }
       const ratio = Math.min(1, capturedEnergy / state.totalVarianceEnergy);
       const residualRatio = Math.max(0, 1 - ratio);
@@ -774,50 +1017,76 @@
       return { rmsErrorPercent, fidelityPercent };
     }
 
-    /**
-     * Builds the real-time numerical series expansion strings for the current shape and active N circles:
-     * x_N(t) = x_0 + r_{k1} cos(2π(k1)t + φ_{k1}) + r_{k2} cos(2π(k2)t + φ_{k2}) + ...
-     * y_N(t) = y_0 + r_{k1} sin(2π(k1)t + φ_{k1}) + r_{k2} sin(2π(k2)t + φ_{k2}) + ...
-     */
     function updateNumericalExpansionStrings() {
-      const activeLimit = Math.min(state.numCircles, state.harmonics.length);
-      const maxExplicitTerms = 3;
-      const shownCount = Math.min(activeLimit, maxExplicitTerms);
-      state.expansionShownTerms = shownCount;
-
+      const maxExplicitTerms = 2;
       const formatSignedZero = (v) => (Math.abs(v) < 0.0005 ? '0.00' : v.toFixed(2));
       const x0Str = formatSignedZero(state.dcTerm.re);
       const y0Str = formatSignedZero(state.dcTerm.im);
 
-      const xTerms = [];
-      const yTerms = [];
+      if (state.epicycleMode === 'orthogonal') {
+        const activeLimit = Math.min(state.numCircles, state.harmonicsX.length);
+        const shownCount = Math.min(activeLimit, maxExplicitTerms);
+        state.expansionShownTerms = shownCount;
 
-      for (let i = 0; i < shownCount; i++) {
-        const h = state.harmonics[i];
-        const rStr = h.amp.toFixed(3);
-        const kStr = String(h.freq);
-        const phiAbs = Math.abs(h.phase).toFixed(2);
-        const phiSign = h.phase >= 0 ? '+' : '-';
-        xTerms.push(`${rStr}·cos(2π(${kStr})t ${phiSign} ${phiAbs})`);
-        yTerms.push(`${rStr}·sin(2π(${kStr})t ${phiSign} ${phiAbs})`);
+        const xTerms = [];
+        const yTerms = [];
+
+        for (let i = 0; i < shownCount; i++) {
+          const hx = state.harmonicsX[i];
+          const rxStr = hx.amp.toFixed(3);
+          const kxStr = String(hx.freq);
+          const phxAbs = Math.abs(hx.phase).toFixed(2);
+          const phxSign = hx.phase >= 0 ? '+' : '-';
+          xTerms.push(`${rxStr}·cos(2π(${kxStr})t${phxSign}${phxAbs})`);
+
+          const hy = state.harmonicsY[i];
+          const ryStr = hy.amp.toFixed(3);
+          const kyStr = String(hy.freq);
+          const phyAbs = Math.abs(hy.phase).toFixed(2);
+          const phySign = hy.phase >= 0 ? '+' : '-';
+          yTerms.push(`${ryStr}·sin(2π(${kyStr})t${phySign}${phyAbs})`);
+        }
+
+        const remaining = activeLimit - shownCount;
+        const eqSymbol = remaining > 0 ? '≈' : '=';
+        const tailStr = remaining > 0 ? ` + ··· [+${remaining}项]` : '';
+
+        state.generalFormulaX = `X(t) = x0 + ∑ Rx,k cos(2πkt + φx,k)`;
+        state.expansionFormulaX = `X(t) ${eqSymbol} ${x0Str}${xTerms.length ? ' + ' + xTerms.join(' + ') : ''}${tailStr}`;
+        state.generalFormulaY = `Y(t) = y0 + ∑ Ry,k sin(2πkt + φy,k)`;
+        state.expansionFormulaY = `Y(t) ${eqSymbol} ${y0Str}${yTerms.length ? ' + ' + yTerms.join(' + ') : ''}${tailStr}`;
+      } else {
+        const activeLimit = Math.min(state.numCircles, state.harmonics.length);
+        const shownCount = Math.min(activeLimit, maxExplicitTerms);
+        state.expansionShownTerms = shownCount;
+
+        const xTerms = [];
+        const yTerms = [];
+
+        for (let i = 0; i < shownCount; i++) {
+          const h = state.harmonics[i];
+          const rStr = h.amp.toFixed(3);
+          const kStr = String(h.freq);
+          const phiAbs = Math.abs(h.phase).toFixed(2);
+          const phiSign = h.phase >= 0 ? '+' : '-';
+          xTerms.push(`${rStr}·cos(2π(${kStr})t${phiSign}${phiAbs})`);
+          yTerms.push(`${rStr}·sin(2π(${kStr})t${phiSign}${phiAbs})`);
+        }
+
+        const remaining = activeLimit - shownCount;
+        const eqSymbol = remaining > 0 ? '≈' : '=';
+        const tailStr = remaining > 0 ? ` + ··· [+${remaining}项]` : '';
+
+        state.generalFormulaX = `X(t) = x0 + ∑ |ck| cos(2πkt + φk)`;
+        state.expansionFormulaX = `X(t) ${eqSymbol} ${x0Str}${xTerms.length ? ' + ' + xTerms.join(' + ') : ''}${tailStr}`;
+        state.generalFormulaY = `Y(t) = y0 + ∑ |ck| sin(2πkt + φk)`;
+        state.expansionFormulaY = `Y(t) ${eqSymbol} ${y0Str}${yTerms.length ? ' + ' + yTerms.join(' + ') : ''}${tailStr}`;
       }
-
-      const remaining = activeLimit - shownCount;
-      const eqSymbol = remaining > 0 ? '≈' : '=';
-      const tailStr = remaining > 0 ? ` + ··· [+${remaining}项]` : '';
-
-      state.expansionFormulaX = `x(t) ${eqSymbol} ${x0Str}${xTerms.length ? ' + ' + xTerms.join(' + ') : ''}${tailStr}`;
-      state.expansionFormulaY = `y(t) ${eqSymbol} ${y0Str}${yTerms.length ? ' + ' + yTerms.join(' + ') : ''}${tailStr}`;
     }
 
     // ============================================================================
-    // 2. UNRESTRICTED LARGE SVG PARSER & MULTI-PATH STITCHING ENGINE (HARDENED)
-    // Pure-JS spec-compliant SVG Path ('d') state machine + Transform Matrix engine
-    // Supports Chinese GIS/Map SVGs (e.g., 四川.svg), Illustrator/CorelDRAW/Inkscape
-    // exports, relative 'm' chains, concatenated arc flags, polygons, <use>, etc.
+    // 2. UNRESTRICTED LARGE SVG PARSER & MULTI-PATH STITCHING ENGINE
     // ============================================================================
-
-    // --- 2A. 2D Affine Transform Matrix [a, b, c, d, e, f] Utilities ---
     function matIdentity() {
       return [1, 0, 0, 1, 0, 0];
     }
@@ -898,7 +1167,6 @@
         if (tAttr) {
           mat = matMultiply(mat, parseTransformAttribute(tAttr));
         }
-        // Handle inline style transform if present (e.g. style="transform: matrix(...)")
         const styleAttr = node.getAttribute && node.getAttribute('style');
         if (styleAttr && styleAttr.includes('transform')) {
           const m = styleAttr.match(/transform\s*:\s*([^;]+)/i);
@@ -910,11 +1178,9 @@
       return mat;
     }
 
-    // --- 2B. Spec-Compliant Pure-JS SVG Path ('d') Parser & Curve Sampler ---
     function sampleCubicBezier(x0, y0, x1, y1, x2, y2, x3, y3, outPts) {
       const chord = Math.hypot(x3 - x0, y3 - y0);
       const net = Math.hypot(x1 - x0, y1 - y0) + Math.hypot(x2 - x1, y2 - y1) + Math.hypot(x3 - x2, y3 - y2);
-      // Adaptive step count based on curvature and arc length
       const steps = Math.max(4, Math.min(36, Math.ceil(6 + (net - chord) * 0.25 + net * 0.04)));
       for (let s = 1; s <= steps; s++) {
         const t = s / steps;
@@ -943,7 +1209,6 @@
       }
     }
 
-    // SVG W3C Spec F.6.5 Endpoint-to-Center Elliptical Arc Sampler
     function sampleEllipticalArc(x1, y1, rx, ry, phiDeg, largeArcFlag, sweepFlag, x2, y2, outPts) {
       if (Math.abs(x1 - x2) < 1e-7 && Math.abs(y1 - y2) < 1e-7) return;
       rx = Math.abs(rx);
@@ -967,7 +1232,6 @@
       const x1pSq = x1p * x1p;
       const y1pSq = y1p * y1p;
 
-      // Scale radii up if too small to reach endpoint
       const lambda = x1pSq / rxSq + y1pSq / rySq;
       if (lambda > 1) {
         const sqrtL = Math.sqrt(lambda);
@@ -1018,10 +1282,6 @@
       }
     }
 
-    /**
-     * State-aware SVG Path (`d`) scanner that supports compressed numbers, scientific notation,
-     * concatenated arc flags (`a25,25 0 0150,0`), relative `m` chains, and implicit `l`/`L` pairs.
-     */
     function parsePathDToSubpaths(dStr, matrix) {
       if (!dStr || typeof dStr !== 'string') return [];
       const len = dStr.length;
@@ -1030,7 +1290,6 @@
       const skipSeparators = () => {
         while (idx < len) {
           const code = dStr.charCodeAt(idx);
-          // whitespace or comma
           if (code === 32 || code === 44 || code === 9 || code === 10 || code === 13) {
             idx++;
           } else {
@@ -1043,7 +1302,7 @@
         skipSeparators();
         if (idx >= len) return false;
         const ch = dStr[idx];
-        return /[a-df-zA-DF-Z]/.test(ch); // exclude 'e'/'E'
+        return /[a-df-zA-DF-Z]/.test(ch);
       };
 
       const readFlag = () => {
@@ -1134,7 +1393,6 @@
           }
           curSubpath = [{ x: curX, y: curY }];
           lastCmd = activeCmd;
-          // Per SVG specification: subsequent coordinate pairs after M/m are implicit L/l!
           activeCmd = isRel ? 'l' : 'L';
           continue;
         }
@@ -1245,7 +1503,6 @@
           curY = ay;
           lastCmd = activeCmd;
         } else {
-          // Unknown command token
           idx++;
         }
       }
@@ -1254,7 +1511,6 @@
         subpaths.push(curSubpath);
       }
 
-      // Apply cumulative 2D transform matrix and calculate physical arc length for each subpath
       const results = [];
       for (let s = 0; s < subpaths.length; s++) {
         const raw = subpaths[s];
@@ -1283,10 +1539,6 @@
       return results;
     }
 
-    /**
-     * Converts basic SVG shape elements (<polygon>, <polyline>, <line>, <rect>, <circle>, <ellipse>)
-     * into transformed subpath point arrays.
-     */
     function extractBasicShapeSubpath(el, matrix) {
       const tag = el.tagName.toLowerCase();
       const rawPts = [];
@@ -1343,7 +1595,6 @@
 
       if (rawPts.length < 2) return null;
 
-      // Subdivide long straight segments so resampler & bounding box work evenly
       const transformed = [];
       let arcLen = 0;
       for (let i = 0; i < rawPts.length; i++) {
@@ -1365,10 +1616,6 @@
       return { pts: transformed, length: arcLen };
     }
 
-    /**
-     * Checks if a subpath is strictly an outer rectangular artboard background frame.
-     * NEVER deletes the sole contour in a single-path map SVG like 四川.svg!
-     */
     function isLikelyBackgroundRect(pts, overallBBox) {
       if (pts.length < 4 || pts.length > 16) return false;
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -1385,10 +1632,8 @@
       const totalH = overallBBox.maxY - overallBBox.minY;
       if (totalW <= 0 || totalH <= 0) return false;
 
-      // Must span >96% of total bounding box
       if (w < totalW * 0.96 || h < totalH * 0.96) return false;
 
-      // Check if >95% of points hug the 4 straight edges of its bounding box within 1.5% tolerance
       const tol = Math.max(w, h) * 0.015;
       let onEdgeCount = 0;
       for (let i = 0; i < pts.length; i++) {
@@ -1403,14 +1648,9 @@
       return onEdgeCount / pts.length >= 0.95;
     }
 
-    /**
-     * Fault-tolerant SVG XML/HTML DOM Parser + Geometry Extractor
-     * Handles DOCTYPE entities, unbound namespaces, <use> clones, and compound paths.
-     */
     function extractSubpathsFromSVGString(svgText, fileName = 'custom.svg', fileSize = 0) {
       const t0 = performance.now();
 
-      // 1. Strip UTF-8 BOM, null chars, XML headers, and <!DOCTYPE ... [ ... ]> blocks
       let cleanText = (svgText || '')
         .replace(/^\uFEFF/, '')
         .replace(/\0/g, '')
@@ -1418,7 +1658,6 @@
         .replace(/<!DOCTYPE[\s\S]*?(?:\[[\s\S]*?\][\s\S]*?)?>/gi, '')
         .trim();
 
-      // Support bare <path d="..."/> or raw path data pasted by user
       if (!/<svg[\s>]/i.test(cleanText)) {
         if (/^<(path|polygon|polyline|rect|circle|ellipse|g)[\s>]/i.test(cleanText)) {
           cleanText = `<svg xmlns="http://www.w3.org/2000/svg">${cleanText}</svg>`;
@@ -1427,7 +1666,6 @@
         }
       }
 
-      // 2. Try strict XML parsing first; if any parsererror occurs, fallback to fault-tolerant text/html
       const parser = new DOMParser();
       let doc = parser.parseFromString(cleanText, 'image/svg+xml');
       let svgRoot = doc.querySelector('svg');
@@ -1449,7 +1687,6 @@
         throw new Error('未在文件中找到有效的 <svg> 节点，请检查文件内容。');
       }
 
-      // 3. Expand <use href="#..."> / <use xlink:href="#..."> elements inline before traversal
       const useElements = Array.from(svgRoot.querySelectorAll('use'));
       for (let u = 0; u < useElements.length; u++) {
         const useEl = useElements[u];
@@ -1476,7 +1713,6 @@
         }
       }
 
-      // 4. Collect all geometric elements outside <defs>, <clipPath>, <mask>, <pattern>, <marker>, <symbol>
       const allShapes = Array.from(
         svgRoot.querySelectorAll('path, polygon, polyline, rect, circle, ellipse, line')
       );
@@ -1491,12 +1727,10 @@
         return true;
       });
 
-      // Fallback: if an SVG placed all its geometry inside <defs>/<symbol> without visible shapes outside
       if (activeShapes.length === 0 && allShapes.length > 0) {
         activeShapes = allShapes;
       }
 
-      // 5. Parse all paths and basic shapes using pure-JS math engine
       const rawExtracted = [];
       let totalArcLength = 0;
 
@@ -1526,7 +1760,6 @@
         throw new Error('未能在 SVG 中提取到任何有效的矢量路径或几何轮廓。');
       }
 
-      // 6. Compute overall bounding box across all extracted points
       const overallBBox = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
       for (let i = 0; i < rawExtracted.length; i++) {
         const pts = rawExtracted[i].pts;
@@ -1539,7 +1772,6 @@
         }
       }
 
-      // 7. Optional: Filter out full-bleed rectangular background frame ONLY if multiple subpaths exist
       const filterRectEnabled = document.getElementById('svg-filter-rect').checked;
       let candidateSubpaths = rawExtracted;
       if (filterRectEnabled && candidateSubpaths.length > 1) {
@@ -1549,7 +1781,6 @@
         }
       }
 
-      // 8. Filter tiny noise fragments based on user setting (never leaving 0 subpaths)
       const minFraction = parseFloat(document.getElementById('svg-min-subpath').value || '0.001');
       const candidateTotalLen = candidateSubpaths.reduce((acc, d) => acc + d.length, 0);
       const minAllowedLen = candidateTotalLen * minFraction;
@@ -1559,7 +1790,6 @@
         finalSubpaths = candidateSubpaths;
       }
 
-      // Cap total subpaths if an SVG has > 4000 micro-segments by keeping the longest 4000
       if (finalSubpaths.length > 4000) {
         finalSubpaths.sort((a, b) => b.length - a.length);
         finalSubpaths = finalSubpaths.slice(0, 4000);
@@ -1577,10 +1807,6 @@
       };
     }
 
-    /**
-     * Fallback Raster Contour Tracer: If an uploaded SVG only wraps an embedded <image> bitmap,
-     * renders it onto an offscreen canvas and traces the silhouette boundary automatically.
-     */
     async function extractContourFromRasterSVG(svgText, fileName, fileSize) {
       const t0 = performance.now();
       return new Promise((resolve, reject) => {
@@ -1597,7 +1823,6 @@
           cctx.drawImage(img, 20, 20, size - 40, size - 40);
           const imgData = cctx.getImageData(0, 0, size, size).data;
 
-          // Build foreground mask (non-transparent and non-white pixels)
           const mask = new Uint8Array(size * size);
           let fgCount = 0;
           for (let i = 0; i < size * size; i++) {
@@ -1617,7 +1842,6 @@
             return;
           }
 
-          // Moore-Neighbor boundary tracing
           let startX = -1, startY = -1;
           outer: for (let y = 1; y < size - 1; y++) {
             for (let x = 1; x < size - 1; x++) {
@@ -1684,11 +1908,6 @@
       });
     }
 
-    /**
-     * Stitches multiple subpaths into a single continuous tour using either:
-     * - 'longest': Only keeps the longest contour
-     * - 'stitch': Greedy Nearest-Neighbor traversal (evaluating both forward & reversed directions)
-     */
     function stitchAndResampleSubpaths(subpathsData, M, strategy = 'stitch') {
       if (!subpathsData || subpathsData.length === 0) return [];
 
@@ -1698,7 +1917,6 @@
         chosenSubpaths = [chosenSubpaths[0]];
       }
 
-      // Order subpaths via Greedy Nearest-Neighbor starting from the longest subpath
       chosenSubpaths.sort((a, b) => b.length - a.length);
       const used = new Uint8Array(chosenSubpaths.length);
       const orderedPointArrays = [];
@@ -1745,7 +1963,6 @@
         }
       }
 
-      // Flatten into a single closed polyline
       const combined = [];
       for (let i = 0; i < orderedPointArrays.length; i++) {
         const arr = orderedPointArrays[i];
@@ -1757,17 +1974,12 @@
       return resampleClosedPolyline(combined, M);
     }
 
-    /**
-     * Uniformly resamples any closed polyline of [{x, y}] into exactly M equidistant points
-     * and normalizes it into [-1, 1] x [-1, 1] aspect-correct coordinates.
-     */
     function resampleClosedPolyline(rawPts, M) {
       if (!rawPts || rawPts.length === 0) return [];
       if (rawPts.length === 1) {
         return Array.from({ length: M }, () => ({ x: 0, y: 0 }));
       }
 
-      // Close loop by appending start point
       const pts = rawPts.slice();
       const first = pts[0];
       const last = pts[pts.length - 1];
@@ -1813,7 +2025,6 @@
         if (y > maxY) maxY = y;
       }
 
-      // Normalize to centered [-1, 1] coordinate space while preserving aspect ratio
       const cx = (minX + maxX) / 2;
       const cy = (minY + maxY) / 2;
       const span = Math.max(maxX - minX, maxY - minY, 1e-6) / 2;
@@ -1912,10 +2123,32 @@
     // 4. RECONSTRUCTION & ANIMATION PIPELINE
     // ============================================================================
     function evaluateFourierAtTime(t, N) {
+      const twoPiT = 2 * Math.PI * t;
+
+      if (state.epicycleMode === 'orthogonal') {
+        let x = state.dcTerm.re;
+        let y = state.dcTerm.im;
+        const limitX = Math.min(N, state.harmonicsX.length);
+        const limitY = Math.min(N, state.harmonicsY.length);
+
+        for (let i = 0; i < limitX; i++) {
+          const hx = state.harmonicsX[i];
+          const angleX = hx.freq * twoPiT + hx.phase;
+          x += hx.amp * Math.cos(angleX);
+        }
+
+        for (let i = 0; i < limitY; i++) {
+          const hy = state.harmonicsY[i];
+          const angleY = hy.freq * twoPiT + hy.phase;
+          y += hy.amp * Math.sin(angleY);
+        }
+
+        return { x, y };
+      }
+
       let x = state.dcTerm.re;
       let y = state.dcTerm.im;
       const limit = Math.min(N, state.harmonics.length);
-      const twoPiT = 2 * Math.PI * t;
 
       for (let i = 0; i < limit; i++) {
         const h = state.harmonics[i];
@@ -1926,11 +2159,8 @@
       return { x, y };
     }
 
-    function rebuildCurrentContourAndFFT(sampledPts, resetCirclesToDefault = false) {
-      state.sampledPoints = sampledPts;
-      computeFFT(sampledPts);
-
-      const maxPossible = state.harmonics.length;
+    function syncCircleControlsRange(resetCirclesToDefault = false) {
+      const maxPossible = getMaxSelectableCircles();
       const sliderCircles = document.getElementById('slider-circles');
       const inputCircles = document.getElementById('input-circles');
       const labelMax = document.getElementById('label-max-circles');
@@ -1940,14 +2170,19 @@
       labelMax.textContent = `/ ${maxPossible}`;
 
       if (resetCirclesToDefault) {
-        state.numCircles = Math.min(256, maxPossible);
+        state.numCircles = Math.min(128, maxPossible);
       } else {
         state.numCircles = Math.min(state.numCircles, maxPossible);
       }
 
       sliderCircles.value = state.numCircles;
       inputCircles.value = state.numCircles;
+    }
 
+    function rebuildCurrentContourAndFFT(sampledPts, resetCirclesToDefault = false) {
+      state.sampledPoints = sampledPts;
+      computeFFT(sampledPts);
+      syncCircleControlsRange(resetCirclesToDefault);
       resetAnimationCycle();
       updateReadoutUI();
       drawSpectrumChart();
@@ -1961,34 +2196,270 @@
       state.trail.push(startPt);
     }
 
+    function updateCircleQuickButtonsUI() {
+      const activeN = state.numCircles;
+      document.querySelectorAll('.circle-quick-btn').forEach(btn => {
+        const btnVal = parseInt(btn.getAttribute('data-circle-set'), 10);
+        const isActive = btnVal === activeN;
+        btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        if (isActive) {
+          btn.className =
+            'circle-quick-btn px-2 py-1 rounded bg-sky-500/20 text-sky-600 dark:text-sky-300 border border-sky-500/50 font-semibold text-[11px] font-mono shadow-sm shadow-sky-500/10 transition';
+        } else {
+          btn.className =
+            'circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/30 hover:bg-sky-500/10 text-[11px] font-mono transition';
+        }
+      });
+    }
+
     function updateReadoutUI() {
       const { rmsErrorPercent, fidelityPercent } = computeErrorMetrics(state.numCircles);
-      const shownCount = Math.min(state.numCircles, state.maxShownCircles);
+      const maxTerms = getMaxSelectableCircles();
+      const activeN = Math.min(state.numCircles, maxTerms);
+      const shownCount = Math.min(activeN, state.maxShownCircles);
 
       updateNumericalExpansionStrings();
+      updateCircleQuickButtonsUI();
 
-      document.getElementById('top-bar-circles').textContent = `本轮数量: ${state.numCircles}`;
+      if (state.epicycleMode === 'orthogonal') {
+        document.getElementById('top-bar-circles').textContent = `正交圆周: ${activeN}×2 组`;
+        document.getElementById('terms-used-readout').textContent =
+          `X/Y 各显示 ${shownCount} 个圆周 · 各参与计算 ${activeN} 个圆周 (共 ${activeN * 2} 个圆)`;
+      } else {
+        document.getElementById('top-bar-circles').textContent = `本轮数量: ${activeN}`;
+        document.getElementById('terms-used-readout').textContent =
+          `已显示 ${shownCount} 个本轮 · 参与计算 ${activeN} 个本轮`;
+      }
+
       document.getElementById('top-bar-rms').textContent = `相对 RMS 误差: ${rmsErrorPercent.toFixed(4)}%`;
       document.getElementById('fidelity-badge').textContent = `能量还原度: ${fidelityPercent.toFixed(2)}%`;
-      document.getElementById('terms-used-readout').textContent =
-        `已显示 ${shownCount} 个本轮 · 参与计算 ${state.numCircles} 个本轮`;
+    }
+
+    function setEpicycleMode(newMode) {
+      if (newMode !== 'complex' && newMode !== 'orthogonal') return;
+      state.epicycleMode = newMode;
+
+      const btnComplex = document.getElementById('btn-mode-complex');
+      const btnOrtho = document.getElementById('btn-mode-orthogonal');
+      const badgePill = document.getElementById('mode-badge-pill');
+      const descText = document.getElementById('mode-desc-text');
+      const stageBtn = document.getElementById('btn-stage-mode-toggle');
+      const stageIcon = document.getElementById('stage-mode-icon');
+      const stageLabel = document.getElementById('stage-mode-label');
+      const circlesTitle = document.getElementById('label-circles-title');
+      const headerFormula = document.getElementById('header-formula-badge');
+      const specTitle = document.getElementById('spectrum-card-title');
+      const specDesc = document.getElementById('spectrum-card-desc');
+
+      if (newMode === 'orthogonal') {
+        btnOrtho.className = 'py-2.5 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 bg-emerald-500 text-white shadow-sm shadow-emerald-500/30';
+        btnComplex.className = 'py-2.5 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-sky-500 dark:hover:text-sky-300';
+        badgePill.textContent = '正交双级数 X(t) ⊥ Y(t)';
+        badgePill.className = 'text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30';
+        descText.innerHTML = '当前为<strong>正交双圆环投影模式</strong>：将横坐标 $x(t)$ 与纵坐标 $y(t)$ 拆分为两个独立的实数傅里叶级数，正上方圆周组计算 $x(t)$ 并向下垂直投射，正左方圆周组计算 $y(t)$ 并向右水平投射，在右下角交汇作画。';
+
+        stageBtn.className = 'px-2.5 h-7 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/40 text-sky-700 dark:text-sky-300 flex items-center justify-center gap-1.5 text-xs font-medium transition';
+        stageIcon.textContent = '🌀';
+        stageLabel.textContent = '切换: 复数单链模式';
+        circlesTitle.textContent = '每组正交圆周数量';
+
+        if (headerFormula) {
+          headerFormula.innerHTML = `
+            <span class="text-sky-600 dark:text-sky-400">X(t) = x<sub>0</sub> + ∑ R<sub>x,k</sub> cos(2πkt+φ<sub>x,k</sub>)</span>
+            <span class="text-slate-300 dark:text-slate-700">⊥</span>
+            <span class="text-emerald-600 dark:text-emerald-400">Y(t) = y<sub>0</sub> + ∑ R<sub>y,k</sub> sin(2πkt+φ<sub>y,k</sub>)</span>
+          `;
+        }
+        specTitle.innerHTML = '<span>📊 实时正交双通道实数频谱图 (Orthogonal Spectrum R<sub>x,k</sub> &amp; R<sub>y,k</sub>)</span>';
+        specDesc.innerHTML = '横轴为正频率 k ≥ 1，纵轴并列展示上方水平级数振幅 <span class="text-sky-600 dark:text-sky-400 font-semibold">R<sub>x,k</sub> (青蓝)</span> 与左方垂直级数振幅 <span class="text-emerald-600 dark:text-emerald-400 font-semibold">R<sub>y,k</sub> (翠绿)</span>。';
+      } else {
+        btnComplex.className = 'py-2.5 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 bg-sky-500 text-white shadow-sm shadow-sky-500/30';
+        btnOrtho.className = 'py-2.5 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-sky-500 dark:hover:text-sky-300';
+        badgePill.textContent = '复平面单链 c_k';
+        badgePill.className = 'text-[11px] font-mono px-2 py-0.5 rounded bg-sky-500/15 text-sky-600 dark:text-sky-300 border border-sky-500/30';
+        descText.innerHTML = '当前为<strong>复数单链模式</strong>：将 $(x(t), y(t))$ 视为复数 $z(t) = x(t) + i y(t)$，由单一旋转本轮链首尾相接直接描绘轨迹。点击上方「正交双环投影」可拆分为上方 $X(t)$ 与左方 $Y(t)$ 两组实数级数正交交汇作画。';
+
+        stageBtn.className = 'px-2.5 h-7 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-700 dark:text-emerald-300 flex items-center justify-center gap-1.5 text-xs font-medium transition';
+        stageIcon.textContent = '📐';
+        stageLabel.textContent = '切换: 正交双环投影';
+        circlesTitle.textContent = '计算本轮数量';
+
+        if (headerFormula) {
+          headerFormula.innerHTML = `
+            <span>z<sub>N</sub>(t) = ∑<sub>k∈K<sub>N</sub></sub> c<sub>k</sub> e<sup>2πikt</sup></span>
+            <span class="text-slate-300 dark:text-slate-700">|</span>
+            <span class="text-slate-500 dark:text-slate-400">c<sub>k</sub> = (1/M) ∑ z<sub>n</sub> e<sup>-2πikn/M</sup></span>
+          `;
+        }
+        specTitle.innerHTML = '<span>📊 实时复数傅里叶频谱图 (Frequency Spectrum |c<sub>k</sub>|)</span>';
+        specDesc.innerHTML = '横轴为旋转频率 k（负频率顺时针旋转，正频率逆时针旋转），纵轴为圆环半径 |c<sub>k</sub>|。亮蓝色代表当前参与绘图的本轮，暗灰色为已截断的高频项。';
+      }
+
+      syncCircleControlsRange(false);
+      resetAnimationCycle();
+      updateReadoutUI();
+      drawSpectrumChart();
+      setStatusMessage(
+        newMode === 'orthogonal'
+          ? `📐 已切换至「正交双圆环投影模式」：上方 X(t) 级数 + 左方 Y(t) 级数 → 右下角正交交汇作画`
+          : `🌀 已切换至「复数单链模式」：单条复平面旋转向量链直接作画`
+      );
     }
 
     // ============================================================================
-    // 5. INTERACTIVE CANVAS RENDERER (EPICYCLES + LIVE NUMERICAL FORMULA HUD + SPECTRUM)
+    // 5. ASPECT RATIO & FREE ZONE LAYOUT STUDIO ENGINE
     // ============================================================================
     const epicycleCanvas = document.getElementById('epicycle-canvas');
-    const ctx = epicycleCanvas.getContext('2d');
+    const ctx = epicycleCanvas.getContext('2d', { alpha: false });
     const spectrumCanvas = document.getElementById('spectrum-canvas');
     const sCtx = spectrumCanvas.getContext('2d');
+    const canvasWrapper = document.getElementById('canvas-wrapper');
+
+    /**
+     * Computes exact even-pixel Ultra-HD resolution (videoWidth x videoHeight)
+     * from aspectW : aspectH and qualityTier (1080P / 1440P / 2160P)
+     */
+    function computeAndApplyAspectRatioResolution() {
+      const tier = VIDEO_QUALITY_TIERS[state.qualityTier] || VIDEO_QUALITY_TIERS[1080];
+      const baseShort = tier.baseShortSide;
+      const wRatio = Math.max(0.1, state.aspectW);
+      const hRatio = Math.max(0.1, state.aspectH);
+      const ratioVal = wRatio / hRatio;
+
+      let wPx, hPx;
+      if (ratioVal <= 1.0) {
+        wPx = baseShort;
+        hPx = Math.round(baseShort / ratioVal);
+      } else {
+        hPx = baseShort;
+        wPx = Math.round(baseShort * ratioVal);
+      }
+      // Ensure even dimensions for hardware H.264/VP9 encoders
+      if (wPx % 2 !== 0) wPx += 1;
+      if (hPx % 2 !== 0) hPx += 1;
+
+      state.videoWidth = wPx;
+      state.videoHeight = hPx;
+      state.videoBitrate = tier.bitrate;
+
+      epicycleCanvas.width = state.videoWidth;
+      epicycleCanvas.height = state.videoHeight;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      // Adjust stage wrapper CSS aspect-ratio and max-width so portrait, square, and landscape fit cleanly
+      canvasWrapper.style.aspectRatio = `${wRatio} / ${hRatio}`;
+      if (ratioVal <= 0.65) {
+        canvasWrapper.style.maxWidth = '468px';
+      } else if (ratioVal <= 0.85) {
+        canvasWrapper.style.maxWidth = '540px';
+      } else if (ratioVal <= 1.15) {
+        canvasWrapper.style.maxWidth = '620px';
+      } else {
+        canvasWrapper.style.maxWidth = '860px';
+      }
+
+      const ratioStr = `${wRatio}:${hRatio}`;
+      const badge = document.getElementById('res-pill-badge');
+      if (badge) {
+        badge.textContent = `${ratioStr} · ${state.videoWidth}×${state.videoHeight}`;
+      }
+      const dimReadout = document.getElementById('ratio-dim-readout');
+      if (dimReadout) {
+        dimReadout.textContent = `${ratioStr} (${state.videoWidth}×${state.videoHeight})`;
+      }
+    }
+
+    function setAspectRatioPreset(ratioKey, customW = null, customH = null) {
+      state.aspectRatioKey = ratioKey;
+      const customBox = document.getElementById('custom-ratio-box');
+
+      if (ratioKey === 'custom') {
+        customBox.classList.remove('hidden');
+        customBox.classList.add('flex');
+        const cw = parseFloat(customW || document.getElementById('input-ratio-w').value) || 9;
+        const ch = parseFloat(customH || document.getElementById('input-ratio-h').value) || 16;
+        state.aspectW = Math.max(1, Math.min(100, cw));
+        state.aspectH = Math.max(1, Math.min(100, ch));
+      } else {
+        customBox.classList.add('hidden');
+        customBox.classList.remove('flex');
+        const parts = ratioKey.split(':').map(Number);
+        state.aspectW = parts[0] || 9;
+        state.aspectH = parts[1] || 16;
+      }
+
+      document.querySelectorAll('.ratio-preset-btn').forEach(btn => {
+        const key = btn.getAttribute('data-ratio');
+        const isAct = key === ratioKey;
+        btn.className = isAct
+          ? 'ratio-preset-btn py-1.5 px-1 rounded-lg text-[11px] font-mono font-semibold bg-sky-500 text-white shadow-sm shadow-sky-500/20 transition'
+          : 'ratio-preset-btn py-1.5 px-1 rounded-lg text-[11px] font-mono font-medium bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:border-sky-500/40 border border-transparent transition';
+      });
+
+      computeAndApplyAspectRatioResolution();
+      renderEpicycleFrame();
+    }
+
+    function syncZoneSlidersFromState() {
+      const zKey = state.activeZoneTab;
+      const z = state.zones[zKey];
+      if (!z) return;
+
+      document.getElementById('zone-editor-title').textContent = z.label;
+      const sliderX = document.getElementById('slider-zone-x');
+      const sliderY = document.getElementById('slider-zone-y');
+      const sliderScale = document.getElementById('slider-zone-scale');
+      const visWrapper = document.getElementById('zone-visible-wrapper');
+      const chkVis = document.getElementById('chk-zone-visible');
+
+      sliderX.value = (z.x * 100).toFixed(1);
+      sliderY.value = (z.y * 100).toFixed(1);
+      sliderScale.value = Math.round(z.scale * 100);
+
+      document.getElementById('label-zone-x').textContent = `${(z.x * 100).toFixed(1)}%`;
+      document.getElementById('label-zone-y').textContent = `${(z.y * 100).toFixed(1)}%`;
+      document.getElementById('label-zone-scale').textContent = `${Math.round(z.scale * 100)}%`;
+
+      if (zKey === 'anim') {
+        visWrapper.classList.add('hidden');
+        visWrapper.classList.remove('flex');
+      } else {
+        visWrapper.classList.remove('hidden');
+        visWrapper.classList.add('flex');
+        chkVis.checked = z.visible !== false;
+      }
+
+      document.querySelectorAll('.zone-tab-btn').forEach(btn => {
+        const tab = btn.getAttribute('data-zone-tab');
+        const isAct = tab === zKey;
+        btn.className = isAct
+          ? 'zone-tab-btn py-1.5 px-2 rounded-lg font-semibold bg-violet-500 text-white shadow-sm transition truncate'
+          : 'zone-tab-btn py-1.5 px-2 rounded-lg font-medium text-slate-600 dark:text-slate-300 hover:text-violet-500 transition truncate';
+      });
+    }
+
+    function applyLayoutPreset(presetName) {
+      if (presetName === 'standard') {
+        state.zones = JSON.parse(JSON.stringify(DEFAULT_ZONE_LAYOUT));
+      } else if (presetName === 'swap') {
+        state.zones.formula = { ...DEFAULT_ZONE_LAYOUT.formula, x: 0.50, y: 0.85, scale: 1.0, visible: true };
+        state.zones.anim = { ...DEFAULT_ZONE_LAYOUT.anim, x: 0.50, y: 0.48, scale: 1.0, visible: true };
+        state.zones.text = { ...DEFAULT_ZONE_LAYOUT.text, x: 0.50, y: 0.11, scale: 1.0, visible: true };
+      } else if (presetName === 'side') {
+        // Great for 16:9 or 4:3 landscape
+        state.zones.anim = { ...DEFAULT_ZONE_LAYOUT.anim, x: 0.65, y: 0.52, scale: 1.08, visible: true };
+        state.zones.formula = { ...DEFAULT_ZONE_LAYOUT.formula, x: 0.26, y: 0.26, scale: 0.90, visible: true };
+        state.zones.text = { ...DEFAULT_ZONE_LAYOUT.text, x: 0.26, y: 0.80, scale: 0.95, visible: true };
+      }
+      syncZoneSlidersFromState();
+      renderEpicycleFrame();
+    }
 
     function resizeCanvases() {
-      const dpr = window.devicePixelRatio || 1;
-      const wrapper = document.getElementById('canvas-wrapper');
-      const rect = wrapper.getBoundingClientRect();
-      epicycleCanvas.width = Math.max(1, Math.floor(rect.width * dpr));
-      epicycleCanvas.height = Math.max(1, Math.floor(rect.height * dpr));
+      computeAndApplyAspectRatioResolution();
 
+      const dpr = window.devicePixelRatio || 1;
       const sRect = spectrumCanvas.parentElement.getBoundingClientRect();
       spectrumCanvas.width = Math.max(1, Math.floor(sRect.width * dpr));
       spectrumCanvas.height = Math.max(1, Math.floor(sRect.height * dpr));
@@ -1998,6 +2469,9 @@
 
     window.addEventListener('resize', resizeCanvases);
 
+    // ============================================================================
+    // 6. ADAPTIVE LIGHT / DARK THEME RENDERER (SPECTRUM + EPICYCLE STAGE)
+    // ============================================================================
     function drawSpectrumChart() {
       const dpr = window.devicePixelRatio || 1;
       const W = spectrumCanvas.width;
@@ -2005,14 +2479,71 @@
       sCtx.clearRect(0, 0, W, H);
 
       const isDark = document.documentElement.classList.contains('dark');
+      const padBottom = 18 * dpr;
+      const padTop = 8 * dpr;
+      const plotH = H - padBottom - padTop;
+
+      if (state.epicycleMode === 'orthogonal') {
+        const orthoItems = state.orthoByFreq;
+        if (!orthoItems || orthoItems.length === 0) return;
+
+        const activeCount = Math.min(state.numCircles, state.harmonicsX.length);
+        const minActiveAmpX = activeCount > 0 ? state.harmonicsX[activeCount - 1].amp : Infinity;
+        const minActiveAmpY = activeCount > 0 ? state.harmonicsY[activeCount - 1].amp : Infinity;
+
+        const maxBins = Math.min(90, orthoItems.length);
+        let maxAmp = 1e-6;
+        for (let i = 0; i < maxBins; i++) {
+          if (orthoItems[i].ampX > maxAmp) maxAmp = orthoItems[i].ampX;
+          if (orthoItems[i].ampY > maxAmp) maxAmp = orthoItems[i].ampY;
+        }
+
+        const groupStep = W / maxBins;
+        const subBarW = Math.max(1.0 * dpr, groupStep * 0.38);
+
+        for (let i = 0; i < maxBins; i++) {
+          const it = orthoItems[i];
+          const groupX = i * groupStep + groupStep * 0.12;
+
+          const normX = state.spectrumLogScale
+            ? Math.log10(1 + (it.ampX / maxAmp) * 999) / 3
+            : it.ampX / maxAmp;
+          const bhX = Math.max(1.5 * dpr, normX * plotH);
+          const isActX = it.ampX >= minActiveAmpX && activeCount > 0;
+          sCtx.fillStyle = isActX
+            ? (isDark ? '#38bdf8' : '#0284c7')
+            : (isDark ? 'rgba(56, 189, 248, 0.20)' : 'rgba(2, 132, 199, 0.25)');
+          sCtx.fillRect(groupX, H - padBottom - bhX, subBarW, bhX);
+
+          const normY = state.spectrumLogScale
+            ? Math.log10(1 + (it.ampY / maxAmp) * 999) / 3
+            : it.ampY / maxAmp;
+          const bhY = Math.max(1.5 * dpr, normY * plotH);
+          const isActY = it.ampY >= minActiveAmpY && activeCount > 0;
+          sCtx.fillStyle = isActY
+            ? (isDark ? '#34d399' : '#059669')
+            : (isDark ? 'rgba(52, 211, 153, 0.20)' : 'rgba(5, 150, 105, 0.25)');
+          sCtx.fillRect(groupX + subBarW + 1 * dpr, H - padBottom - bhY, subBarW, bhY);
+        }
+
+        sCtx.fillStyle = isDark ? '#94a3b8' : '#475569';
+        sCtx.font = `${10 * dpr}px "JetBrains Mono", monospace`;
+        sCtx.textAlign = 'left';
+        sCtx.fillText('k = 1 (基频)', 8 * dpr, H - 4 * dpr);
+        sCtx.textAlign = 'center';
+        sCtx.fillText('■ Rx,k (上方水平级数)   ■ Ry,k (左方垂直级数)', W / 2, H - 4 * dpr);
+        sCtx.textAlign = 'right';
+        sCtx.fillText(`k = +${maxBins}`, W - 8 * dpr, H - 4 * dpr);
+        return;
+      }
+
+      // Complex Mode Spectrum
       const items = state.harmonicsByFreq;
       if (!items || items.length === 0) return;
 
-      // Determine active threshold amplitude for top N circles
       const activeCount = Math.min(state.numCircles, state.harmonics.length);
       const minActiveAmp = activeCount > 0 ? state.harmonics[activeCount - 1].amp : Infinity;
 
-      // Display center frequency window [-128, +128] so bars are clearly visible
       const halfWindow = Math.min(120, Math.floor(items.length / 2));
       const centerIdx = items.findIndex(it => it.freq === 0);
       if (centerIdx === -1) return;
@@ -2028,15 +2559,11 @@
         }
       }
 
-      const padBottom = 18 * dpr;
-      const padTop = 8 * dpr;
-      const plotH = H - padBottom - padTop;
       const barStep = W / count;
       const barWidth = Math.max(1.2 * dpr, barStep * 0.72);
 
-      // Center k=0 axis line
       const zeroX = (centerIdx - startIdx + 0.5) * barStep;
-      sCtx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.18)' : 'rgba(100, 116, 139, 0.2)';
+      sCtx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.18)' : 'rgba(100, 116, 139, 0.25)';
       sCtx.lineWidth = 1 * dpr;
       sCtx.beginPath();
       sCtx.moveTo(zeroX, 0);
@@ -2050,7 +2577,7 @@
         let normH = 0;
         if (state.spectrumLogScale) {
           const logVal = Math.log10(1 + (it.amp / maxAmp) * 999);
-          normH = logVal / 3; // log10(1000) = 3
+          normH = logVal / 3;
         } else {
           normH = it.amp / maxAmp;
         }
@@ -2061,15 +2588,14 @@
 
         const isActive = it.amp >= minActiveAmp && activeCount > 0;
         if (isActive) {
-          sCtx.fillStyle = '#38bdf8';
+          sCtx.fillStyle = isDark ? '#38bdf8' : '#0284c7';
         } else {
           sCtx.fillStyle = isDark ? 'rgba(148, 163, 184, 0.22)' : 'rgba(148, 163, 184, 0.45)';
         }
         sCtx.fillRect(bx, by, barWidth, bh);
       }
 
-      // Axis labels
-      sCtx.fillStyle = isDark ? '#94a3b8' : '#64748b';
+      sCtx.fillStyle = isDark ? '#94a3b8' : '#475569';
       sCtx.font = `${10 * dpr}px "JetBrains Mono", monospace`;
       sCtx.textAlign = 'center';
       sCtx.fillText('k = 0', zeroX, H - 4 * dpr);
@@ -2079,220 +2605,714 @@
       sCtx.fillText(`k = +${halfWindow} (逆时针)`, W - 8 * dpr, H - 4 * dpr);
     }
 
-    function renderEpicycleFrame() {
-      const dpr = window.devicePixelRatio || 1;
-      const W = epicycleCanvas.width;
-      const H = epicycleCanvas.height;
-
-      // Deep dark navy-black background matching the video
-      ctx.fillStyle = '#05070b';
-      ctx.fillRect(0, 0, W, H);
-
-      const baseScale = Math.min(W, H) * (state.showVideoHud ? 0.28 : 0.37);
-
-      if (state.harmonics.length === 0) return;
-
-      // Compute epicycle chain up to state.numCircles
-      const activeLimit = Math.min(state.numCircles, state.harmonics.length);
-      const shownLimit = Math.min(activeLimit, state.maxShownCircles);
-      const twoPiT = 2 * Math.PI * state.t;
-
-      let curX = state.dcTerm.re;
-      let curY = state.dcTerm.im;
-
-      const chainCenters = new Array(shownLimit);
-      for (let i = 0; i < activeLimit; i++) {
-        const h = state.harmonics[i];
-        const angle = h.freq * twoPiT + h.phase;
-        const nextX = curX + h.amp * Math.cos(angle);
-        const nextY = curY + h.amp * Math.sin(angle);
-        if (i < shownLimit) {
-          chainCenters[i] = {
-            cx: curX,
-            cy: curY,
-            nx: nextX,
-            ny: nextY,
-            r: h.amp
-          };
-        }
-        curX = nextX;
-        curY = nextY;
-      }
-
-      const tipX = curX;
-      const tipY = curY;
-
-      // Apply Camera Transform (either Follow-Pen-Tip zoom or User Pan/Zoom)
-      ctx.save();
-      const centerScreenX = W / 2;
-      const centerScreenY = state.showVideoHud ? H * 0.51 : H * 0.5;
-
-      if (state.followTip) {
-        const zoom = state.followZoom;
-        ctx.translate(centerScreenX, centerScreenY);
-        ctx.scale(baseScale * zoom, baseScale * zoom);
-        ctx.translate(-tipX, -tipY);
+    /**
+     * Returns comprehensive Light/Dark color tokens for the Animation Canvas
+     */
+    function getStageThemePalette() {
+      const isDark = document.documentElement.classList.contains('dark');
+      if (isDark) {
+        return {
+          isDark: true,
+          bgBase: '#05070b',
+          bgGlowInner: 'rgba(14, 28, 54, 0.35)',
+          bgGlowOuter: 'rgba(5, 7, 11, 0)',
+          gridLine: 'rgba(30, 41, 59, 0.28)',
+          guideFrame: 'rgba(51, 65, 85, 0.45)',
+          guideAxis: 'rgba(51, 65, 85, 0.35)',
+          ghostPath: 'rgba(148, 163, 184, 0.25)',
+          complexCircle: 'rgba(148, 178, 222, 0.30)',
+          complexRadii: 'rgba(226, 232, 240, 0.48)',
+          orthoCircleX: 'rgba(56, 189, 248, 0.34)',
+          orthoCircleY: 'rgba(52, 211, 153, 0.34)',
+          orthoRadiiX: 'rgba(125, 211, 252, 0.62)',
+          orthoRadiiY: 'rgba(110, 231, 183, 0.62)',
+          projDashX: 'rgba(56, 189, 248, 0.82)',
+          projDashY: 'rgba(52, 211, 153, 0.82)',
+          trailGlow: 'rgba(56, 189, 248, 0.28)',
+          trailCore: '#38bdf8',
+          tipHaloX: 'rgba(56, 189, 248, 0.45)',
+          tipCoreX: '#e0f2fe',
+          tipHaloY: 'rgba(52, 211, 153, 0.45)',
+          tipCoreY: '#d1fae5',
+          penHalo: 'rgba(56, 189, 248, 0.52)',
+          penCore: '#ffffff',
+          zoneLabelX: 'rgba(56, 189, 248, 0.90)',
+          zoneLabelY: 'rgba(52, 211, 153, 0.90)',
+          zoneLabelMain: 'rgba(226, 232, 240, 0.72)',
+          hudBg: 'rgba(10, 15, 26, 0.84)',
+          hudBorderComplex: 'rgba(56, 189, 248, 0.35)',
+          hudBorderOrtho: 'rgba(52, 211, 153, 0.35)',
+          hudHeader: '#94a3b8',
+          hudGeneralX: '#bae6fd',
+          hudFormulaX: '#38bdf8',
+          hudGeneralYComplex: '#bae6fd',
+          hudFormulaYComplex: '#7dd3fc',
+          hudGeneralYOrtho: '#a7f3d0',
+          hudFormulaYOrtho: '#34d399',
+          textTitle: '#7dd3fc',
+          textSubtitle: '#38bdf8',
+          textMuted: 'rgba(203, 213, 225, 0.78)'
+        };
       } else {
-        ctx.translate(centerScreenX + state.camPanX * dpr, centerScreenY + state.camPanY * dpr);
-        ctx.scale(baseScale * state.camZoom, baseScale * state.camZoom);
-      }
-
-      const invScale = 1 / (baseScale * (state.followTip ? state.followZoom : state.camZoom));
-
-      // 1. Optional Original Contour Ghost Path
-      if (state.showOriginal && state.sampledPoints.length > 1) {
-        ctx.strokeStyle = 'rgba(148, 163, 184, 0.22)';
-        ctx.lineWidth = 1.2 * dpr * invScale;
-        ctx.beginPath();
-        for (let i = 0; i < state.sampledPoints.length; i++) {
-          const p = state.sampledPoints[i];
-          if (i === 0) ctx.moveTo(p.x, p.y);
-          else ctx.lineTo(p.x, p.y);
-        }
-        ctx.closePath();
-        ctx.stroke();
-      }
-
-      // 2. Epicycle Circles
-      if (state.showCircles) {
-        ctx.strokeStyle = 'rgba(148, 175, 215, 0.26)';
-        ctx.lineWidth = 1.0 * dpr * invScale;
-        for (let i = 0; i < shownLimit; i++) {
-          const c = chainCenters[i];
-          ctx.beginPath();
-          ctx.arc(c.cx, c.cy, c.r, 0, 2 * Math.PI);
-          ctx.stroke();
-        }
-      }
-
-      // 3. Rotating Radius Vectors
-      if (state.showRadii && shownLimit > 0) {
-        ctx.strokeStyle = 'rgba(203, 213, 225, 0.42)';
-        ctx.lineWidth = 1.05 * dpr * invScale;
-        ctx.beginPath();
-        ctx.moveTo(chainCenters[0].cx, chainCenters[0].cy);
-        for (let i = 0; i < shownLimit; i++) {
-          ctx.lineTo(chainCenters[i].nx, chainCenters[i].ny);
-        }
-        // Connect last shown circle to actual high-order tip if activeLimit > shownLimit
-        if (activeLimit > shownLimit) {
-          ctx.lineTo(tipX, tipY);
-        }
-        ctx.stroke();
-      }
-
-      // 4. Drawn Pen Trail (White for <=4 circles, transitioning to electric sky-blue for >=8 circles)
-      if (state.trail.length > 1) {
-        const isHighDetail = state.numCircles >= 8;
-        ctx.strokeStyle = isHighDetail ? '#38bdf8' : '#ffffff';
-        ctx.lineWidth = 2.2 * dpr * invScale;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.beginPath();
-        for (let i = 0; i < state.trail.length; i++) {
-          const pt = state.trail[i];
-          if (i === 0) ctx.moveTo(pt.x, pt.y);
-          else ctx.lineTo(pt.x, pt.y);
-        }
-        ctx.stroke();
-      }
-
-      // 5. Glowing White Pen Tip Dot
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(tipX, tipY, 3.2 * dpr * invScale, 0, 2 * Math.PI);
-      ctx.fill();
-
-      ctx.restore();
-
-      // 6. Top Real-Time Numerical Expansion HUD & Bottom Readouts (Localized)
-      if (state.showVideoHud) {
-        const { rmsErrorPercent } = computeErrorMetrics(state.numCircles);
-
-        ctx.save();
-
-        // --- TOP HUD: Real-Time Numerical Series Expansion of Current Shape ---
-        const headerLine = `实时笔尖: (${tipX.toFixed(2)}, ${(-tipY).toFixed(2)})`;
-        const lineX = state.expansionFormulaX;
-        const lineY = state.expansionFormulaY;
-
-        // Dynamically fit font size so the 3-term formula never overflows narrow screens
-        let formulaFontPx = Math.round(11.5 * dpr);
-        ctx.font = `500 ${formulaFontPx}px "JetBrains Mono", monospace`;
-        const maxLineWidth = Math.max(ctx.measureText(lineX).width, ctx.measureText(lineY).width);
-        const maxAllowedW = W * 0.92;
-        if (maxLineWidth > maxAllowedW && maxLineWidth > 0) {
-          formulaFontPx = Math.max(Math.round(8.5 * dpr), Math.floor(formulaFontPx * (maxAllowedW / maxLineWidth)));
-          ctx.font = `500 ${formulaFontPx}px "JetBrains Mono", monospace`;
-        }
-
-        const boxPadX = 14 * dpr;
-        const boxPadY = 8 * dpr;
-        const lineGap = Math.round(formulaFontPx * 1.45);
-        const contentW = Math.min(
-          W * 0.95,
-          Math.max(ctx.measureText(lineX).width, ctx.measureText(lineY).width, ctx.measureText(headerLine).width) + boxPadX * 2
-        );
-        const boxH = boxPadY * 2 + lineGap * 2.8;
-        const boxX = (W - contentW) / 2;
-        const boxY = Math.max(50 * dpr, H * 0.085);
-
-        // Translucent dark HUD panel behind the live numerical expansion
-        ctx.fillStyle = 'rgba(10, 15, 26, 0.78)';
-        ctx.strokeStyle = 'rgba(56, 189, 248, 0.28)';
-        ctx.lineWidth = 1 * dpr;
-        ctx.beginPath();
-        if (typeof ctx.roundRect === 'function') {
-          ctx.roundRect(boxX, boxY, contentW, boxH, 10 * dpr);
-        } else {
-          ctx.rect(boxX, boxY, contentW, boxH);
-        }
-        ctx.fill();
-        ctx.stroke();
-
-        // Line 1: Shape Name & Live Coordinates Header
-        ctx.textAlign = 'center';
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = `500 ${Math.max(Math.round(10 * dpr), formulaFontPx - Math.round(1 * dpr))}px Inter, "JetBrains Mono", monospace`;
-        ctx.fillText(headerLine, W / 2, boxY + boxPadY + formulaFontPx * 0.85);
-
-        // Line 2: x_N(t) Numerical Expansion
-        ctx.fillStyle = '#38bdf8';
-        ctx.font = `500 ${formulaFontPx}px "JetBrains Mono", monospace`;
-        ctx.fillText(lineX, W / 2, boxY + boxPadY + formulaFontPx * 0.85 + lineGap);
-
-        // Line 3: y_N(t) Numerical Expansion
-        ctx.fillStyle = '#7dd3fc';
-        ctx.font = `500 ${formulaFontPx}px "JetBrains Mono", monospace`;
-        ctx.fillText(lineY, W / 2, boxY + boxPadY + formulaFontPx * 0.85 + lineGap * 2);
-
-        // --- BOTTOM HUD: Localized Circles & Relative RMS Error Readouts ---
-        ctx.textAlign = 'center';
-        ctx.fillStyle = '#7dd3fc';
-        ctx.font = `500 ${Math.round(22 * dpr)}px Inter, system-ui, sans-serif`;
-        ctx.fillText(`本轮数量 : ${state.numCircles}`, W / 2, H * 0.845);
-
-        ctx.fillStyle = '#7dd3fc';
-        ctx.font = `400 ${Math.round(14.5 * dpr)}px Inter, system-ui, sans-serif`;
-        ctx.fillText(`相对 RMS 误差 : ${rmsErrorPercent.toFixed(4)}%`, W / 2, H * 0.895);
-
-        if (state.numCircles > state.maxShownCircles) {
-          ctx.fillStyle = 'rgba(226, 232, 240, 0.75)';
-          ctx.font = `400 ${Math.round(11 * dpr)}px Inter, system-ui, sans-serif`;
-          ctx.fillText(
-            `已显示 ${state.maxShownCircles} 个本轮 · 参与计算 ${state.numCircles} 个本轮`,
-            W / 2,
-            H * 0.935
-          );
-        }
-
-        ctx.restore();
+        // Crisp Academic / Blueprint Light Mode Palette
+        return {
+          isDark: false,
+          bgBase: '#f8fafc',
+          bgGlowInner: 'rgba(224, 242, 254, 0.70)',
+          bgGlowOuter: 'rgba(248, 250, 252, 0)',
+          gridLine: 'rgba(203, 213, 225, 0.42)',
+          guideFrame: 'rgba(148, 163, 184, 0.55)',
+          guideAxis: 'rgba(148, 163, 184, 0.45)',
+          ghostPath: 'rgba(100, 116, 139, 0.30)',
+          complexCircle: 'rgba(2, 132, 199, 0.32)',
+          complexRadii: 'rgba(51, 65, 85, 0.55)',
+          orthoCircleX: 'rgba(2, 132, 199, 0.36)',
+          orthoCircleY: 'rgba(5, 150, 105, 0.36)',
+          orthoRadiiX: 'rgba(3, 105, 161, 0.65)',
+          orthoRadiiY: 'rgba(4, 120, 87, 0.65)',
+          projDashX: 'rgba(2, 132, 199, 0.85)',
+          projDashY: 'rgba(5, 150, 105, 0.85)',
+          trailGlow: 'rgba(2, 132, 199, 0.22)',
+          trailCore: '#0284c7',
+          tipHaloX: 'rgba(2, 132, 199, 0.35)',
+          tipCoreX: '#0284c7',
+          tipHaloY: 'rgba(5, 150, 105, 0.35)',
+          tipCoreY: '#059669',
+          penHalo: 'rgba(2, 132, 199, 0.40)',
+          penCore: '#0f172a',
+          zoneLabelX: 'rgba(3, 105, 161, 0.92)',
+          zoneLabelY: 'rgba(4, 120, 87, 0.92)',
+          zoneLabelMain: 'rgba(51, 65, 85, 0.80)',
+          hudBg: 'rgba(255, 255, 255, 0.90)',
+          hudBorderComplex: 'rgba(2, 132, 199, 0.38)',
+          hudBorderOrtho: 'rgba(5, 150, 105, 0.38)',
+          hudHeader: '#475569',
+          hudGeneralX: '#0284c7',
+          hudFormulaX: '#0369a1',
+          hudGeneralYComplex: '#0284c7',
+          hudFormulaYComplex: '#0369a1',
+          hudGeneralYOrtho: '#059669',
+          hudFormulaYOrtho: '#047857',
+          textTitle: '#0f172a',
+          textSubtitle: '#0284c7',
+          textMuted: 'rgba(71, 85, 105, 0.88)'
+        };
       }
     }
 
-    // Returns the active progression sequence [1, 2, 4, 8, 32, 128, 256, 1024] clamped to available harmonics
+    /**
+     * Helper to draw interactive hover/drag outline around a movable HUD zone
+     * (Only shown during interactive hover/drag, NOT shown during video export if not hovered)
+     */
+    function drawZoneHoverHighlight(zoneKey, boxX, boxY, boxW, boxH, vScale, labelText) {
+      if (!state.allowDirectZoneDrag) return;
+      const isHovered = state.hoveredZone === zoneKey;
+      const isDragging = state.draggingZone === zoneKey;
+      if (!isHovered && !isDragging) return;
+
+      ctx.save();
+      ctx.strokeStyle = isDragging ? '#8b5cf6' : 'rgba(139, 92, 246, 0.85)';
+      ctx.lineWidth = (isDragging ? 2.2 : 1.5) * vScale;
+      ctx.setLineDash([5 * vScale, 4 * vScale]);
+      const pad = 4 * vScale;
+      ctx.strokeRect(boxX - pad, boxY - pad, boxW + pad * 2, boxH + pad * 2);
+      ctx.setLineDash([]);
+
+      // Small pill badge at top-right of the zone
+      const tagFont = Math.round(10 * vScale);
+      ctx.font = `600 ${tagFont}px Inter, system-ui, sans-serif`;
+      const tagStr = isDragging ? `✥ 正在移动: ${labelText}` : `✥ 拖拽移动: ${labelText}`;
+      const tagW = ctx.measureText(tagStr).width + 12 * vScale;
+      const tagH = 18 * vScale;
+      const tagX = boxX + boxW - tagW;
+      const tagY = Math.max(4 * vScale, boxY - tagH - 6 * vScale);
+
+      ctx.fillStyle = '#7c3aed';
+      ctx.beginPath();
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(tagX, tagY, tagW, tagH, 5 * vScale);
+      } else {
+        ctx.rect(tagX, tagY, tagW, tagH);
+      }
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(tagStr, tagX + tagW / 2, tagY + tagH / 2);
+      ctx.restore();
+    }
+
+    function renderEpicycleFrame() {
+      const W = epicycleCanvas.width;
+      const H = epicycleCanvas.height;
+      const minDim = Math.min(W, H);
+      // vScale normalizes all stroke widths and typography against a 540px reference short side
+      const vScale = minDim / 540;
+      const palette = getStageThemePalette();
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      // 1. Background Fill (Adaptive Light / Dark)
+      ctx.fillStyle = palette.bgBase;
+      ctx.fillRect(0, 0, W, H);
+
+      // Subtle radial ambient glow
+      const bgGrad = ctx.createRadialGradient(
+        W * state.zones.anim.x,
+        H * state.zones.anim.y,
+        minDim * 0.05,
+        W * state.zones.anim.x,
+        H * state.zones.anim.y,
+        minDim * 0.72
+      );
+      bgGrad.addColorStop(0, palette.bgGlowInner);
+      bgGrad.addColorStop(1, palette.bgGlowOuter);
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, W, H);
+
+      // Reset zone hit-test bounds before drawing
+      state.zoneBounds.formula = null;
+      state.zoneBounds.text = null;
+
+      if (state.harmonics.length === 0) return;
+
+      const twoPiT = 2 * Math.PI * state.t;
+      const animCenterX = W * state.zones.anim.x;
+      const animCenterY = H * state.zones.anim.y;
+      const animScaleFactor = state.zones.anim.scale;
+
+      let hudCurveX = 0;
+      let hudCurveY = 0;
+
+      if (state.epicycleMode === 'orthogonal') {
+        // ====================================================================
+        // ORTHOGONAL DUAL-EPICYCLE PROJECTION MODE RENDERER
+        // ====================================================================
+        const baseScale = minDim * (state.showVideoHud ? 0.178 : 0.205);
+        const Ox = ORTHO_LAYOUT.drawOffsetX;
+        const Oy = ORTHO_LAYOUT.drawOffsetY;
+        const topOriginX = Ox + state.dcTerm.re;
+        const topOriginY = ORTHO_LAYOUT.topChainCenterY;
+        const leftOriginX = ORTHO_LAYOUT.leftChainCenterX;
+        const leftOriginY = Oy + state.dcTerm.im;
+
+        const activeLimitX = Math.min(state.numCircles, state.harmonicsX.length);
+        const shownLimitX = Math.min(activeLimitX, state.maxShownCircles);
+        const activeLimitY = Math.min(state.numCircles, state.harmonicsY.length);
+        const shownLimitY = Math.min(activeLimitY, state.maxShownCircles);
+
+        // Evaluate Top Epicycle Chain (X-series)
+        let curTopX = topOriginX;
+        let curTopY = topOriginY;
+        const chainTop = new Array(shownLimitX);
+        for (let i = 0; i < activeLimitX; i++) {
+          const hx = state.harmonicsX[i];
+          const angleX = hx.freq * twoPiT + hx.phase;
+          const nextX = curTopX + hx.amp * Math.cos(angleX);
+          const nextY = curTopY + hx.amp * Math.sin(angleX);
+          if (i < shownLimitX) {
+            chainTop[i] = { cx: curTopX, cy: curTopY, nx: nextX, ny: nextY, r: hx.amp };
+          }
+          curTopX = nextX;
+          curTopY = nextY;
+        }
+        const topTipX = curTopX;
+        const topTipY = curTopY;
+
+        // Evaluate Left Epicycle Chain (Y-series)
+        let curLeftX = leftOriginX;
+        let curLeftY = leftOriginY;
+        const chainLeft = new Array(shownLimitY);
+        for (let i = 0; i < activeLimitY; i++) {
+          const hy = state.harmonicsY[i];
+          const angleY = hy.freq * twoPiT + hy.phase;
+          const nextX = curLeftX + hy.amp * Math.cos(angleY);
+          const nextY = curLeftY + hy.amp * Math.sin(angleY);
+          if (i < shownLimitY) {
+            chainLeft[i] = { cx: curLeftX, cy: curLeftY, nx: nextX, ny: nextY, r: hy.amp };
+          }
+          curLeftX = nextX;
+          curLeftY = nextY;
+        }
+        const leftTipX = curLeftX;
+        const leftTipY = curLeftY;
+
+        const penTipX = topTipX;
+        const penTipY = leftTipY;
+
+        hudCurveX = penTipX - Ox;
+        hudCurveY = penTipY - Oy;
+
+        ctx.save();
+        if (state.followTip) {
+          const zoom = state.followZoom;
+          ctx.translate(W * 0.5, H * 0.5);
+          ctx.scale(baseScale * zoom, baseScale * zoom);
+          ctx.translate(-penTipX, -penTipY);
+        } else {
+          ctx.translate(animCenterX, animCenterY);
+          ctx.scale(baseScale * animScaleFactor, baseScale * animScaleFactor);
+        }
+
+        const invScale = 1 / (baseScale * (state.followTip ? state.followZoom : animScaleFactor));
+
+        // Quadrant Framing Guides & Axis Lines (Removed "正交交汇作画区(X,Y)" text as requested)
+        if (state.showProjectionLines) {
+          ctx.save();
+          ctx.strokeStyle = palette.guideFrame;
+          ctx.lineWidth = 1.0 * vScale * invScale;
+          ctx.strokeRect(Ox - 1.12, Oy - 1.12, 2.24, 2.24);
+
+          ctx.strokeStyle = palette.guideAxis;
+          ctx.beginPath();
+          ctx.moveTo(topOriginX, topOriginY - 1.05);
+          ctx.lineTo(topOriginX, topOriginY + 1.05);
+          ctx.moveTo(leftOriginX - 1.05, leftOriginY);
+          ctx.lineTo(leftOriginX + 1.05, leftOriginY);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // Optional Original Contour Ghost Path
+        if (state.showOriginal && state.sampledPoints.length > 1) {
+          ctx.strokeStyle = palette.ghostPath;
+          ctx.lineWidth = 1.3 * vScale * invScale;
+          ctx.beginPath();
+          for (let i = 0; i < state.sampledPoints.length; i++) {
+            const p = state.sampledPoints[i];
+            if (i === 0) ctx.moveTo(Ox + p.x, Oy + p.y);
+            else ctx.lineTo(Ox + p.x, Oy + p.y);
+          }
+          ctx.closePath();
+          ctx.stroke();
+        }
+
+        // Top & Left Epicycle Circles
+        if (state.showCircles) {
+          ctx.lineWidth = 1.15 * vScale * invScale;
+
+          ctx.strokeStyle = palette.orthoCircleX;
+          for (let i = 0; i < shownLimitX; i++) {
+            const c = chainTop[i];
+            ctx.beginPath();
+            ctx.arc(c.cx, c.cy, c.r, 0, 2 * Math.PI);
+            ctx.stroke();
+          }
+
+          ctx.strokeStyle = palette.orthoCircleY;
+          for (let i = 0; i < shownLimitY; i++) {
+            const c = chainLeft[i];
+            ctx.beginPath();
+            ctx.arc(c.cx, c.cy, c.r, 0, 2 * Math.PI);
+            ctx.stroke();
+          }
+        }
+
+        // Rotating Radius Vectors
+        if (state.showRadii) {
+          ctx.lineWidth = 1.2 * vScale * invScale;
+
+          if (shownLimitX > 0) {
+            ctx.strokeStyle = palette.orthoRadiiX;
+            ctx.beginPath();
+            ctx.moveTo(chainTop[0].cx, chainTop[0].cy);
+            for (let i = 0; i < shownLimitX; i++) {
+              ctx.lineTo(chainTop[i].nx, chainTop[i].ny);
+            }
+            if (activeLimitX > shownLimitX) {
+              ctx.lineTo(topTipX, topTipY);
+            }
+            ctx.stroke();
+          }
+
+          if (shownLimitY > 0) {
+            ctx.strokeStyle = palette.orthoRadiiY;
+            ctx.beginPath();
+            ctx.moveTo(chainLeft[0].cx, chainLeft[0].cy);
+            for (let i = 0; i < shownLimitY; i++) {
+              ctx.lineTo(chainLeft[i].nx, chainLeft[i].ny);
+            }
+            if (activeLimitY > shownLimitY) {
+              ctx.lineTo(leftTipX, leftTipY);
+            }
+            ctx.stroke();
+          }
+        }
+
+        // Orthogonal Dashed Projection Lines
+        if (state.showProjectionLines) {
+          ctx.save();
+          const dashLen = 6 * vScale * invScale;
+          const gapLen = 4.5 * vScale * invScale;
+          ctx.setLineDash([dashLen, gapLen]);
+          ctx.lineWidth = 1.65 * vScale * invScale;
+
+          ctx.strokeStyle = palette.projDashX;
+          ctx.beginPath();
+          ctx.moveTo(topTipX, topTipY);
+          ctx.lineTo(penTipX, penTipY);
+          ctx.stroke();
+
+          ctx.strokeStyle = palette.projDashY;
+          ctx.beginPath();
+          ctx.moveTo(leftTipX, leftTipY);
+          ctx.lineTo(penTipX, penTipY);
+          ctx.stroke();
+
+          ctx.restore();
+        }
+
+        // Drawn Pen Trail
+        if (state.trail.length > 1) {
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+
+          ctx.beginPath();
+          for (let i = 0; i < state.trail.length; i++) {
+            const pt = state.trail[i];
+            if (i === 0) ctx.moveTo(Ox + pt.x, Oy + pt.y);
+            else ctx.lineTo(Ox + pt.x, Oy + pt.y);
+          }
+
+          ctx.strokeStyle = palette.trailGlow;
+          ctx.lineWidth = 5.0 * vScale * invScale;
+          ctx.stroke();
+
+          ctx.strokeStyle = palette.trailCore;
+          ctx.lineWidth = 2.4 * vScale * invScale;
+          ctx.stroke();
+        }
+
+        // Adaptive Micro-Dots on Top Tip & Left Tip
+        const orthoCountShrink = 1 / (1 + 0.22 * Math.log2(Math.max(1, state.numCircles)));
+        const lastRx = shownLimitX > 0 ? chainTop[shownLimitX - 1].r : 0;
+        const lastRy = shownLimitY > 0 ? chainLeft[shownLimitY - 1].r : 0;
+
+        const topCoreR = Math.min(
+          1.45 * vScale * invScale * orthoCountShrink,
+          Math.max(0.42 * vScale * invScale, lastRx * 0.42)
+        );
+        const topHaloR = topCoreR * 1.7;
+
+        const leftCoreR = Math.min(
+          1.45 * vScale * invScale * orthoCountShrink,
+          Math.max(0.42 * vScale * invScale, lastRy * 0.42)
+        );
+        const leftHaloR = leftCoreR * 1.7;
+
+        ctx.fillStyle = palette.tipHaloX;
+        ctx.beginPath();
+        ctx.arc(topTipX, topTipY, topHaloR, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.fillStyle = palette.tipCoreX;
+        ctx.beginPath();
+        ctx.arc(topTipX, topTipY, topCoreR, 0, 2 * Math.PI);
+        ctx.fill();
+
+        ctx.fillStyle = palette.tipHaloY;
+        ctx.beginPath();
+        ctx.arc(leftTipX, leftTipY, leftHaloR, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.fillStyle = palette.tipCoreY;
+        ctx.beginPath();
+        ctx.arc(leftTipX, leftTipY, leftCoreR, 0, 2 * Math.PI);
+        ctx.fill();
+
+        // Refined Intersection Pen Tip Dot
+        const penCoreR = 2.0 * vScale * invScale;
+        const penHaloR = 3.8 * vScale * invScale;
+        ctx.fillStyle = palette.penHalo;
+        ctx.beginPath();
+        ctx.arc(penTipX, penTipY, penHaloR, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.fillStyle = palette.penCore;
+        ctx.beginPath();
+        ctx.arc(penTipX, penTipY, penCoreR, 0, 2 * Math.PI);
+        ctx.fill();
+
+        ctx.restore();
+      } else {
+        // ====================================================================
+        // COMPLEX SINGLE-CHAIN EPICYCLE MODE RENDERER
+        // ====================================================================
+        const baseScale = minDim * (state.showVideoHud ? 0.34 : 0.40);
+        const activeLimit = Math.min(state.numCircles, state.harmonics.length);
+        const shownLimit = Math.min(activeLimit, state.maxShownCircles);
+
+        let curX = state.dcTerm.re;
+        let curY = state.dcTerm.im;
+
+        const chainCenters = new Array(shownLimit);
+        for (let i = 0; i < activeLimit; i++) {
+          const h = state.harmonics[i];
+          const angle = h.freq * twoPiT + h.phase;
+          const nextX = curX + h.amp * Math.cos(angle);
+          const nextY = curY + h.amp * Math.sin(angle);
+          if (i < shownLimit) {
+            chainCenters[i] = {
+              cx: curX,
+              cy: curY,
+              nx: nextX,
+              ny: nextY,
+              r: h.amp
+            };
+          }
+          curX = nextX;
+          curY = nextY;
+        }
+
+        const tipX = curX;
+        const tipY = curY;
+        hudCurveX = tipX;
+        hudCurveY = tipY;
+
+        ctx.save();
+        if (state.followTip) {
+          const zoom = state.followZoom;
+          ctx.translate(W * 0.5, H * 0.5);
+          ctx.scale(baseScale * zoom, baseScale * zoom);
+          ctx.translate(-tipX, -tipY);
+        } else {
+          ctx.translate(animCenterX, animCenterY);
+          ctx.scale(baseScale * animScaleFactor, baseScale * animScaleFactor);
+        }
+
+        const invScale = 1 / (baseScale * (state.followTip ? state.followZoom : animScaleFactor));
+
+        // Optional Original Contour Ghost Path
+        if (state.showOriginal && state.sampledPoints.length > 1) {
+          ctx.strokeStyle = palette.ghostPath;
+          ctx.lineWidth = 1.3 * vScale * invScale;
+          ctx.beginPath();
+          for (let i = 0; i < state.sampledPoints.length; i++) {
+            const p = state.sampledPoints[i];
+            if (i === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+          }
+          ctx.closePath();
+          ctx.stroke();
+        }
+
+        // Epicycle Circles
+        if (state.showCircles) {
+          ctx.strokeStyle = palette.complexCircle;
+          ctx.lineWidth = 1.15 * vScale * invScale;
+          for (let i = 0; i < shownLimit; i++) {
+            const c = chainCenters[i];
+            ctx.beginPath();
+            ctx.arc(c.cx, c.cy, c.r, 0, 2 * Math.PI);
+            ctx.stroke();
+          }
+        }
+
+        // Rotating Radius Vectors
+        if (state.showRadii && shownLimit > 0) {
+          ctx.strokeStyle = palette.complexRadii;
+          ctx.lineWidth = 1.2 * vScale * invScale;
+          ctx.beginPath();
+          ctx.moveTo(chainCenters[0].cx, chainCenters[0].cy);
+          for (let i = 0; i < shownLimit; i++) {
+            ctx.lineTo(chainCenters[i].nx, chainCenters[i].ny);
+          }
+          if (activeLimit > shownLimit) {
+            ctx.lineTo(tipX, tipY);
+          }
+          ctx.stroke();
+        }
+
+        // Drawn Pen Trail
+        if (state.trail.length > 1) {
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+
+          ctx.beginPath();
+          for (let i = 0; i < state.trail.length; i++) {
+            const pt = state.trail[i];
+            if (i === 0) ctx.moveTo(pt.x, pt.y);
+            else ctx.lineTo(pt.x, pt.y);
+          }
+
+          ctx.strokeStyle = palette.trailGlow;
+          ctx.lineWidth = 5.0 * vScale * invScale;
+          ctx.stroke();
+
+          ctx.strokeStyle = palette.trailCore;
+          ctx.lineWidth = 2.4 * vScale * invScale;
+          ctx.stroke();
+        }
+
+        // Adaptive Glowing Pen Tip Dot
+        const complexCountShrink = 1 / (1 + 0.20 * Math.log2(Math.max(1, state.numCircles)));
+        const lastComplexR = shownLimit > 0 ? chainCenters[shownLimit - 1].r : 0;
+        const tipCoreR = Math.min(
+          1.75 * vScale * invScale * complexCountShrink,
+          Math.max(0.50 * vScale * invScale, lastComplexR * 0.45)
+        );
+        const tipHaloR = tipCoreR * 1.75;
+
+        ctx.fillStyle = palette.penHalo;
+        ctx.beginPath();
+        ctx.arc(tipX, tipY, tipHaloR, 0, 2 * Math.PI);
+        ctx.fill();
+
+        ctx.fillStyle = palette.penCore;
+        ctx.beginPath();
+        ctx.arc(tipX, tipY, tipCoreR, 0, 2 * Math.PI);
+        ctx.fill();
+
+        ctx.restore();
+      }
+
+      // ====================================================================
+      // MOVABLE HUD ZONES: MERGED 5-LINE FORMULA ZONE & TEXT CAPTION ZONE
+      // ====================================================================
+      if (state.showVideoHud) {
+        const { rmsErrorPercent } = computeErrorMetrics(state.numCircles);
+        const isOrtho = state.epicycleMode === 'orthogonal';
+
+        // --- ZONE A: Merged 5-Line Formula Zone ---
+        // Line 1: 实时笔尖
+        // Line 2: X(t)的通项公式
+        // Line 3: X(t)的实际公式
+        // Line 4: Y(t)的通项公式
+        // Line 5: Y(t)的实际公式
+        if (state.zones.formula.visible !== false) {
+          const fZone = state.zones.formula;
+          const fScale = fZone.scale * vScale;
+
+          const line1 = `实时笔尖 (${hudCurveX.toFixed(2)}, ${(-hudCurveY).toFixed(2)})`;
+          const line2 = state.generalFormulaX;
+          const line3 = state.expansionFormulaX;
+          const line4 = state.generalFormulaY;
+          const line5 = state.expansionFormulaY;
+          const allLines = [line1, line2, line3, line4, line5];
+
+          ctx.save();
+          let formulaFontPx = Math.round(11.8 * fScale);
+          ctx.font = `500 ${formulaFontPx}px "JetBrains Mono", monospace`;
+
+          let maxLineWidth = 0;
+          for (let i = 0; i < allLines.length; i++) {
+            const w = ctx.measureText(allLines[i]).width;
+            if (w > maxLineWidth) maxLineWidth = w;
+          }
+
+          const maxAllowedW = W * 0.90;
+          if (maxLineWidth > maxAllowedW && maxLineWidth > 0) {
+            formulaFontPx = Math.max(Math.round(7.5 * vScale), Math.floor(formulaFontPx * (maxAllowedW / maxLineWidth)));
+            ctx.font = `500 ${formulaFontPx}px "JetBrains Mono", monospace`;
+            maxLineWidth = 0;
+            for (let i = 0; i < allLines.length; i++) {
+              const w = ctx.measureText(allLines[i]).width;
+              if (w > maxLineWidth) maxLineWidth = w;
+            }
+          }
+
+          const boxPadX = 16 * fScale;
+          const boxPadY = 12 * fScale;
+          const lineGap = Math.round(formulaFontPx * 1.48);
+          const contentW = Math.min(W * 0.94, maxLineWidth + boxPadX * 2);
+          const boxH = boxPadY * 2 + lineGap * 4 + formulaFontPx;
+          const boxX = W * fZone.x - contentW / 2;
+          const boxY = H * fZone.y - boxH / 2;
+
+          state.zoneBounds.formula = { x: boxX, y: boxY, w: contentW, h: boxH };
+
+          ctx.fillStyle = palette.hudBg;
+          ctx.strokeStyle = isOrtho ? palette.hudBorderOrtho : palette.hudBorderComplex;
+          ctx.lineWidth = 1.2 * vScale;
+          ctx.beginPath();
+          if (typeof ctx.roundRect === 'function') {
+            ctx.roundRect(boxX, boxY, contentW, boxH, 12 * fScale);
+          } else {
+            ctx.rect(boxX, boxY, contentW, boxH);
+          }
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          const firstRowY = boxY + boxPadY + formulaFontPx * 0.5;
+
+          // Row 1: 实时笔尖
+          ctx.fillStyle = palette.hudHeader;
+          ctx.font = `600 ${Math.max(Math.round(9.5 * fScale), formulaFontPx)}px Inter, "JetBrains Mono", sans-serif`;
+          ctx.fillText(line1, W * fZone.x, firstRowY);
+
+          // Row 2: X(t)的通项公式
+          ctx.fillStyle = palette.hudGeneralX;
+          ctx.font = `600 ${formulaFontPx}px "JetBrains Mono", monospace`;
+          ctx.fillText(line2, W * fZone.x, firstRowY + lineGap);
+
+          // Row 3: X(t)的实际公式
+          ctx.fillStyle = palette.hudFormulaX;
+          ctx.font = `500 ${formulaFontPx}px "JetBrains Mono", monospace`;
+          ctx.fillText(line3, W * fZone.x, firstRowY + lineGap * 2);
+
+          // Row 4: Y(t)的通项公式
+          ctx.fillStyle = isOrtho ? palette.hudGeneralYOrtho : palette.hudGeneralYComplex;
+          ctx.font = `600 ${formulaFontPx}px "JetBrains Mono", monospace`;
+          ctx.fillText(line4, W * fZone.x, firstRowY + lineGap * 3);
+
+          // Row 5: Y(t)的实际公式
+          ctx.fillStyle = isOrtho ? palette.hudFormulaYOrtho : palette.hudFormulaYComplex;
+          ctx.font = `500 ${formulaFontPx}px "JetBrains Mono", monospace`;
+          ctx.fillText(line5, W * fZone.x, firstRowY + lineGap * 4);
+
+          ctx.restore();
+
+          drawZoneHoverHighlight('formula', boxX, boxY, contentW, boxH, vScale, '公式区');
+        }
+
+        // --- ZONE B: Movable Text Caption & Error Readout Zone ---
+        if (state.zones.text.visible !== false) {
+          const tZone = state.zones.text;
+          const tScale = tZone.scale * vScale;
+          const centerX = W * tZone.x;
+          const centerY = H * tZone.y;
+
+          ctx.save();
+          ctx.textAlign = 'center';
+
+          const mainText = isOrtho
+            ? `正交圆周 : ${state.numCircles} × 2 组`
+            : `本轮数量 : ${state.numCircles}`;
+          const rmsText = `相对 RMS 误差 : ${rmsErrorPercent.toFixed(4)}%`;
+
+          const fontTitle = Math.round(25 * tScale);
+          const fontSub = Math.round(16 * tScale);
+
+          const y1 = centerY - 10 * tScale;
+          const y2 = centerY + 20 * tScale;
+
+          ctx.fillStyle = palette.textTitle;
+          ctx.font = `600 ${fontTitle}px Inter, system-ui, sans-serif`;
+          const w1 = ctx.measureText(mainText).width;
+          ctx.fillText(mainText, centerX, y1);
+
+          ctx.fillStyle = palette.textSubtitle;
+          ctx.font = `500 ${fontSub}px "JetBrains Mono", Inter, sans-serif`;
+          const w2 = ctx.measureText(rmsText).width;
+          ctx.fillText(rmsText, centerX, y2);
+
+          const textW = Math.max(w1, w2) + 28 * tScale;
+          const textH = 62 * tScale;
+          const textBoxX = centerX - textW / 2;
+          const textBoxY = centerY - 36 * tScale;
+
+          state.zoneBounds.text = { x: textBoxX, y: textBoxY, w: textW, h: textH };
+          ctx.restore();
+
+          drawZoneHoverHighlight('text', textBoxX, textBoxY, textW, textH, vScale, '文字说明区');
+        }
+      }
+    }
+
+    // Returns the active progression sequence [1, 2, 4, 8, 16, 32, 128, 1024] clamped to available harmonics
     function getValidAutoSteps() {
-      const maxTerms = Math.max(1, state.harmonics.length);
+      const maxTerms = getMaxSelectableCircles();
       const valid = VIDEO_AUTO_STEPS.filter(n => n <= maxTerms);
       return valid.length > 0 ? valid : [maxTerms];
     }
@@ -2305,11 +3325,11 @@
         const steps = getValidAutoSteps();
         dot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-ping';
         status.textContent = `${state.autoStepIndex + 1}/${steps.length} · N=${steps[state.autoStepIndex] || state.numCircles}`;
-        status.className = 'font-mono text-[11px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300';
+        status.className = 'font-mono text-[11px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-300';
       } else {
         dot.className = 'w-2 h-2 rounded-full bg-slate-400';
         status.textContent = 'OFF';
-        status.className = 'font-mono text-[11px] px-1.5 py-0.5 rounded bg-slate-900/40';
+        status.className = 'font-mono text-[11px] px-1.5 py-0.5 rounded bg-slate-200/70 dark:bg-slate-900/40 text-slate-600 dark:text-slate-300';
       }
     }
 
@@ -2320,19 +3340,15 @@
       lastFrameTime = now;
 
       if (state.isPlaying) {
-        // If holding at end of cycle before next step
         if (state.pauseHoldTimer > 0) {
           state.pauseHoldTimer -= dt;
           if (state.pauseHoldTimer <= 0) {
             if (state.isRecording && state.recordMode === 'cycle') {
-              // Single cycle recording finished
               stopAnimationRecording();
               resetAnimationCycle();
             } else if (state.isRecording && state.recordMode === 'autostep') {
-              // Full 1 -> 1024 progression recording mode
               const validSteps = getValidAutoSteps();
               if (state.autoStepIndex >= validSteps.length - 1) {
-                // Finished the final step (1024)! Stop recording & download automatically
                 stopAnimationRecording();
                 setAutoStepUI(false);
                 resetAnimationCycle();
@@ -2346,12 +3362,10 @@
             }
           }
         } else {
-          // Base cycle duration: ~3.2 seconds at 1.0x speed (matches video rhythm)
           const cycleDuration = 3.2 / state.speed;
           const prevT = state.t;
           const nextT = Math.min(1.0, prevT + dt / cycleDuration);
 
-          // Sub-step trail interpolation so high-frequency details never look jagged
           const subSteps = Math.max(4, Math.ceil((nextT - prevT) * state.sampleCount));
           for (let s = 1; s <= subSteps; s++) {
             const interpT = prevT + ((nextT - prevT) * s) / subSteps;
@@ -2383,9 +3397,8 @@
           }
 
           if (state.t >= 1.0) {
-            // Close the loop seamlessly
             state.trail.push(evaluateFourierAtTime(0, state.numCircles));
-            state.pauseHoldTimer = 0.55; // Brief pause at completed shape like the video
+            state.pauseHoldTimer = 0.55;
             playCycleChime(Math.min(1, Math.log2(state.numCircles + 1) / 11));
           }
         }
@@ -2406,17 +3419,17 @@
     }
 
     function setCircleCount(newN) {
-      const maxTerms = Math.max(1, state.harmonics.length);
+      const maxTerms = getMaxSelectableCircles();
       const clamped = Math.max(1, Math.min(maxTerms, Math.round(newN)));
       state.numCircles = clamped;
       document.getElementById('slider-circles').value = clamped;
       document.getElementById('input-circles').value = clamped;
+      updateCircleQuickButtonsUI();
       resetAnimationCycle();
       updateReadoutUI();
       drawSpectrumChart();
     }
 
-    // Ensure sampleCount is at least 2048 so N=1024 harmonics are available for 1->1024 progression
     function ensureSampleCountFor1024() {
       if (state.sampleCount < 2048) {
         state.sampleCount = 2048;
@@ -2433,11 +3446,100 @@
     }
 
     // ============================================================================
-    // 6. EVENT LISTENERS & UI BINDINGS
+    // 7. EVENT LISTENERS & UI BINDINGS
     // ============================================================================
     function setStatusMessage(msg) {
       document.getElementById('status-text').textContent = msg;
     }
+
+    // Mode Switcher Buttons
+    document.getElementById('btn-mode-complex').addEventListener('click', () => {
+      setEpicycleMode('complex');
+    });
+    document.getElementById('btn-mode-orthogonal').addEventListener('click', () => {
+      setEpicycleMode('orthogonal');
+    });
+    document.getElementById('btn-stage-mode-toggle').addEventListener('click', () => {
+      setEpicycleMode(state.epicycleMode === 'complex' ? 'orthogonal' : 'complex');
+    });
+
+    // Aspect Ratio Preset Buttons & Custom Ratio Input
+    document.querySelectorAll('.ratio-preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const rKey = btn.getAttribute('data-ratio');
+        setAspectRatioPreset(rKey);
+        setStatusMessage(`📐 已切换动画画布长宽比为 ${state.aspectW}:${state.aspectH} (${state.videoWidth}×${state.videoHeight})`);
+      });
+    });
+
+    document.getElementById('btn-apply-custom-ratio').addEventListener('click', () => {
+      const cw = parseFloat(document.getElementById('input-ratio-w').value) || 9;
+      const ch = parseFloat(document.getElementById('input-ratio-h').value) || 16;
+      setAspectRatioPreset('custom', cw, ch);
+      setStatusMessage(`📐 已应用自定义长宽比 ${state.aspectW}:${state.aspectH} (${state.videoWidth}×${state.videoHeight})`);
+    });
+
+    // Zone Layout Studio Tabs & Sliders
+    document.querySelectorAll('.zone-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.activeZoneTab = btn.getAttribute('data-zone-tab');
+        syncZoneSlidersFromState();
+      });
+    });
+
+    document.getElementById('chk-canvas-drag-zones').addEventListener('change', (e) => {
+      state.allowDirectZoneDrag = e.target.checked;
+      document.getElementById('layout-active-badge').textContent = state.allowDirectZoneDrag
+        ? '画布可直接拖拽三区'
+        : '仅使用滑块移动';
+    });
+
+    document.getElementById('slider-zone-x').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value) / 100;
+      const z = state.zones[state.activeZoneTab];
+      if (z) {
+        z.x = val;
+        document.getElementById('label-zone-x').textContent = `${(val * 100).toFixed(1)}%`;
+      }
+    });
+
+    document.getElementById('slider-zone-y').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value) / 100;
+      const z = state.zones[state.activeZoneTab];
+      if (z) {
+        z.y = val;
+        document.getElementById('label-zone-y').textContent = `${(val * 100).toFixed(1)}%`;
+      }
+    });
+
+    document.getElementById('slider-zone-scale').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value) / 100;
+      const z = state.zones[state.activeZoneTab];
+      if (z) {
+        z.scale = val;
+        document.getElementById('label-zone-scale').textContent = `${Math.round(val * 100)}%`;
+      }
+    });
+
+    document.getElementById('chk-zone-visible').addEventListener('change', (e) => {
+      const z = state.zones[state.activeZoneTab];
+      if (z && state.activeZoneTab !== 'anim') {
+        z.visible = e.target.checked;
+      }
+    });
+
+    document.querySelectorAll('.layout-preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const preset = btn.getAttribute('data-layout-preset');
+        applyLayoutPreset(preset);
+        setStatusMessage(`✨ 已应用排版模板: ${btn.textContent}`);
+      });
+    });
+
+    document.getElementById('btn-reset-zone-layout').addEventListener('click', () => {
+      applyLayoutPreset('standard');
+      setStatusMessage('↺ 已复位公式区、动画区、文字说明区位置与大小');
+    });
 
     // Presets Bar
     document.querySelectorAll('.preset-btn').forEach(btn => {
@@ -2453,24 +3555,21 @@
         document.getElementById('svg-info-card').classList.add('hidden');
         const pts = generatePresetPoints(key, state.sampleCount);
         rebuildCurrentContourAndFFT(pts, false);
-        setStatusMessage(`已加载预设: ${state.shapeName} (${state.sampleCount} 采样点)`);
+        setStatusMessage(`已加载预设: ${state.shapeName} (${state.sampleCount} 采样点 · ${state.aspectW}:${state.aspectH} ${state.videoWidth}×${state.videoHeight})`);
       });
     });
 
-    // Robust File Reader with UTF-8 and GBK fallback (for Chinese map SVGs)
+    // File Reader for SVG
     async function readSvgFileAsText(file) {
       if (typeof file.arrayBuffer === 'function') {
         const buffer = await file.arrayBuffer();
         const utf8Decoder = new TextDecoder('utf-8', { fatal: false });
         let text = utf8Decoder.decode(buffer);
-        // If replacement character U+FFFD appears, try GBK/GB18030 decoding
         if (text.includes('\uFFFD')) {
           try {
             const gbkDecoder = new TextDecoder('gbk', { fatal: false });
             text = gbkDecoder.decode(buffer);
-          } catch (e) {
-            // Keep UTF-8 decoded text if GBK is unsupported
-          }
+          } catch (e) {}
         }
         return text;
       }
@@ -2482,7 +3581,6 @@
       });
     }
 
-    // SVG File Upload & Unlimited Size Drag-and-Drop
     async function handleSVGFileLoad(file) {
       if (!file) return;
       const overlay = document.getElementById('svg-loading-overlay');
@@ -2499,7 +3597,6 @@
       loadTitle.textContent = `正在读取 ${file.name} (${sizeStr})...`;
       loadSub.textContent = '无文件大小限制 · 正在解析 SVG 几何路径与变换矩阵';
 
-      // Yield to browser UI thread so loading spinner renders smoothly for 5MB+ files
       await new Promise(r => setTimeout(r, 25));
 
       try {
@@ -2519,7 +3616,6 @@
       try {
         result = extractSubpathsFromSVGString(svgText, fileName, sizeStr);
       } catch (vectorErr) {
-        // Fallback: if the SVG wraps an embedded raster <image>, trace its silhouette
         if (/<image[\s>]/i.test(svgText)) {
           result = await extractContourFromRasterSVG(svgText, fileName, sizeStr);
         } else {
@@ -2537,12 +3633,6 @@
         throw new Error('路径重采样为空，请检查 SVG 是否包含有效坐标。');
       }
 
-      // Reset camera pan/zoom so newly imported SVG is centered in viewport
-      state.camZoom = 1.0;
-      state.camPanX = 0;
-      state.camPanY = 0;
-
-      // Show SVG Diagnostics Card
       const infoCard = document.getElementById('svg-info-card');
       infoCard.classList.remove('hidden');
       infoCard.classList.add('flex');
@@ -2554,7 +3644,6 @@
       setStatusMessage(`✅ 成功导入 SVG: ${fileName} (${result.subpaths.length} 子路径, ${state.sampleCount} 采样点)`);
     }
 
-    // Bind Dropzone Click & Keyboard Enter/Space to trigger hidden file input reliably
     const svgFileInput = document.getElementById('svg-file-input');
     const svgDropzone = document.getElementById('svg-dropzone');
 
@@ -2580,7 +3669,6 @@
       e.target.value = '';
     });
 
-    // Re-stitch immediately when user changes strategy on already imported SVG
     document.getElementById('svg-path-strategy').addEventListener('change', (e) => {
       if (state.lastSvgMeta && state.lastSvgMeta.subpaths) {
         const pts = stitchAndResampleSubpaths(state.lastSvgMeta.subpaths, state.sampleCount, e.target.value);
@@ -2588,7 +3676,6 @@
       }
     });
 
-    // Global Drag & Drop SVG onto dropzone or canvas
     ['dragenter', 'dragover'].forEach(evtName => {
       window.addEventListener(evtName, (e) => {
         e.preventDefault();
@@ -2613,7 +3700,6 @@
       }
     });
 
-    // Raw SVG Paste Box
     document.getElementById('btn-toggle-svg-paste').addEventListener('click', () => {
       const box = document.getElementById('svg-paste-box');
       box.classList.toggle('hidden');
@@ -2630,79 +3716,141 @@
       }
     });
 
-    // Canvas Pointer Interactions (Pan & Zoom)
-    const canvasWrapper = document.getElementById('canvas-wrapper');
-
-    function getPointerPos(e) {
+    // ============================================================================
+    // DIRECT ON-CANVAS MULTI-ZONE HIT-TESTING & DRAGGING (Formula, Text, Animation)
+    // ============================================================================
+    function getPointerCanvasPixels(e) {
       const rect = epicycleCanvas.getBoundingClientRect();
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const pxX = ((clientX - rect.left) / Math.max(1, rect.width)) * epicycleCanvas.width;
+      const pxY = ((clientY - rect.top) / Math.max(1, rect.height)) * epicycleCanvas.height;
       return {
-        x: clientX - rect.left,
-        y: clientY - rect.top
+        pxX,
+        pxY,
+        normX: pxX / Math.max(1, epicycleCanvas.width),
+        normY: pxY / Math.max(1, epicycleCanvas.height)
       };
     }
 
+    function hitTestZoneAtCanvasPx(pxX, pxY) {
+      if (!state.allowDirectZoneDrag) return 'anim';
+      const order = ['formula', 'text'];
+      for (let i = 0; i < order.length; i++) {
+        const key = order[i];
+        const b = state.zoneBounds[key];
+        if (b && pxX >= b.x && pxX <= b.x + b.w && pxY >= b.y && pxY <= b.y + b.h) {
+          return key;
+        }
+      }
+      return 'anim';
+    }
+
     canvasWrapper.addEventListener('mousedown', (e) => {
-      const pos = getPointerPos(e);
-      state.isDraggingCanvas = true;
-      state.dragStartX = pos.x - state.camPanX;
-      state.dragStartY = pos.y - state.camPanY;
+      const pos = getPointerCanvasPixels(e);
+      const hitZone = hitTestZoneAtCanvasPx(pos.pxX, pos.pxY);
+      state.draggingZone = hitZone;
+      state.activeZoneTab = hitZone;
+      const targetZone = state.zones[hitZone];
+      state.dragOffsetNormX = pos.normX - targetZone.x;
+      state.dragOffsetNormY = pos.normY - targetZone.y;
+      syncZoneSlidersFromState();
     });
 
     window.addEventListener('mousemove', (e) => {
-      if (state.isDraggingCanvas) {
-        const pos = getPointerPos(e);
-        state.camPanX = pos.x - state.dragStartX;
-        state.camPanY = pos.y - state.dragStartY;
+      if (state.draggingZone) {
+        const pos = getPointerCanvasPixels(e);
+        const targetZone = state.zones[state.draggingZone];
+        if (targetZone) {
+          targetZone.x = Math.max(0.04, Math.min(0.96, pos.normX - state.dragOffsetNormX));
+          targetZone.y = Math.max(0.04, Math.min(0.96, pos.normY - state.dragOffsetNormY));
+          syncZoneSlidersFromState();
+        }
+        return;
+      }
+
+      // Hover detection when inside canvasWrapper
+      const rect = epicycleCanvas.getBoundingClientRect();
+      if (
+        e.clientX >= rect.left &&
+        e.clientX <= rect.right &&
+        e.clientY >= rect.top &&
+        e.clientY <= rect.bottom
+      ) {
+        const pos = getPointerCanvasPixels(e);
+        const hit = hitTestZoneAtCanvasPx(pos.pxX, pos.pxY);
+        state.hoveredZone = hit === 'anim' ? null : hit;
+        canvasWrapper.style.cursor = state.hoveredZone ? 'move' : 'grab';
+      } else {
+        state.hoveredZone = null;
       }
     });
 
     window.addEventListener('mouseup', () => {
-      state.isDraggingCanvas = false;
+      state.draggingZone = null;
     });
 
-    // Touch support for mobile panning
+    canvasWrapper.addEventListener('mouseleave', () => {
+      if (!state.draggingZone) {
+        state.hoveredZone = null;
+      }
+    });
+
     canvasWrapper.addEventListener('touchstart', (e) => {
       if (e.touches.length === 1) {
-        const pos = getPointerPos(e);
-        state.isDraggingCanvas = true;
-        state.dragStartX = pos.x - state.camPanX;
-        state.dragStartY = pos.y - state.camPanY;
+        const pos = getPointerCanvasPixels(e);
+        const hitZone = hitTestZoneAtCanvasPx(pos.pxX, pos.pxY);
+        state.draggingZone = hitZone;
+        state.activeZoneTab = hitZone;
+        const targetZone = state.zones[hitZone];
+        state.dragOffsetNormX = pos.normX - targetZone.x;
+        state.dragOffsetNormY = pos.normY - targetZone.y;
+        syncZoneSlidersFromState();
       }
     }, { passive: true });
 
     canvasWrapper.addEventListener('touchmove', (e) => {
-      if (state.isDraggingCanvas && e.touches.length === 1) {
-        const pos = getPointerPos(e);
-        state.camPanX = pos.x - state.dragStartX;
-        state.camPanY = pos.y - state.dragStartY;
+      if (state.draggingZone && e.touches.length === 1) {
+        const pos = getPointerCanvasPixels(e);
+        const targetZone = state.zones[state.draggingZone];
+        if (targetZone) {
+          targetZone.x = Math.max(0.04, Math.min(0.96, pos.normX - state.dragOffsetNormX));
+          targetZone.y = Math.max(0.04, Math.min(0.96, pos.normY - state.dragOffsetNormY));
+          syncZoneSlidersFromState();
+        }
       }
     }, { passive: true });
 
     canvasWrapper.addEventListener('touchend', () => {
-      state.isDraggingCanvas = false;
+      state.draggingZone = null;
+      state.hoveredZone = null;
     });
 
-    // Mouse Wheel Zoom on Canvas
     canvasWrapper.addEventListener('wheel', (e) => {
       e.preventDefault();
-      const factor = e.deltaY < 0 ? 1.12 : 0.89;
-      state.camZoom = Math.max(0.25, Math.min(20, state.camZoom * factor));
+      const factor = e.deltaY < 0 ? 1.10 : 0.91;
+      const targetKey = state.hoveredZone || 'anim';
+      state.activeZoneTab = targetKey;
+      const targetZone = state.zones[targetKey];
+      if (targetZone) {
+        targetZone.scale = Math.max(0.25, Math.min(15, targetZone.scale * factor));
+        syncZoneSlidersFromState();
+      }
     }, { passive: false });
 
     document.getElementById('btn-zoom-in').addEventListener('click', () => {
-      state.camZoom = Math.min(20, state.camZoom * 1.25);
+      state.zones.anim.scale = Math.min(15, state.zones.anim.scale * 1.2);
+      if (state.activeZoneTab === 'anim') syncZoneSlidersFromState();
     });
     document.getElementById('btn-zoom-out').addEventListener('click', () => {
-      state.camZoom = Math.max(0.25, state.camZoom / 1.25);
+      state.zones.anim.scale = Math.max(0.25, state.zones.anim.scale / 1.2);
+      if (state.activeZoneTab === 'anim') syncZoneSlidersFromState();
     });
     document.getElementById('btn-reset-view').addEventListener('click', () => {
-      state.camZoom = 1.0;
-      state.camPanX = 0;
-      state.camPanY = 0;
+      applyLayoutPreset('standard');
       state.followTip = false;
       document.getElementById('chk-follow-tip').checked = false;
+      setStatusMessage('↺ 已重置视角与三区位置');
     });
 
     // Harmonics (Circles) Slider & Numeric Input
@@ -2719,9 +3867,13 @@
         const setVal = btn.getAttribute('data-circle-set');
         const stepVal = btn.getAttribute('data-circle-step');
         if (setVal === 'max') {
-          setCircleCount(state.harmonics.length);
+          setCircleCount(getMaxSelectableCircles());
         } else if (setVal) {
-          setCircleCount(parseInt(setVal, 10));
+          const targetN = parseInt(setVal, 10);
+          if (targetN >= 1024 || targetN > getMaxSelectableCircles()) {
+            ensureSampleCountFor1024();
+          }
+          setCircleCount(targetN);
         } else if (stepVal) {
           setCircleCount(state.numCircles + parseInt(stepVal, 10));
         }
@@ -2748,6 +3900,14 @@
       updateReadoutUI();
     });
 
+    // Video Quality Tier Selector (1080P / 2K / 4K)
+    document.getElementById('select-video-res').addEventListener('change', (e) => {
+      state.qualityTier = parseInt(e.target.value, 10) || 1080;
+      computeAndApplyAspectRatioResolution();
+      renderEpicycleFrame();
+      setStatusMessage(`📐 已切换超清画布分辨率: ${state.aspectW}:${state.aspectH} (${state.videoWidth}×${state.videoHeight})`);
+    });
+
     // Playback Controls
     document.getElementById('btn-play-pause').addEventListener('click', () => {
       state.isPlaying = !state.isPlaying;
@@ -2759,7 +3919,7 @@
       resetAnimationCycle();
     });
 
-    // Video Auto-Step 1 -> 1024 Mode Toggle
+    // Video Auto-Step 1 -> 1024 Mode Toggle (1, 2, 4, 8, 16, 32, 128, 1024)
     document.getElementById('btn-autostep').addEventListener('click', () => {
       if (!state.autoStepEnabled) {
         ensureSampleCountFor1024();
@@ -2777,7 +3937,6 @@
       }
     });
 
-    // Update record button label when user switches record mode dropdown
     document.getElementById('select-record-mode').addEventListener('change', (e) => {
       state.recordMode = e.target.value;
       if (!state.isRecording) {
@@ -2804,6 +3963,9 @@
     document.getElementById('chk-video-hud').addEventListener('change', (e) => {
       state.showVideoHud = e.target.checked;
     });
+    document.getElementById('chk-show-projection').addEventListener('change', (e) => {
+      state.showProjectionLines = e.target.checked;
+    });
     document.getElementById('chk-follow-tip').addEventListener('change', (e) => {
       state.followTip = e.target.checked;
     });
@@ -2826,20 +3988,29 @@
       if (state.soundEnabled) playCycleChime(0.5);
     });
 
-    // Export PNG Snapshot
+    // Export Ultra-HD PNG Snapshot
     document.getElementById('btn-export-png').addEventListener('click', () => {
+      const prevHover = state.hoveredZone;
+      state.hoveredZone = null;
+      renderEpicycleFrame();
+      state.hoveredZone = prevHover;
+
       const link = document.createElement('a');
-      link.download = `fourier-${state.shapeName.toLowerCase()}-${state.numCircles}-circles.png`;
+      const modePrefix = state.epicycleMode === 'orthogonal' ? 'ortho' : 'complex';
+      const themeTag = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+      link.download = `fourier-${state.aspectW}x${state.aspectH}-${themeTag}-${modePrefix}-${state.videoWidth}x${state.videoHeight}-${state.shapeName.toLowerCase()}-${state.numCircles}circles.png`;
       link.href = epicycleCanvas.toDataURL('image/png');
       link.click();
+      setStatusMessage(`📷 已导出超清 PNG (${state.videoWidth}×${state.videoHeight} · ${themeTag === 'dark' ? '暗色主题' : '亮色主题'})`);
     });
 
     // ============================================================================
-    // VIDEO ANIMATION RECORDER & DOWNLOADER (60 FPS Canvas MediaRecorder)
-    // Supports full 1 -> 1024 progression auto-recording!
+    // ULTRA-HD VIDEO ANIMATION RECORDER (60 FPS + 1->2->4->8->16->32->128->1024)
     // ============================================================================
     function detectSupportedVideoMime() {
       const candidates = [
+        { mime: 'video/mp4;codecs="avc1.640033"', ext: 'mp4' },
+        { mime: 'video/mp4;codecs="avc1.64002a"', ext: 'mp4' },
         { mime: 'video/mp4;codecs=avc1', ext: 'mp4' },
         { mime: 'video/mp4', ext: 'mp4' },
         { mime: 'video/webm;codecs=vp9', ext: 'webm' },
@@ -2863,16 +4034,19 @@
       const iconHeader = document.getElementById('header-record-icon');
       const lblHeader = document.getElementById('header-record-label');
       const modeVal = document.getElementById('select-record-mode').value || 'autostep';
+      const resSelect = document.getElementById('select-video-res');
+
+      if (resSelect) resSelect.disabled = recording;
 
       if (recording) {
         btnMain.className = 'w-full py-2.5 px-3 rounded-lg bg-rose-500 hover:bg-rose-600 text-white font-semibold text-xs transition flex items-center justify-center gap-2 shadow-sm shadow-rose-500/30';
         dotMain.className = 'w-2 h-2 rounded-full bg-white animate-ping';
         if (modeVal === 'autostep') {
-          txtMain.textContent = '正在录制 1→1024 递增全过程... 点击可提前保存';
+          txtMain.textContent = '正在录制 1→2→4→8→16→32→128→1024 全过程... 点击可提前保存';
         } else if (modeVal === 'cycle') {
           txtMain.textContent = '正在录制单周期动画 (0%)... 点击可提前保存';
         } else {
-          txtMain.textContent = '正在自由录制中... 点击停止并下载视频';
+          txtMain.textContent = '正在超清录制中... 点击停止并下载视频';
         }
 
         btnHeader.className = 'px-2.5 py-1.5 rounded-lg text-xs font-medium border border-rose-500/60 bg-rose-500/20 text-rose-500 dark:text-rose-300 hover:bg-rose-500/30 flex items-center gap-1.5 transition';
@@ -2882,16 +4056,16 @@
         btnMain.className = 'w-full py-2.5 px-3 rounded-lg bg-gradient-to-r from-emerald-500 to-sky-500 hover:from-emerald-600 hover:to-sky-600 text-white font-semibold text-xs transition flex items-center justify-center gap-2 shadow-sm shadow-sky-500/20';
         dotMain.className = 'w-2 h-2 rounded-full bg-white';
         if (modeVal === 'autostep') {
-          txtMain.textContent = '一键录制并下载 1→1024 全过程动画';
+          txtMain.textContent = '一键录制 1→1024 全过程超清视频';
         } else if (modeVal === 'cycle') {
-          txtMain.textContent = '录制并下载当前本轮单周期动画';
+          txtMain.textContent = '录制并下载当前本轮单周期视频';
         } else {
-          txtMain.textContent = '开始手动录制动画 (60 FPS)';
+          txtMain.textContent = '开始手动录制超清动画 (60 FPS)';
         }
 
         btnHeader.className = 'px-2.5 py-1.5 rounded-lg text-xs font-medium border border-sky-500/40 bg-sky-500/15 text-sky-600 dark:text-sky-300 hover:bg-sky-500/25 flex items-center gap-1.5 transition';
         iconHeader.textContent = '🎥';
-        lblHeader.textContent = '下载绘图动画';
+        lblHeader.textContent = '下载超清视频';
       }
     }
 
@@ -2904,12 +4078,14 @@
         return;
       }
 
+      state.qualityTier = parseInt(document.getElementById('select-video-res').value, 10) || 1080;
+      computeAndApplyAspectRatioResolution();
+
       state.recordMode = document.getElementById('select-record-mode').value || 'autostep';
       state.recordedChunks = [];
       state.recordMimeType = formatInfo.mime;
       state.recordFileExt = formatInfo.ext;
 
-      // Setup initial state based on selected recording mode
       if (state.recordMode === 'autostep') {
         ensureSampleCountFor1024();
         state.autoStepIndex = 0;
@@ -2926,19 +4102,23 @@
         document.getElementById('play-label').textContent = '暂停动画 (Pause)';
       }
 
-      // Render one immediate frame so stream starts with clean visuals
+      state.hoveredZone = null;
       renderEpicycleFrame();
 
       const stream = epicycleCanvas.captureStream(60);
-      const options = { videoBitsPerSecond: 8000000 };
+      const options = { videoBitsPerSecond: state.videoBitrate };
       if (state.recordMimeType) {
         options.mimeType = state.recordMimeType;
       }
 
       try {
         state.mediaRecorder = new MediaRecorder(stream, options);
-      } catch (e) {
-        state.mediaRecorder = new MediaRecorder(stream);
+      } catch (errHighProfile) {
+        try {
+          state.mediaRecorder = new MediaRecorder(stream, { videoBitsPerSecond: 25000000 });
+        } catch (errFallback) {
+          state.mediaRecorder = new MediaRecorder(stream);
+        }
       }
 
       state.mediaRecorder.ondataavailable = (e) => {
@@ -2953,34 +4133,37 @@
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         const safeName = (state.shapeName || 'shape').toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5_-]+/gi, '-');
+        const modeTag = state.epicycleMode === 'orthogonal' ? 'ortho' : 'complex';
+        const themeTag = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
         const suffix = state.recordMode === 'autostep'
           ? '1-to-1024-progression'
           : `${state.numCircles}circles`;
-        link.download = `fourier-${safeName}-${suffix}.${state.recordFileExt}`;
+        link.download = `fourier-${state.aspectW}x${state.aspectH}-${themeTag}-${modeTag}-${state.videoWidth}x${state.videoHeight}-${safeName}-${suffix}.${state.recordFileExt}`;
         link.href = url;
         link.click();
         setTimeout(() => URL.revokeObjectURL(url), 5000);
 
         state.isRecording = false;
         updateRecordingUI(false);
-        setStatusMessage(`✅ 绘图动画已导出并下载: ${link.download}`);
+        setStatusMessage(`✅ 超清视频已导出: ${link.download}`);
       };
 
       state.mediaRecorder.start(100);
       state.isRecording = true;
       updateRecordingUI(true);
 
+      const mbpsLabel = Math.round(state.videoBitrate / 1000000);
       if (state.recordMode === 'autostep') {
         const validSteps = getValidAutoSteps();
         setStatusMessage(
-          `🔴 正在录制完整递增过程 (${validSteps.join(' → ')})，全部绘制完成后将自动下载视频...`
+          `🔴 正在录制超清 (${state.videoWidth}×${state.videoHeight} · ${mbpsLabel}Mbps) 递增全过程 (${validSteps.join(' → ')})...`
         );
       } else if (state.recordMode === 'cycle') {
         setStatusMessage(
-          `🔴 正在录制完整绘图周期 (${state.numCircles} 个本轮)，完成后将自动下载...`
+          `🔴 正在录制超清 (${state.videoWidth}×${state.videoHeight} · ${mbpsLabel}Mbps) 单周期动画...`
         );
       } else {
-        setStatusMessage('🔴 正在录制绘图动画，再次点击按钮即可停止并下载视频...');
+        setStatusMessage(`🔴 正在录制超清 (${state.videoWidth}×${state.videoHeight}) 动画，再次点击即可保存下载...`);
       }
     }
 
@@ -3002,20 +4185,31 @@
     document.getElementById('btn-download-anim').addEventListener('click', toggleAnimationRecording);
     document.getElementById('btn-header-record').addEventListener('click', toggleAnimationRecording);
 
-    // Dark / Light Theme Toggle
+    // Dark / Light Theme Toggle (Synchronizes both UI & Animation Stage Canvas)
     document.getElementById('btn-theme-toggle').addEventListener('click', () => {
-      document.documentElement.classList.toggle('dark');
+      const isDarkNow = document.documentElement.classList.toggle('dark');
+      const lbl = document.getElementById('theme-mode-label');
+      if (lbl) {
+        lbl.textContent = isDarkNow ? '暗色舞台' : '亮色舞台';
+      }
       drawSpectrumChart();
+      renderEpicycleFrame();
+      setStatusMessage(
+        isDarkNow
+          ? '🌙 已切换至「深色模式」：动画演示区与频谱图已同步为深空流光配色'
+          : '☀️ 已切换至「浅色模式」：动画演示区与频谱图已同步为科研蓝图浅色配色'
+      );
     });
 
     // ============================================================================
-    // 7. INITIALIZE ON WINDOW LOAD
+    // 8. INITIALIZE ON WINDOW LOAD
     // ============================================================================
     window.onload = function () {
       resizeCanvases();
-      // Start with the Heart shape animation by default on page load
+      syncZoneSlidersFromState();
       const initialPts = generatePresetPoints('heart', state.sampleCount);
       rebuildCurrentContourAndFFT(initialPts, true);
+      setEpicycleMode('orthogonal');
       requestAnimationFrame(animationLoop);
     };
   </script>

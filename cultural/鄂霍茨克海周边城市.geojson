@@ -1,0 +1,245 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "彼得罗巴甫洛夫斯克",
+        "styleUrl": "#__managed_style_008E3B62B44299A7E52C"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          158.6389547297545,
+          53.05432971492709,
+          -7.073241992117119e-10
+        ]
+      },
+      "id": "0C3190E0004299A7E510"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "马加丹",
+        "styleUrl": "#__managed_style_008E3B62B44299A7E52C"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          150.8402547395796,
+          59.5739915332396,
+          -7.073241992117119e-10
+        ]
+      },
+      "id": "083A3BCFDF4299A8A089"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "南萨哈林斯克",
+        "styleUrl": "#__managed_style_008E3B62B44299A7E52C"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          142.7277714499438,
+          46.97354273371992,
+          -1.414648398423424e-09
+        ]
+      },
+      "id": "08FEA1EC194299A95928"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "霍尔木斯克",
+        "styleUrl": "#__managed_style_008E3B62B44299A7E52C"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          142.0522585454081,
+          47.06858953605493,
+          0.0
+        ]
+      },
+      "id": "0E42158F8A4299A9AA36"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "哈巴罗夫斯克（伯力）",
+        "styleUrl": "#__managed_style_008E3B62B44299A7E52C"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          135.0777444279189,
+          48.4891962095262,
+          -7.073241992117119e-10
+        ]
+      },
+      "id": "064B8887FE4299AA1C11"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "符拉迪沃斯托克（海参崴）",
+        "styleUrl": "#__managed_style_008E3B62B44299A7E52C"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          131.913335993754,
+          43.13532161178311,
+          -7.073241992117119e-10
+        ]
+      },
+      "id": "01B161C0EA4299AB19D4"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "共青城",
+        "styleUrl": "#__managed_style_008E3B62B44299A7E52C"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          137.0384327089339,
+          50.55618815883992,
+          -7.073241992117119e-10
+        ]
+      },
+      "id": "052F78EEB04299AB92F4"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "根室",
+        "styleUrl": "#__managed_style_008E3B62B44299A7E52C"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          145.5814284136211,
+          43.32887259061312,
+          -1.414648398423424e-09
+        ]
+      },
+      "id": "0E45A5B1384299ABE237"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "札幌",
+        "styleUrl": "#__managed_style_008E3B62B44299A7E52C"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          141.3474029446798,
+          43.08164507478363,
+          0.0002654191618089996
+        ]
+      },
+      "id": "08252D5C694299AC5B9B"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "稚内",
+        "styleUrl": "#__managed_style_008E3B62B44299A7E52C"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          141.6804539570565,
+          45.40322828921066,
+          0.0
+        ]
+      },
+      "id": "0FF1096E674299ACE82F"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "鄂霍茨克",
+        "styleUrl": "#__managed_style_008E3B62B44299A7E52C"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          143.2522831984836,
+          59.38473402281289,
+          0.0
+        ]
+      },
+      "id": "0AB79E88C04299AD57DC"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "奥哈",
+        "styleUrl": "#__managed_style_008E3B62B44299A7E52C"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          142.9702956956815,
+          53.59975921576739,
+          -1.414648398423424e-09
+        ]
+      },
+      "id": "027429BB7B4299ADB59C"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "庙街",
+        "styleUrl": "#__managed_style_008E3B62B44299A7E52C"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          140.7250800254628,
+          53.14545612865419,
+          -1.414648398423424e-09
+        ]
+      },
+      "id": "0C3382B53F4299ADF064"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "雅库茨克",
+        "styleUrl": "#__managed_style_008E3B62B44299A7E52C"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          129.7676443025476,
+          62.04778293138445,
+          0.0
+        ]
+      },
+      "id": "0D9EF4EFDA4299AE99EC"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "函馆",
+        "styleUrl": "#__managed_style_008E3B62B44299A7E52C"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          140.7547175184085,
+          41.77862540486417,
+          0.0
+        ]
+      },
+      "id": "0FC2E6761E4299AF5517"
+    }
+  ]
+}
