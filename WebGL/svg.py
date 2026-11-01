@@ -432,14 +432,14 @@ def export_single_path_svg(
 if __name__ == "__main__":
   # 自动匹配您上传的文件名 '甘肃省_市.geojson' 或 'gansu.geojson'
   INPUT_GEOJSON = (
-      "./chinamap/陕西省_市.geojson"
-      if os.path.exists("./chinamap/陕西省_市.geojson")
-      else "./chinamap/陕西省_省.geojson"
+      "./chinamap/北京市_县.geojson"
+      if os.path.exists("./chinamap/北京市_县.geojson")
+      else "./chinamap/北京市_市.geojson"
   )
   OUTPUT_SVG = "euler_single_path.svg"
 
   if not os.path.exists(INPUT_GEOJSON):
-    print("未找到输入文件！请将您的 GeoJSON 文件命名为 '陕西省_市.geojson' 并放在脚本同目录下。")
+    print("未找到输入文件！请将您的 GeoJSON 文件命名为 '北京市_县.geojson' 并放在脚本同目录下。")
   else:
     print(f"====== 正在读取 '{INPUT_GEOJSON}' 并构建单笔闭合 SVG ======")
     raw_geojson = load_geojson(INPUT_GEOJSON)

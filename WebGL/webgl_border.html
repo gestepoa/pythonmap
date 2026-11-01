@@ -1,0 +1,2923 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GeoJSON 多边形渐进逼近可视化 (HTML5 Canvas 版)</title>
+  <!-- 引入 Tailwind CSS 用于构建响应式控制面板 -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 引入 D3.js 用于球面面积计算与 Albers 等面积投影 -->
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <!-- 引入复古衬线字体供 Canvas 渲染使用 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #141619;
+      color: #f3f4f6;
+    }
+    /* 自定义滑块样式 */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: #2d323b;
+      height: 6px;
+      border-radius: 999px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #f39c12;
+      cursor: pointer;
+      border: 2px solid #fff;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+      transition: transform 0.15s ease;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+    /* 隐藏数字输入框默认上下箭头，保持界面整洁 */
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+      opacity: 1;
+    }
+    /* 确保 Canvas 自适应屏幕宽高与动态长宽比 */
+    .canvas-wrapper {
+      aspect-ratio: 9 / 16;
+      max-height: calc(100vh - 48px);
+      max-width: calc(100vw - 48px);
+      touch-action: none;
+      transition: aspect-ratio 0.25s ease;
+    }
+    @media (max-width: 1023px) {
+      .canvas-wrapper {
+        max-height: 78vh;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col lg:flex-row items-center lg:items-stretch justify-center p-4 lg:p-6 gap-6">
+
+  <!-- 顶部浮动消息提示框 (替代原生 alert) -->
+  <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- 左侧：交互控制与算法监控面板 -->
+  <aside class="w-full max-w-xl lg:max-w-md bg-[#1e2229] border border-gray-800 rounded-2xl p-5 flex flex-col justify-between shadow-2xl">
+    <div class="space-y-4">
+      <!-- 顶部标题说明 -->
+      <div class="border-b border-gray-800 pb-3.5">
+        <div class="flex items-center justify-between">
+          <span class="px-2.5 py-0.5 text-xs font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30 rounded-full">
+            HTML5 Canvas 渲染引擎
+          </span>
+          <span id="status-badge" class="text-xs text-emerald-400 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            就绪
+          </span>
+        </div>
+        <h1 class="text-xl font-bold text-white mt-2">多边形渐进逼近可视化</h1>
+        <p class="text-xs text-gray-400 mt-1 leading-relaxed">
+          基于逆向 <span class="text-gray-200 font-medium">Visvalingam-Whyatt</span> 有效面积算法，自动融合接壤行政区划并保留岛屿/飞地。画布中的 <span class="text-amber-400 font-medium">条边</span>、<span class="text-amber-400 font-medium">渐近线</span> 与 <span class="text-amber-400 font-medium">匹配</span> 均可直接拖动。
+        </p>
+      </div>
+
+      <!-- 1. 数据源上传与预设选择 -->
+      <div class="space-y-2.5">
+        <div class="flex items-center justify-between">
+          <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400">
+            1. 数据源 (GeoJSON 矢量边界)
+          </label>
+          <span id="merge-info-badge" class="text-[11px] text-amber-400/90 font-mono hidden"></span>
+        </div>
+
+        <!-- 拖拽与点击上传区域 -->
+        <label id="drop-zone" for="geojson-file" class="flex flex-col items-center justify-center border-2 border-dashed border-gray-700 hover:border-amber-500/70 bg-[#171a20] hover:bg-[#1b1f27] transition rounded-xl p-3 cursor-pointer text-center">
+          <div class="text-sm font-medium text-gray-200 flex items-center gap-2">
+            <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+            </svg>
+            <span>点击或拖拽上传 <code class="text-amber-400">.geojson / .json</code> 文件</span>
+          </div>
+          <span class="text-[11px] text-gray-500 mt-1">自动融合接壤内部区划，并独立保留所有岛屿与飞地计入总边数</span>
+          <input type="file" id="geojson-file" accept=".geojson,.json" class="hidden" />
+        </label>
+
+        <!-- 外边界融合模式与内部参考线开关 -->
+        <div class="flex flex-wrap items-center justify-between gap-2 bg-[#15181e] border border-gray-800/80 rounded-lg px-3 py-2">
+          <label class="flex items-center gap-2 text-xs text-gray-300 cursor-pointer select-none" title="当GeoJSON包含多个内部行政区划时，自动消除内部交界线并合并为最外层边界">
+            <input type="checkbox" id="dissolve-toggle" checked class="rounded bg-gray-800 border-gray-600 text-amber-500 focus:ring-0 cursor-pointer" />
+            <span>自动融合内部行政区划（仅取最外边界）</span>
+          </label>
+          <label id="show-internal-wrapper" class="flex items-center gap-1.5 text-[11px] text-gray-400 cursor-pointer select-none hidden" title="在画布中以极淡虚线显示被消融的内部行政区划作为对比参考">
+            <input type="checkbox" id="show-internal-toggle" class="rounded bg-gray-800 border-gray-600 text-amber-500 focus:ring-0 cursor-pointer" />
+            <span>显示内部区划虚线</span>
+          </label>
+        </div>
+
+        <!-- 预设国家与多区划融合示例按钮 -->
+        <div class="grid grid-cols-4 gap-1.5 pt-0.5">
+          <button data-preset="Zambia" class="preset-btn px-2 py-2 text-xs font-medium rounded-lg bg-[#272c35] hover:bg-[#323844] text-white border border-amber-500/50 transition truncate">
+            🇿🇲 赞比亚
+          </button>
+          <button data-preset="France" class="preset-btn px-2 py-2 text-xs font-medium rounded-lg bg-[#272c35] hover:bg-[#323844] text-gray-200 border border-transparent transition truncate">
+            🇫🇷 法国
+          </button>
+          <button data-preset="Australia" class="preset-btn px-2 py-2 text-xs font-medium rounded-lg bg-[#272c35] hover:bg-[#323844] text-gray-200 border border-transparent transition truncate">
+            🇦🇺 澳大利亚
+          </button>
+          <button data-preset="MultiDistrictDemo" class="preset-btn px-2 py-2 text-xs font-medium rounded-lg bg-[#272c35] hover:bg-[#323844] text-gray-200 border border-transparent transition truncate" title="演示包含多个内部行政区划的GeoJSON自动合并提取最外层边界">
+            🧩 多区划示例
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. 画布长宽比与可拖动模块控制区 -->
+      <div class="bg-[#15181e] border border-gray-800/80 rounded-xl p-3 space-y-2.5">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold uppercase tracking-wider text-gray-400">
+            2. 页面长宽比与模块自由布局
+          </span>
+          <button id="reset-layout-btn" class="px-2.5 py-1 rounded-md bg-[#272c35] hover:bg-amber-500 hover:text-gray-950 text-gray-300 text-[11px] font-medium transition">
+            ↺ 重置模块位置
+          </button>
+        </div>
+
+        <!-- 页面长宽比选择按钮组 -->
+        <div class="grid grid-cols-5 gap-1.5">
+          <button data-ratio="9:16" class="ratio-btn py-1.5 text-[11px] font-mono rounded-lg bg-[#252a34] hover:bg-[#313846] text-amber-400 border border-amber-500/50 transition">
+            9:16 竖屏
+          </button>
+          <button data-ratio="3:4" class="ratio-btn py-1.5 text-[11px] font-mono rounded-lg bg-[#252a34] hover:bg-[#313846] text-gray-300 border border-transparent transition">
+            3:4 海报
+          </button>
+          <button data-ratio="1:1" class="ratio-btn py-1.5 text-[11px] font-mono rounded-lg bg-[#252a34] hover:bg-[#313846] text-gray-300 border border-transparent transition">
+            1:1 方图
+          </button>
+          <button data-ratio="4:3" class="ratio-btn py-1.5 text-[11px] font-mono rounded-lg bg-[#252a34] hover:bg-[#313846] text-gray-300 border border-transparent transition">
+            4:3 标准
+          </button>
+          <button data-ratio="16:9" class="ratio-btn py-1.5 text-[11px] font-mono rounded-lg bg-[#252a34] hover:bg-[#313846] text-gray-300 border border-transparent transition">
+            16:9 横屏
+          </button>
+        </div>
+
+        <div class="flex items-center justify-between text-xs text-gray-400 pt-0.5">
+          <span>在画布按住拖动：<strong class="text-gray-200">条边</strong>、<strong class="text-gray-200">渐近线</strong>、<strong class="text-gray-200">匹配</strong></span>
+          <label class="flex items-center gap-1.5 text-[11px] text-amber-400/90 cursor-pointer select-none whitespace-nowrap ml-2">
+            <input type="checkbox" id="show-module-guides-toggle" class="rounded bg-gray-800 border-gray-600 text-amber-500 focus:ring-0 cursor-pointer" />
+            <span>常显模块框</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- 3. 演化进度与单步控制 -->
+      <div class="bg-[#15181e] border border-gray-800/80 rounded-xl p-3.5 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold uppercase tracking-wider text-gray-400">3. 边数演化与上限控制</span>
+          <span id="slider-readout" class="text-xs font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">
+            3 / -- 边
+          </span>
+        </div>
+
+        <!-- 自定义最大边数上限输入框与快捷档位 (默认 1000) -->
+        <div class="bg-[#1b1f27] border border-gray-800 rounded-lg p-2.5 space-y-2">
+          <div class="flex items-center justify-between gap-2">
+            <label for="max-sides-input" class="text-xs text-gray-300 font-medium whitespace-nowrap">
+              最大边数上限 <span class="text-[11px] text-gray-500">(默认1000)</span>
+            </label>
+            <div class="flex items-center gap-1.5">
+              <input
+                type="number"
+                id="max-sides-input"
+                min="3"
+                max="10000"
+                step="10"
+                value="1000"
+                class="w-24 bg-[#12151a] border border-gray-700 focus:border-amber-500 rounded-md px-2 py-1 text-xs text-amber-400 font-mono text-right outline-none"
+              />
+              <button
+                id="apply-max-sides-btn"
+                class="px-2.5 py-1 rounded-md bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-gray-950 border border-amber-500/40 text-xs font-medium transition whitespace-nowrap"
+              >
+                应用
+              </button>
+            </div>
+          </div>
+          <div class="flex items-center justify-between gap-1.5">
+            <button data-cap="250" class="max-cap-preset-btn flex-1 py-1 text-[11px] font-mono rounded bg-[#252a34] hover:bg-[#313846] text-gray-300 border border-transparent transition">
+              250边
+            </button>
+            <button data-cap="500" class="max-cap-preset-btn flex-1 py-1 text-[11px] font-mono rounded bg-[#252a34] hover:bg-[#313846] text-gray-300 border border-transparent transition">
+              500边
+            </button>
+            <button data-cap="1000" class="max-cap-preset-btn flex-1 py-1 text-[11px] font-mono rounded bg-[#252a34] hover:bg-[#313846] text-amber-400 border border-amber-500/40 transition">
+              1000(默认)
+            </button>
+            <button data-cap="2000" class="max-cap-preset-btn flex-1 py-1 text-[11px] font-mono rounded bg-[#252a34] hover:bg-[#313846] text-gray-300 border border-transparent transition">
+              2000边
+            </button>
+          </div>
+        </div>
+
+        <!-- 边数滑块 -->
+        <input type="range" id="sides-slider" min="3" max="1000" value="3" class="w-full" />
+
+        <!-- 播放、单步、重播与倍速按钮 -->
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-1.5">
+            <button id="play-btn" class="px-3.5 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-gray-950 font-semibold text-xs flex items-center gap-1.5 transition shadow">
+              <span>⏸ 暂停</span>
+            </button>
+            <button id="restart-btn" class="px-2.5 py-2 rounded-lg bg-[#272c35] hover:bg-[#323844] text-gray-200 text-xs transition" title="从三角形(3边)重新开始">
+              ↺ 重播
+            </button>
+            <button id="step-prev-btn" class="px-2.5 py-2 rounded-lg bg-[#272c35] hover:bg-[#323844] text-gray-200 text-xs font-mono transition" title="减少一条边">
+              -1边
+            </button>
+            <button id="step-next-btn" class="px-2.5 py-2 rounded-lg bg-[#272c35] hover:bg-[#323844] text-gray-200 text-xs font-mono transition" title="增加一条边">
+              +1边
+            </button>
+          </div>
+
+          <!-- 动画倍速 -->
+          <select id="speed-select" class="bg-[#272c35] text-gray-200 text-xs rounded-lg px-2.5 py-2 border border-gray-700 outline-none cursor-pointer">
+            <option value="0.5">0.5x 慢放</option>
+            <option value="1" selected>1.0x 原速</option>
+            <option value="2">2.0x 快进</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 4. 实时几何指标与里程碑看板 -->
+      <div class="space-y-2">
+        <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400">
+          4. 实时指标与真实匹配里程碑 (MATCH)
+        </label>
+        <div class="grid grid-cols-3 gap-2 text-center">
+          <div class="bg-[#15181e] border border-gray-800 rounded-xl p-2">
+            <div class="text-[11px] text-gray-400">当前总边数</div>
+            <div id="stat-sides" class="text-base font-bold text-white font-mono mt-0.5">3 边</div>
+            <div id="stat-active-polys" class="text-[10px] text-gray-500 font-mono">1 / 1 区块</div>
+          </div>
+          <div class="bg-[#15181e] border border-gray-800 rounded-xl p-2">
+            <div class="text-[11px] text-gray-400">真实匹配度 (Match)</div>
+            <div id="stat-iou" class="text-base font-bold text-amber-400 font-mono mt-0.5">0.0%</div>
+            <div class="text-[10px] text-gray-500">相对原始完整地图</div>
+          </div>
+          <div class="bg-[#15181e] border border-gray-800 rounded-xl p-2">
+            <div class="text-[11px] text-gray-400">实际终止边数</div>
+            <div id="stat-total" class="text-base font-bold text-gray-300 font-mono mt-0.5">--</div>
+            <div id="stat-poly-count" class="text-[10px] text-amber-400/80 font-mono">共 1 个外边界</div>
+          </div>
+        </div>
+
+        <!-- 里程碑快捷跳转胶囊 -->
+        <div id="milestone-pills" class="flex flex-wrap gap-1.5 pt-1"></div>
+      </div>
+    </div>
+
+    <!-- 底部导出图片与完整视频录制控制区 -->
+    <div class="pt-3 mt-3 border-t border-gray-800 space-y-2.5">
+      <!-- 视频录制与画质选择 -->
+      <div class="bg-[#15181e] border border-gray-800/90 rounded-xl p-2.5 space-y-2">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-xs font-medium text-gray-300 flex items-center gap-1.5">
+            <span id="rec-dot" class="w-2 h-2 rounded-full bg-rose-500"></span>
+            录制完整演化视频
+          </span>
+          <select id="video-quality-select" class="bg-[#252a34] text-gray-200 text-[11px] font-mono rounded-lg px-2 py-1 border border-gray-700 outline-none cursor-pointer">
+            <option value="standard">标清 720P (6 Mbps)</option>
+            <option value="high" selected>高清 1080P (16 Mbps)</option>
+            <option value="ultra">超清 2K 原画 (32 Mbps)</option>
+          </select>
+        </div>
+        <button id="record-video-btn" class="w-full py-2 px-3 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs flex items-center justify-center gap-2 transition shadow-lg">
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <circle cx="10" cy="10" r="6" />
+          </svg>
+          <span id="record-btn-text">开始录制完整视频 (3边 → 终点)</span>
+        </button>
+      </div>
+
+      <!-- 导出当前帧 PNG -->
+      <button id="download-btn" class="w-full py-2 px-4 rounded-xl bg-[#255494] hover:bg-[#2e67b5] text-white font-medium text-xs flex items-center justify-center gap-2 transition shadow-lg">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+        </svg>
+        <span>导出当前帧高清海报 (PNG)</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- 右侧：全 Canvas 渲染的可变长宽比海报视口 -->
+  <main class="flex-1 flex items-center justify-center w-full overflow-hidden">
+    <div id="canvas-wrapper" class="canvas-wrapper relative w-full max-w-[540px] rounded-xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.65)] ring-1 ring-white/10 select-none">
+      <canvas id="poster-canvas" class="w-full h-full block cursor-default"></canvas>
+    </div>
+  </main>
+
+<script>
+/**
+ * ============================================================================
+ * 0. 通用非阻塞消息提示工具 (严禁使用原生 alert / confirm)
+ * ============================================================================
+ */
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  const colorMap = {
+    info: 'bg-gray-900/95 border-gray-700 text-gray-100',
+    success: 'bg-emerald-950/95 border-emerald-600/60 text-emerald-200',
+    error: 'bg-red-950/95 border-red-600/60 text-red-200'
+  };
+  toast.className = `pointer-events-auto px-4 py-2.5 rounded-xl border text-xs font-medium shadow-xl transition-all duration-300 transform translate-y-0 opacity-100 ${colorMap[type] || colorMap.info}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.classList.add('opacity-0', '-translate-y-2');
+    setTimeout(() => toast.remove(), 300);
+  }, 3400);
+}
+
+/**
+ * ============================================================================
+ * 1. 核心算法：支持多独立多边形（主陆 + 岛屿 + 飞地）的逆向 Visvalingam-Whyatt 引擎
+ *    支持用户自定义最大边数上限（默认 1000）；若未达上限已完全匹配真实地图则提前停止
+ * ============================================================================
+ */
+const DEFAULT_MAX_SIDES_CAP = 1000;
+
+function formatMatchPercentage(iou) {
+  if (iou >= 99.995) return '100.0%';
+  if (iou >= 99.9) return `${iou.toFixed(2)}%`;
+  return `${iou.toFixed(1)}%`;
+}
+
+class VisvalingamSimplifier {
+  /**
+   * @param {Array<Array<[number, number]>>} outerRings 所有独立外边界数组（主陆 + 岛屿 + 飞地，按面积降序）
+   * @param {Array<Array<[number, number]>>} internalRings 可选的内部行政区划投影环 (仅供对比参考显示)
+   * @param {number} maxSidesCap 用户设定的最大边数上限（默认 1000）
+   */
+  constructor(outerRings, internalRings = [], maxSidesCap = DEFAULT_MAX_SIDES_CAP) {
+    const normalizedRings = (Array.isArray(outerRings) && outerRings.length > 0 && Array.isArray(outerRings[0][0]))
+      ? outerRings
+      : [outerRings];
+
+    this.rawOuterRings = normalizedRings.filter(r => Array.isArray(r) && r.length >= 3);
+    this.internalRings = internalRings;
+    this.maxSidesCap = Math.max(3, Math.round(maxSidesCap || DEFAULT_MAX_SIDES_CAP));
+
+    // 真实完整边界（用于绘制背景参考轮廓与计算 100% 真实基准掩码）
+    this.originalRings = this.rawOuterRings;
+    this.polyHierarchies = [];
+    this.cachedTrueMask = null;
+    this.states = new Map();     // k -> { rings: [[[x,y],...], ...], addedPoint: [x,y] | null, activePolyCount: number }
+    this.iouScores = new Map();  // k -> 与真实完整地图的实际 IoU 匹配百分比 (0 ~ 100)
+    this.milestones = [];        // [{ label, threshold, k, iou }]
+
+    this.totalRawSides = this.rawOuterRings.reduce((sum, r) => sum + r.length, 0);
+    this.totalSides = Math.min(this.totalRawSides, this.maxSidesCap);
+  }
+
+  // 计算三个平面点构成的三角形面积
+  static triangleArea(a, b, c) {
+    return Math.abs(
+      (a[0] * (b[1] - c[1]) +
+       b[0] * (c[1] - a[1]) +
+       c[0] * (a[1] - b[1])) * 0.5
+    );
+  }
+
+  // 计算单个平面环面积
+  static ringPlanarArea(ring) {
+    if (!ring || ring.length < 3) return 0;
+    let sum = 0;
+    for (let i = 0, n = ring.length; i < n; i++) {
+      const p1 = ring[i];
+      const p2 = ring[(i + 1) % n];
+      sum += p1[0] * p2[1] - p2[0] * p1[1];
+    }
+    return Math.abs(sum) * 0.5;
+  }
+
+  // 对单个闭合外环执行双向循环链表 Visvalingam-Whyatt 简化，记录 3 -> N_m 边的完整状态与重要性
+  static computeSinglePolygonHierarchy(pts) {
+    const n = pts.length;
+    const statesBySides = new Map(); // s -> { ring, addedPoint, importance }
+    const polyArea = VisvalingamSimplifier.ringPlanarArea(pts);
+
+    if (n <= 3) {
+      const cx = (pts[0][0] + pts[1][0] + pts[2][0]) / 3;
+      const cy = (pts[0][1] + pts[1][1] + pts[2][1]) / 3;
+      statesBySides.set(3, {
+        ring: pts.slice(0, 3),
+        addedPoint: [cx, cy],
+        importance: polyArea
+      });
+      return { maxSides: 3, polyArea, statesBySides };
+    }
+
+    const nodes = pts.map((pt, idx) => ({
+      idx,
+      pt,
+      area: 0,
+      prev: null,
+      next: null,
+      removed: false
+    }));
+
+    for (let i = 0; i < n; i++) {
+      nodes[i].prev = nodes[(i - 1 + n) % n];
+      nodes[i].next = nodes[(i + 1) % n];
+    }
+
+    for (let i = 0; i < n; i++) {
+      nodes[i].area = VisvalingamSimplifier.triangleArea(
+        nodes[i].prev.pt,
+        nodes[i].pt,
+        nodes[i].next.pt
+      );
+    }
+
+    let remaining = n;
+    let maxEliminatedArea = 0;
+    const removedStack = []; // [{ idx, area }]
+
+    while (remaining > 3) {
+      let minNode = null;
+      let minArea = Infinity;
+
+      for (let i = 0; i < n; i++) {
+        if (!nodes[i].removed && nodes[i].area < minArea) {
+          minArea = nodes[i].area;
+          minNode = nodes[i];
+        }
+      }
+
+      if (minNode.area < maxEliminatedArea) {
+        minNode.area = maxEliminatedArea;
+      } else {
+        maxEliminatedArea = minNode.area;
+      }
+
+      minNode.removed = true;
+      minNode.prev.next = minNode.next;
+      minNode.next.prev = minNode.prev;
+
+      minNode.prev.area = VisvalingamSimplifier.triangleArea(
+        minNode.prev.prev.pt,
+        minNode.prev.pt,
+        minNode.prev.next.pt
+      );
+      minNode.next.area = VisvalingamSimplifier.triangleArea(
+        minNode.next.prev.pt,
+        minNode.next.pt,
+        minNode.next.next.pt
+      );
+
+      removedStack.push({ idx: minNode.idx, area: minNode.area });
+      remaining--;
+    }
+
+    const activeFlags = new Array(n).fill(false);
+    for (let i = 0; i < n; i++) {
+      if (!nodes[i].removed) activeFlags[i] = true;
+    }
+
+    const snapshotRing = (s, newlyAddedIdx, importance) => {
+      const ring = [];
+      for (let i = 0; i < n; i++) {
+        if (activeFlags[i]) ring.push(pts[i]);
+      }
+      let addedPt = null;
+      if (newlyAddedIdx !== null) {
+        addedPt = pts[newlyAddedIdx];
+      } else if (ring.length >= 3) {
+        addedPt = [
+          (ring[0][0] + ring[1][0] + ring[2][0]) / 3,
+          (ring[0][1] + ring[1][1] + ring[2][1]) / 3
+        ];
+      }
+      statesBySides.set(s, {
+        ring,
+        addedPoint: addedPt,
+        importance
+      });
+    };
+
+    // 初始三角形 (s = 3)
+    snapshotRing(3, null, polyArea);
+
+    // 逆向出栈：从 4 条边逐步恢复到 n 条边
+    for (let s = 4; s <= n; s++) {
+      const item = removedStack.pop();
+      activeFlags[item.idx] = true;
+      snapshotRing(s, item.idx, item.area);
+    }
+
+    return { maxSides: n, polyArea, statesBySides };
+  }
+
+  /**
+   * 构建全局多边形（主陆 + 岛屿 + 飞地）渐进演化序列，最大上限为 this.maxSidesCap；
+   * 若在上限前已 100% 匹配真实地图，则自动截断并停止在实际匹配边数。
+   */
+  computeEvolutionAndMatch(logicalWidth, logicalHeight, newMaxSidesCap = null) {
+    if (newMaxSidesCap !== null) {
+      this.maxSidesCap = Math.max(3, Math.round(newMaxSidesCap));
+    }
+
+    if (this.polyHierarchies.length === 0) {
+      this.polyHierarchies = this.rawOuterRings.map(ring =>
+        VisvalingamSimplifier.computeSinglePolygonHierarchy(ring)
+      );
+      this.totalRawSides = this.polyHierarchies.reduce((sum, h) => sum + h.maxSides, 0);
+    }
+
+    const M = this.polyHierarchies.length;
+    if (M === 0) return;
+
+    const maxCap = Math.min(this.totalRawSides, this.maxSidesCap);
+    this.states.clear();
+
+    // 记录每个多边形当前已激活的边数：初始 k = 3 时仅主陆 (m = 0) 激活为三角形
+    const curSides = new Int32Array(M);
+    curSides[0] = 3;
+
+    // 每个岛屿/飞地浮现（消耗3条边）时的单边面积收益优先级
+    const islandGainPerSide = new Float64Array(M);
+    for (let m = 1; m < M; m++) {
+      islandGainPerSide[m] = this.polyHierarchies[m].polyArea / 3.0;
+    }
+
+    const buildSnapshot = (sidesArray, addedPt) => {
+      const rings = [];
+      for (let m = 0; m < M; m++) {
+        const s = sidesArray[m];
+        if (s >= 3) {
+          const st = this.polyHierarchies[m].statesBySides.get(s);
+          if (st && st.ring) rings.push(st.ring);
+        }
+      }
+      return {
+        rings,
+        addedPoint: addedPt,
+        activePolyCount: rings.length
+      };
+    };
+
+    // 起点 k = 3
+    this.states.set(3, buildSnapshot(curSides, null));
+
+    let k = 3;
+    while (k < maxCap) {
+      // 1. 收集所有已激活多边形的下一步 (+1 边) 候选动作
+      const plusOneActions = [];
+      for (let m = 0; m < M; m++) {
+        const s = curSides[m];
+        if (s >= 3 && s < this.polyHierarchies[m].maxSides) {
+          const nextSt = this.polyHierarchies[m].statesBySides.get(s + 1);
+          plusOneActions.push({
+            m,
+            nextS: s + 1,
+            importance: nextSt ? nextSt.importance : 0,
+            addedPoint: nextSt ? nextSt.addedPoint : null
+          });
+        }
+      }
+      plusOneActions.sort((a, b) => b.importance - a.importance);
+
+      // 2. 查找尚未浮现的最大面积岛屿/飞地 (+3 边动作)
+      let bestIslandM = -1;
+      let bestIslandGain = -1;
+      if (k + 3 <= maxCap) {
+        for (let m = 1; m < M; m++) {
+          if (curSides[m] === 0 && islandGainPerSide[m] > bestIslandGain) {
+            bestIslandGain = islandGainPerSide[m];
+            bestIslandM = m;
+          }
+        }
+      }
+
+      const topPlusOneImp = plusOneActions.length > 0 ? plusOneActions[0].importance : -1;
+
+      // 当岛屿单边面积收益 >= 当前主陆/已激活多边形的 +1 边有效面积（或所有已激活多边形均已满边）时，浮现该岛屿
+      if (bestIslandM !== -1 && (plusOneActions.length === 0 || bestIslandGain >= topPlusOneImp)) {
+        if (plusOneActions.length >= 1) {
+          const tempSides1 = new Int32Array(curSides);
+          tempSides1[plusOneActions[0].m]++;
+          this.states.set(k + 1, buildSnapshot(tempSides1, plusOneActions[0].addedPoint));
+
+          if (plusOneActions.length >= 2) {
+            const tempSides2 = new Int32Array(tempSides1);
+            tempSides2[plusOneActions[1].m]++;
+            this.states.set(k + 2, buildSnapshot(tempSides2, plusOneActions[1].addedPoint));
+          } else {
+            const h0 = this.polyHierarchies[plusOneActions[0].m];
+            if (tempSides1[plusOneActions[0].m] + 1 <= h0.maxSides) {
+              const tempSides2 = new Int32Array(tempSides1);
+              tempSides2[plusOneActions[0].m]++;
+              const pt2 = h0.statesBySides.get(tempSides2[plusOneActions[0].m])?.addedPoint || null;
+              this.states.set(k + 2, buildSnapshot(tempSides2, pt2));
+            } else {
+              this.states.set(k + 2, buildSnapshot(tempSides1, plusOneActions[0].addedPoint));
+            }
+          }
+        } else {
+          const islandSt = this.polyHierarchies[bestIslandM].statesBySides.get(3);
+          this.states.set(k + 1, buildSnapshot(curSides, islandSt?.addedPoint || null));
+          this.states.set(k + 2, buildSnapshot(curSides, islandSt?.addedPoint || null));
+        }
+
+        // 在 k+3 正式激活该岛屿/飞地 (+3 边)
+        curSides[bestIslandM] = 3;
+        k += 3;
+        const islandTriState = this.polyHierarchies[bestIslandM].statesBySides.get(3);
+        this.states.set(k, buildSnapshot(curSides, islandTriState ? islandTriState.addedPoint : null));
+      } else if (plusOneActions.length > 0) {
+        // 恢复全局最重要的一条边 (+1 边)
+        const act = plusOneActions[0];
+        curSides[act.m] = act.nextS;
+        k += 1;
+        this.states.set(k, buildSnapshot(curSides, act.addedPoint));
+      } else {
+        break;
+      }
+    }
+
+    this.totalSides = k;
+    this.computeTrueIoUCurveAndTruncate(logicalWidth, logicalHeight);
+  }
+
+  /**
+   * 以【未简化的真实完整地图外边界 (this.originalRings)】为唯一基准计算真实 IoU
+   */
+  computeTrueIoUCurveAndTruncate(logicalWidth, logicalHeight) {
+    this.iouScores.clear();
+    const scale = 0.75;
+    const w = Math.floor(logicalWidth * scale);
+    const h = Math.floor(logicalHeight * scale);
+
+    const offscreen = document.createElement('canvas');
+    offscreen.width = w;
+    offscreen.height = h;
+    const ctx = offscreen.getContext('2d', { willReadFrequently: true });
+
+    const rasterizeMultiRingMask = (rings) => {
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      for (const ring of rings) {
+        if (!ring || ring.length < 3) continue;
+        for (let i = 0; i < ring.length; i++) {
+          const x = ring[i][0] * scale;
+          const y = ring[i][1] * scale;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+      }
+      ctx.fill();
+      return new Uint32Array(ctx.getImageData(0, 0, w, h).data.buffer);
+    };
+
+    if (!this.cachedTrueMask) {
+      this.cachedTrueMask = rasterizeMultiRingMask(this.originalRings);
+    }
+    const trueMask = this.cachedTrueMask;
+
+    const calcMaskIoU = (rings) => {
+      const maskK = rasterizeMultiRingMask(rings);
+      let inter = 0;
+      let union = 0;
+      for (let i = 0; i < trueMask.length; i++) {
+        const a = trueMask[i] !== 0;
+        const b = maskK[i] !== 0;
+        if (a && b) inter++;
+        if (a || b) union++;
+      }
+      return union === 0 ? 0 : (inter / union) * 100;
+    };
+
+    const maxGeneratedK = this.totalSides;
+    const sampleKeys = [];
+    for (let k = 3; k <= maxGeneratedK; k++) {
+      if (k <= 80 || k === maxGeneratedK || k % Math.max(1, Math.floor(k / 45)) === 0) {
+        sampleKeys.push(k);
+      }
+    }
+
+    const sampledIoU = new Map();
+    let earlyPerfectK = null;
+
+    for (const k of sampleKeys) {
+      if (k === this.totalRawSides) {
+        sampledIoU.set(k, 100.0);
+        earlyPerfectK = k;
+        break;
+      }
+      const st = this.states.get(k);
+      const iou = calcMaskIoU(st ? st.rings : []);
+      sampledIoU.set(k, iou);
+
+      if (iou >= 99.995) {
+        const prevSampleIdx = sampleKeys.indexOf(k) - 1;
+        const searchStart = prevSampleIdx >= 0 ? sampleKeys[prevSampleIdx] : k;
+        earlyPerfectK = k;
+        for (let fineK = searchStart + 1; fineK <= k; fineK++) {
+          const fineSt = this.states.get(fineK);
+          const fineIoU = calcMaskIoU(fineSt ? fineSt.rings : []);
+          sampledIoU.set(fineK, fineIoU);
+          if (fineIoU >= 99.995) {
+            earlyPerfectK = fineK;
+            sampledIoU.set(fineK, 100.0);
+            break;
+          }
+        }
+        break;
+      }
+    }
+
+    if (earlyPerfectK !== null && earlyPerfectK < this.totalSides) {
+      this.totalSides = earlyPerfectK;
+      for (const key of Array.from(this.states.keys())) {
+        if (key > earlyPerfectK) {
+          this.states.delete(key);
+        }
+      }
+    }
+
+    const validSampleKeys = Array.from(sampledIoU.keys())
+      .filter(k => k <= this.totalSides)
+      .sort((a, b) => a - b);
+
+    for (let i = 0; i < validSampleKeys.length - 1; i++) {
+      const k1 = validSampleKeys[i];
+      const k2 = validSampleKeys[i + 1];
+      const v1 = sampledIoU.get(k1);
+      const v2 = sampledIoU.get(k2);
+      for (let k = k1; k <= k2; k++) {
+        const t = k2 === k1 ? 0 : (k - k1) / (k2 - k1);
+        this.iouScores.set(k, v1 + t * (v2 - v1));
+      }
+    }
+
+    const lastKey = validSampleKeys[validSampleKeys.length - 1];
+    if (lastKey !== undefined) {
+      this.iouScores.set(lastKey, sampledIoU.get(lastKey));
+    }
+
+    if (this.totalSides >= this.totalRawSides) {
+      this.iouScores.set(this.totalSides, 100.0);
+    }
+
+    // 定位已实际达到的收敛里程碑 (仅保留 95% 和 99%)，格式统一为 "99%-97"
+    const targets = [
+      { name: '95%', val: 95.0 },
+      { name: '99%', val: 99.0 }
+    ];
+    this.milestones = [];
+    for (const t of targets) {
+      for (let k = 3; k <= this.totalSides; k++) {
+        if ((this.iouScores.get(k) || 0) >= t.val) {
+          this.milestones.push({
+            threshold: t.name,
+            label: `${t.name}-${k}`,
+            k,
+            iou: this.iouScores.get(k)
+          });
+          break;
+        }
+      }
+    }
+  }
+}
+
+/**
+ * ============================================================================
+ * 2. HTML5 Canvas 复古海报渲染器 (支持动态长宽比与 3 个独立可拖动模块)
+ * ============================================================================
+ */
+const ASPECT_RATIO_PRESETS = {
+  '9:16': { width: 540, height: 960, cssAspect: '9 / 16', maxWidthPx: 540 },
+  '3:4':  { width: 630, height: 840, cssAspect: '3 / 4',  maxWidthPx: 620 },
+  '1:1':  { width: 720, height: 720, cssAspect: '1 / 1',  maxWidthPx: 700 },
+  '4:3':  { width: 840, height: 630, cssAspect: '4 / 3',  maxWidthPx: 840 },
+  '16:9': { width: 960, height: 540, cssAspect: '16 / 9', maxWidthPx: 960 }
+};
+
+class PosterCanvasRenderer {
+  constructor(canvasEl) {
+    this.canvas = canvasEl;
+    this.ctx = canvasEl.getContext('2d');
+    this.aspectKey = '9:16';
+    this.logicalWidth = 540;
+    this.logicalHeight = 960;
+    this.dpr = Math.max(window.devicePixelRatio || 1, 2);
+
+    // 三个独立可拖动模块的坐标状态
+    this.hoveredModuleKey = null;
+    this.draggingModuleKey = null;
+    this.alwaysShowGuides = false;
+
+    this.updateMapBounds();
+    this.resetModulesToDefault();
+    this.setupHiDPI();
+  }
+
+  // 根据当前画布逻辑宽高自适应计算地图安全绘制区域
+  updateMapBounds() {
+    const W = this.logicalWidth;
+    const H = this.logicalHeight;
+    if (H >= W) {
+      // 竖屏或方图布局
+      this.mapBounds = {
+        x0: Math.round(W * 0.07),
+        y0: Math.round(H * 0.24),
+        x1: Math.round(W * 0.93),
+        y1: Math.round(H * 0.76)
+      };
+    } else {
+      // 横屏布局 (4:3, 16:9)
+      this.mapBounds = {
+        x0: Math.round(W * 0.14),
+        y0: Math.round(H * 0.21),
+        x1: Math.round(W * 0.86),
+        y1: Math.round(H * 0.78)
+      };
+    }
+  }
+
+  // 切换画布长宽比与分辨率倍增系数（用于高清视频录制）
+  setAspectRatio(ratioKey, customDpr = null) {
+    const preset = ASPECT_RATIO_PRESETS[ratioKey] || ASPECT_RATIO_PRESETS['9:16'];
+    this.aspectKey = ratioKey;
+    this.logicalWidth = preset.width;
+    this.logicalHeight = preset.height;
+    if (customDpr !== null) {
+      this.dpr = customDpr;
+    } else {
+      this.dpr = Math.max(window.devicePixelRatio || 1, 2);
+    }
+    this.updateMapBounds();
+    this.resetModulesToDefault();
+    this.setupHiDPI();
+  }
+
+  // 初始化或重置三个独立可拖动模块的默认位置（自适应当前长宽比）
+  resetModulesToDefault() {
+    const W = this.logicalWidth;
+    const H = this.logicalHeight;
+    const isLandscape = W > H;
+    const chartWidth = Math.min(310, Math.round(W * 0.52));
+    const chartHeight = isLandscape ? 58 : 70;
+
+    this.modules = {
+      // 模块 1: "1000 条边" 边数计数器模块 (x 为右对齐锚点, y 为数字顶部参考)
+      sides: {
+        key: 'sides',
+        label: '条边计数模块',
+        x: Math.round(W / 2 + 72),
+        y: isLandscape ? Math.round(H * 0.04) : Math.round(H * 0.10)
+      },
+      // 模块 2: 渐近线折线图模块 (x 为坐标轴原点 X, y 为折线图顶部)
+      chart: {
+        key: 'chart',
+        label: '渐近线图表模块',
+        x: Math.round(W * 0.075),
+        y: H - chartHeight - (isLandscape ? 32 : 78),
+        width: chartWidth,
+        height: chartHeight
+      },
+      // 模块 3: "% 匹配" 匹配度模块 (x 为右对齐锚点, y 为数值基线参考顶部)
+      match: {
+        key: 'match',
+        label: '匹配度模块',
+        x: Math.round(W * 0.93),
+        y: H - (isLandscape ? 92 : 145)
+      }
+    };
+  }
+
+  // 获取指定模块在逻辑坐标系下的交互包围盒
+  getModuleBoundingBox(key) {
+    const m = this.modules[key];
+    if (!m) return null;
+
+    if (key === 'sides') {
+      return {
+        x: m.x - 190,
+        y: m.y - 6,
+        w: 200,
+        h: 112
+      };
+    }
+    if (key === 'chart') {
+      return {
+        x: m.x - 16,
+        y: m.y - 22,
+        w: m.width + 38,
+        h: m.height + 54
+      };
+    }
+    if (key === 'match') {
+      return {
+        x: m.x - 168,
+        y: m.y - 6,
+        w: 178,
+        h: 86
+      };
+    }
+    return null;
+  }
+
+  // 碰撞检测：根据逻辑坐标 (lx, ly) 查找命中的可拖动模块（按上层优先顺序）
+  hitTestModule(lx, ly) {
+    const order = ['sides', 'match', 'chart'];
+    for (const key of order) {
+      const box = this.getModuleBoundingBox(key);
+      if (
+        box &&
+        lx >= box.x &&
+        lx <= box.x + box.w &&
+        ly >= box.y &&
+        ly <= box.y + box.h
+      ) {
+        return key;
+      }
+    }
+    return null;
+  }
+
+  setupHiDPI() {
+    this.canvas.width = Math.round(this.logicalWidth * this.dpr);
+    this.canvas.height = Math.round(this.logicalHeight * this.dpr);
+    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+  }
+
+  // 1. 绘制纯净复古米色背景（已删除所有网格线）
+  drawGridBackground() {
+    const ctx = this.ctx;
+    const W = this.logicalWidth;
+    const H = this.logicalHeight;
+
+    ctx.fillStyle = '#f4efe6';
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // 2. 绘制地图主区域：真实最外围轮廓参考线 + 当前 k 边形深蓝填充 + 新增顶点橙色圆点
+  drawMapPolygon(originalRings, currentState, isFinalStep, internalRings = [], showInternal = false) {
+    const ctx = this.ctx;
+
+    // 2.0 若开启了内部行政区划参考线，则以极淡虚线绘制在底层供对比
+    if (showInternal && internalRings && internalRings.length > 1) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(130, 120, 108, 0.32)';
+      ctx.lineWidth = 0.85;
+      ctx.setLineDash([3, 3]);
+      for (const r of internalRings) {
+        if (!r || r.length < 3) continue;
+        ctx.beginPath();
+        for (let i = 0; i < r.length; i++) {
+          if (i === 0) ctx.moveTo(r[i][0], r[i][1]);
+          else ctx.lineTo(r[i][0], r[i][1]);
+        }
+        ctx.closePath();
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // 2.1 真实完整最外围边界参考线（支持主陆 + 所有岛屿与飞地）
+    if (originalRings && originalRings.length > 0) {
+      ctx.save();
+      ctx.beginPath();
+      for (const ring of originalRings) {
+        if (!ring || ring.length < 3) continue;
+        for (let i = 0; i < ring.length; i++) {
+          const pt = ring[i];
+          if (i === 0) ctx.moveTo(pt[0], pt[1]);
+          else ctx.lineTo(pt[0], pt[1]);
+        }
+        ctx.closePath();
+      }
+      ctx.strokeStyle = 'rgba(110, 104, 95, 0.72)';
+      ctx.lineWidth = 1.25;
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 2.2 当前总边数为 k 时的所有已激活多边形深蓝色填充与描边
+    if (currentState && currentState.rings && currentState.rings.length > 0) {
+      ctx.save();
+      ctx.beginPath();
+      for (const ring of currentState.rings) {
+        if (!ring || ring.length < 3) continue;
+        for (let i = 0; i < ring.length; i++) {
+          const pt = ring[i];
+          if (i === 0) ctx.moveTo(pt[0], pt[1]);
+          else ctx.lineTo(pt[0], pt[1]);
+        }
+        ctx.closePath();
+      }
+      ctx.fillStyle = '#183b6b';
+      ctx.fill();
+      ctx.strokeStyle = '#0f2544';
+      ctx.lineWidth = 1.5;
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 2.3 当前步骤新增顶点的高亮橙色圆点
+    if (currentState && currentState.addedPoint && !isFinalStep) {
+      const [vx, vy] = currentState.addedPoint;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(vx, vy, 8, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(243, 156, 18, 0.28)';
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(vx, vy, 4.8, 0, Math.PI * 2);
+      ctx.fillStyle = '#f39c12';
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // 3. 独立可拖动模块 A：绘制 "1000 条边" 边数计数器模块（与匹配模块一样采用右对齐样式）
+  drawSidesModule(currentSides) {
+    const ctx = this.ctx;
+    const mod = this.modules.sides;
+
+    ctx.save();
+    ctx.fillStyle = '#22252a';
+    ctx.font = '700 72px "Source Serif 4", Georgia, serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(String(currentSides), mod.x, mod.y + 68);
+
+    ctx.fillStyle = '#6c6a65';
+    ctx.font = '600 15px "Source Serif 4", "Noto Serif SC", "Songti SC", serif';
+    ctx.fillText('条 边', mod.x, mod.y + 94);
+    ctx.restore();
+  }
+
+  // 4. 独立可拖动模块 B：绘制渐近线（含第一象限无注释 XY 坐标轴、对数坐标 IoU 趋势折线图与里程碑）模块
+  drawChartModule(simplifier, currentSides) {
+    const ctx = this.ctx;
+    const mod = this.modules.chart;
+    const n = simplifier.totalSides;
+    const curIoU = simplifier.iouScores.get(currentSides) || 0;
+
+    // 坐标轴原点及正半轴端点（仅显示 X > 0, Y > 0 部分）
+    const axisOriginX = mod.x;
+    const axisOriginY = mod.y + mod.height + 8;
+    const axisTopY = mod.y - 10;
+    const axisRightX = mod.x + mod.width + 12;
+
+    // 函数曲线绘制区域（严格位于第一象限 X > 0, Y > 0 内部）
+    const chartX0 = mod.x + 6;
+    const chartX1 = mod.x + mod.width;
+    const chartYTop = mod.y;
+    const chartYBottom = mod.y + mod.height;
+
+    const logMin = Math.log(3);
+    const logMax = Math.log(Math.max(4, n));
+    const xOfK = (k) => {
+      const ratio = (Math.log(Math.max(3, k)) - logMin) / (logMax - logMin);
+      return chartX0 + ratio * (chartX1 - chartX0);
+    };
+    const yOfIoU = (iou) => {
+      const clamped = Math.max(35, Math.min(100, iou));
+      const ratio = (clamped - 35) / (100 - 35);
+      return chartYBottom - ratio * (chartYBottom - chartYTop);
+    };
+
+    ctx.save();
+
+    // 绘制仅显示大于 0 部分的第一象限 XY 坐标轴（无箭头、无任何文字/刻度注释）
+    ctx.strokeStyle = 'rgba(78, 76, 72, 0.78)';
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Y 轴正半轴与 X 轴正半轴（在原点相交，无负半轴延伸与箭头）
+    ctx.beginPath();
+    ctx.moveTo(axisOriginX, axisTopY);
+    ctx.lineTo(axisOriginX, axisOriginY);
+    ctx.lineTo(axisRightX, axisOriginY);
+    ctx.stroke();
+
+    // 全程浅色背景参考轨迹
+    ctx.beginPath();
+    for (let k = 3; k <= n; k++) {
+      const x = xOfK(k);
+      const y = yOfIoU(simplifier.iouScores.get(k));
+      if (k === 3) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = 'rgba(130, 124, 114, 0.35)';
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+
+    // 已走过深色轨迹
+    ctx.beginPath();
+    for (let k = 3; k <= currentSides; k++) {
+      const x = xOfK(k);
+      const y = yOfIoU(simplifier.iouScores.get(k));
+      if (k === 3) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = '#22252a';
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+
+    // 已达成的里程碑节点与文字（仅保留 95% 与 99%，上下错开避免重叠）
+    const offsets = [
+      { dx: 4, dy: 15 },
+      { dx: 0, dy: -13 }
+    ];
+
+    simplifier.milestones.forEach((m, idx) => {
+      if (currentSides >= m.k) {
+        const mx = xOfK(m.k);
+        const my = yOfIoU(m.iou);
+
+        ctx.beginPath();
+        ctx.arc(mx, my, 3, 0, Math.PI * 2);
+        ctx.fillStyle = '#22252a';
+        ctx.fill();
+
+        const off = offsets[idx % offsets.length];
+        ctx.fillStyle = '#22252a';
+        ctx.font = '700 11px "Source Serif 4", Georgia, serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(m.label, mx + off.dx, my + off.dy);
+      }
+    });
+
+    // 当前边数在渐近线上的橙色圆点
+    const curX = xOfK(currentSides);
+    const curY = yOfIoU(curIoU);
+    ctx.beginPath();
+    ctx.arc(curX, curY, 4.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#f39c12';
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 5. 独立可拖动模块 C：绘制 "% 匹配" 匹配度百分比模块
+  drawMatchModule(simplifier, currentSides) {
+    const ctx = this.ctx;
+    const mod = this.modules.match;
+    const curIoU = simplifier.iouScores.get(currentSides) || 0;
+    const formattedMatch = formatMatchPercentage(curIoU);
+
+    ctx.save();
+    ctx.fillStyle = '#22252a';
+    ctx.font = '700 44px "Source Serif 4", Georgia, serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(formattedMatch, mod.x, mod.y + 45);
+
+    ctx.fillStyle = '#6c6a65';
+    ctx.font = '600 14px "Source Serif 4", "Noto Serif SC", "Songti SC", serif';
+    ctx.fillText('匹 配', mod.x, mod.y + 68);
+    ctx.restore();
+  }
+
+  // 绘制右下角浅色地图来源小字
+  drawSourceCredit() {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.fillStyle = 'rgba(108, 106, 101, 0.58)';
+    ctx.font = '400 10px "Inter", "Noto Serif SC", "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(
+      '地图来自https://cloudcenter.tianditu.gov.cn/administrativeDivision/',
+      this.logicalWidth - 14,
+      this.logicalHeight - 8
+    );
+    ctx.restore();
+  }
+
+  // 6. 绘制可拖动模块的交互辅助虚线框（仅在鼠标悬停、正在拖动或开启“常显模块框”时显示，导出或录屏时自动隐藏）
+  drawDraggableModuleGizmos() {
+    const ctx = this.ctx;
+    const keys = ['sides', 'chart', 'match'];
+
+    for (const key of keys) {
+      const isDragging = this.draggingModuleKey === key;
+      const isHovered = this.hoveredModuleKey === key;
+      if (!this.alwaysShowGuides && !isDragging && !isHovered) continue;
+
+      const box = this.getModuleBoundingBox(key);
+      const mod = this.modules[key];
+      if (!box || !mod) continue;
+
+      ctx.save();
+      ctx.fillStyle = isDragging
+        ? 'rgba(243, 156, 18, 0.08)'
+        : isHovered
+          ? 'rgba(37, 84, 148, 0.06)'
+          : 'rgba(110, 104, 95, 0.03)';
+      ctx.strokeStyle = isDragging
+        ? 'rgba(243, 156, 18, 0.9)'
+        : isHovered
+          ? 'rgba(37, 84, 148, 0.75)'
+          : 'rgba(110, 104, 95, 0.45)';
+      ctx.lineWidth = isDragging || isHovered ? 1.5 : 1;
+      ctx.setLineDash([5, 4]);
+
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect(box.x, box.y, box.w, box.h, 8);
+      } else {
+        ctx.rect(box.x, box.y, box.w, box.h);
+      }
+      ctx.fill();
+      ctx.stroke();
+
+      // 顶部小型拖动提示标签
+      if (isDragging || isHovered) {
+        ctx.setLineDash([]);
+        const tagText = `✥ ${mod.label}`;
+        ctx.font = '600 10px "Inter", sans-serif';
+        const tagW = ctx.measureText(tagText).width + 12;
+        const tagH = 18;
+        const tagX = Math.max(6, Math.min(this.logicalWidth - tagW - 6, box.x));
+        const tagY = Math.max(6, box.y - tagH - 4);
+
+        ctx.fillStyle = isDragging ? '#f39c12' : '#255494';
+        ctx.beginPath();
+        if (ctx.roundRect) {
+          ctx.roundRect(tagX, tagY, tagW, tagH, 4);
+        } else {
+          ctx.rect(tagX, tagY, tagW, tagH);
+        }
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(tagText, tagX + 6, tagY + tagH / 2);
+      }
+      ctx.restore();
+    }
+  }
+
+  // 完整渲染单帧画面
+  render(simplifier, currentSides, showInternal = false, hideGizmos = false) {
+    this.drawGridBackground();
+    if (!simplifier) return;
+
+    const k = Math.max(3, Math.min(simplifier.totalSides, currentSides));
+    const state = simplifier.states.get(k);
+    const isFinalStep = k >= simplifier.totalSides;
+
+    // 绘制中央多边形地图
+    this.drawMapPolygon(
+      simplifier.originalRings,
+      state,
+      isFinalStep,
+      simplifier.internalRings,
+      showInternal
+    );
+
+    // 绘制三个独立可拖动模块：1000 条边、渐近线折线图、% 匹配
+    this.drawSidesModule(k);
+    this.drawChartModule(simplifier, k);
+    this.drawMatchModule(simplifier, k);
+
+    // 绘制右下角地图来源浅色小字
+    this.drawSourceCredit();
+
+    // 绘制拖动交互辅助框（导出图片时传入 hideGizmos = true 不绘制）
+    if (!hideGizmos) {
+      this.drawDraggableModuleGizmos();
+    }
+  }
+}
+
+/**
+ * ============================================================================
+ * 3. 行政区划外边界融合与岛屿/飞地独立提取引擎
+ * ============================================================================
+ */
+function computePlanarRingArea(ring) {
+  if (!ring || ring.length < 3) return 0;
+  let sum = 0;
+  for (let i = 0, n = ring.length; i < n; i++) {
+    const p1 = ring[i];
+    const p2 = ring[(i + 1) % n];
+    sum += p1[0] * p2[1] - p2[0] * p1[1];
+  }
+  return Math.abs(sum) * 0.5;
+}
+
+function removeCollinearVertices(ring, areaEps = 0.012) {
+  if (!ring || ring.length <= 4) return ring;
+  const result = [];
+  const n = ring.length;
+  for (let i = 0; i < n; i++) {
+    const prev = result.length > 0 ? result[result.length - 1] : ring[(i - 1 + n) % n];
+    const curr = ring[i];
+    const next = ring[(i + 1) % n];
+    const triArea = Math.abs(
+      (prev[0] * (curr[1] - next[1]) +
+       curr[0] * (next[1] - prev[1]) +
+       next[0] * (prev[1] - curr[1])) * 0.5
+    );
+    if (triArea >= areaEps || result.length < 3) {
+      result.push(curr);
+    }
+  }
+  return result.length >= 3 ? result : ring.slice(0, 3);
+}
+
+function computeGeoRingApproxArea(ring) {
+  if (!ring || ring.length < 3) return 0;
+  let sum = 0;
+  let latSum = 0;
+  const n = ring.length;
+  for (let i = 0; i < n; i++) {
+    const p1 = ring[i];
+    const p2 = ring[(i + 1) % n];
+    sum += p1[0] * p2[1] - p2[0] * p1[1];
+    latSum += p1[1];
+  }
+  const meanLatRad = (latSum / n) * (Math.PI / 180);
+  return Math.abs(sum) * 0.5 * Math.max(0.05, Math.cos(meanLatRad));
+}
+
+function projectedRingsShareBoundary(ringA, boxA, ringB, boxB, tol = 0.45) {
+  if (
+    boxA.maxX + tol < boxB.minX ||
+    boxB.maxX + tol < boxA.minX ||
+    boxA.maxY + tol < boxB.minY ||
+    boxB.maxY + tol < boxA.minY
+  ) {
+    return false;
+  }
+
+  const tolSq = tol * tol;
+  let sharedCount = 0;
+  const stepA = Math.max(1, Math.floor(ringA.length / 450));
+  const stepB = Math.max(1, Math.floor(ringB.length / 450));
+
+  for (let i = 0; i < ringA.length; i += stepA) {
+    const ax = ringA[i][0];
+    const ay = ringA[i][1];
+    if (ax < boxB.minX - tol || ax > boxB.maxX + tol || ay < boxB.minY - tol || ay > boxB.maxY + tol) {
+      continue;
+    }
+    for (let j = 0; j < ringB.length; j += stepB) {
+      const dx = ax - ringB[j][0];
+      const dy = ay - ringB[j][1];
+      if (dx * dx + dy * dy <= tolSq) {
+        sharedCount++;
+        if (sharedCount >= 2) return true;
+        break;
+      }
+    }
+  }
+  return false;
+}
+
+function dissolveTouchingRingsToOuterBoundary(touchingRings, bounds) {
+  if (touchingRings.length === 1) {
+    return [cleanProjectedRing(touchingRings[0], 0.25)];
+  }
+
+  const pad = 16;
+  const scale = 3.0;
+  const ox = Math.floor(bounds.x0 - pad);
+  const oy = Math.floor(bounds.y0 - pad);
+  const W = Math.ceil((bounds.x1 - bounds.x0 + pad * 2) * scale);
+  const H = Math.ceil((bounds.y1 - bounds.y0 + pad * 2) * scale);
+
+  const offscreen = document.createElement('canvas');
+  offscreen.width = W;
+  offscreen.height = H;
+  const ctx = offscreen.getContext('2d', { willReadFrequently: true });
+
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2.0;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+
+  for (const ring of touchingRings) {
+    if (!ring || ring.length < 3) continue;
+    ctx.beginPath();
+    for (let i = 0; i < ring.length; i++) {
+      const px = (ring[i][0] - ox) * scale;
+      const py = (ring[i][1] - oy) * scale;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  const imgData = ctx.getImageData(0, 0, W, H).data;
+  const totalPixels = W * H;
+  const mask = new Uint8Array(totalPixels);
+  for (let i = 0; i < totalPixels; i++) {
+    const x = i % W;
+    const y = (i / W) | 0;
+    if (x >= 2 && x < W - 2 && y >= 2 && y < H - 2) {
+      mask[i] = imgData[i * 4 + 3] > 96 ? 1 : 0;
+    }
+  }
+
+  const labels = new Int32Array(totalPixels);
+  const queue = new Int32Array(totalPixels);
+  let currentLabel = 0;
+  const componentInfos = [];
+
+  for (let i = 0; i < totalPixels; i++) {
+    if (mask[i] === 1 && labels[i] === 0) {
+      currentLabel++;
+      let head = 0;
+      let tail = 0;
+      queue[tail++] = i;
+      labels[i] = currentLabel;
+      let count = 0;
+      const firstPixelIdx = i;
+
+      while (head < tail) {
+        const curr = queue[head++];
+        count++;
+
+        const n1 = curr - 1;
+        const n2 = curr + 1;
+        const n3 = curr - W;
+        const n4 = curr + W;
+
+        if (mask[n1] === 1 && labels[n1] === 0) { labels[n1] = currentLabel; queue[tail++] = n1; }
+        if (mask[n2] === 1 && labels[n2] === 0) { labels[n2] = currentLabel; queue[tail++] = n2; }
+        if (mask[n3] === 1 && labels[n3] === 0) { labels[n3] = currentLabel; queue[tail++] = n3; }
+        if (mask[n4] === 1 && labels[n4] === 0) { labels[n4] = currentLabel; queue[tail++] = n4; }
+      }
+
+      if (count >= 12) {
+        componentInfos.push({ label: currentLabel, count, startIdx: firstPixelIdx });
+      }
+    }
+  }
+
+  if (componentInfos.length === 0) {
+    return touchingRings.map(r => cleanProjectedRing(r, 0.25)).filter(r => r.length >= 3);
+  }
+
+  componentInfos.sort((a, b) => b.count - a.count);
+
+  const allOrigPts = [];
+  for (const r of touchingRings) {
+    for (let i = 0; i < r.length; i++) {
+      allOrigPts.push(r[i]);
+    }
+  }
+
+  const extractedBoundaries = [];
+  for (const comp of componentInfos) {
+    const targetLabel = comp.label;
+    const startX = comp.startIdx % W;
+    const startY = (comp.startIdx / W) | 0;
+    const isFg = (x, y) => (x >= 0 && x < W && y >= 0 && y < H) && (labels[y * W + x] === targetLabel);
+
+    const rawContour = [];
+    let vx = startX;
+    let vy = startY;
+    let dir = 0;
+    const maxSteps = totalPixels * 2;
+    let steps = 0;
+
+    while (steps++ < maxSteps) {
+      rawContour.push([vx / scale + ox, vy / scale + oy]);
+
+      if (dir === 0) vx++;
+      else if (dir === 1) vy++;
+      else if (dir === 2) vx--;
+      else vy--;
+
+      if (vx === startX && vy === startY) {
+        break;
+      }
+
+      let frontLeft = false;
+      let frontRight = false;
+      if (dir === 0) {
+        frontLeft = isFg(vx, vy - 1);
+        frontRight = isFg(vx, vy);
+      } else if (dir === 1) {
+        frontLeft = isFg(vx, vy);
+        frontRight = isFg(vx - 1, vy);
+      } else if (dir === 2) {
+        frontLeft = isFg(vx - 1, vy);
+        frontRight = isFg(vx - 1, vy - 1);
+      } else {
+        frontLeft = isFg(vx - 1, vy - 1);
+        frontRight = isFg(vx, vy - 1);
+      }
+
+      if (frontLeft) {
+        dir = (dir + 3) & 3;
+      } else if (!frontRight) {
+        dir = (dir + 1) & 3;
+      }
+    }
+
+    if (rawContour.length < 4) continue;
+
+    let smoothed = rawContour;
+    for (let pass = 0; pass < 3; pass++) {
+      const nextRing = [];
+      const len = smoothed.length;
+      for (let i = 0; i < len; i++) {
+        const prev = smoothed[(i - 1 + len) % len];
+        const curr = smoothed[i];
+        const next = smoothed[(i + 1) % len];
+        nextRing.push([
+          prev[0] * 0.25 + curr[0] * 0.50 + next[0] * 0.25,
+          prev[1] * 0.25 + curr[1] * 0.50 + next[1] * 0.25
+        ]);
+      }
+      smoothed = nextRing;
+    }
+
+    const finalOuterRing = [];
+    for (let i = 0; i < smoothed.length; i++) {
+      const pt = smoothed[i];
+      let bestDist = 0.8;
+      let snapped = pt;
+      for (let j = 0; j < allOrigPts.length; j++) {
+        const orig = allOrigPts[j];
+        const d = Math.hypot(pt[0] - orig[0], pt[1] - orig[1]);
+        if (d < bestDist) {
+          bestDist = d;
+          snapped = orig;
+        }
+      }
+
+      if (finalOuterRing.length > 0) {
+        const prev = finalOuterRing[finalOuterRing.length - 1];
+        if (Math.hypot(snapped[0] - prev[0], snapped[1] - prev[1]) < 0.5) {
+          continue;
+        }
+      }
+      finalOuterRing.push(snapped);
+    }
+
+    if (finalOuterRing.length > 3) {
+      const first = finalOuterRing[0];
+      const last = finalOuterRing[finalOuterRing.length - 1];
+      if (Math.hypot(first[0] - last[0], first[1] - last[1]) < 0.6) {
+        finalOuterRing.pop();
+      }
+    }
+
+    const simplifiedContour = removeCollinearVertices(finalOuterRing, 0.012);
+    if (simplifiedContour.length >= 3) {
+      extractedBoundaries.push(simplifiedContour);
+    }
+  }
+
+  return extractedBoundaries;
+}
+
+function cleanProjectedRing(rawProjected, minStep = 0.35) {
+  const projected = [];
+  for (let i = 0; i < rawProjected.length; i++) {
+    const pt = rawProjected[i];
+    if (!pt || !Number.isFinite(pt[0]) || !Number.isFinite(pt[1])) continue;
+    if (projected.length > 0) {
+      const prev = projected[projected.length - 1];
+      if (Math.hypot(pt[0] - prev[0], pt[1] - prev[1]) < minStep) continue;
+    }
+    projected.push(pt);
+  }
+
+  if (projected.length > 2) {
+    const first = projected[0];
+    const last = projected[projected.length - 1];
+    if (Math.hypot(first[0] - last[0], first[1] - last[1]) < minStep * 1.2) {
+      projected.pop();
+    }
+  }
+  return removeCollinearVertices(projected, 0.008);
+}
+
+function extractAndProjectOuterBoundary(geojson, bounds, dissolveInternal = true) {
+  const rawRings = [];
+  const fallbackLines = [];
+
+  function traverse(node) {
+    if (!node) return;
+    if (Array.isArray(node.features)) {
+      node.features.forEach(f => traverse(f));
+    } else if (node.type === 'Feature') {
+      traverse(node.geometry);
+    } else if (node.type === 'Polygon') {
+      if (node.coordinates && node.coordinates[0] && node.coordinates[0].length >= 4) {
+        rawRings.push(node.coordinates[0]);
+      }
+    } else if (node.type === 'MultiPolygon') {
+      if (Array.isArray(node.coordinates)) {
+        node.coordinates.forEach(poly => {
+          if (poly && poly[0] && poly[0].length >= 4) {
+            rawRings.push(poly[0]);
+          }
+        });
+      }
+    } else if (node.type === 'LineString') {
+      if (Array.isArray(node.coordinates) && node.coordinates.length >= 4) {
+        fallbackLines.push(node.coordinates);
+      }
+    } else if (node.type === 'MultiLineString') {
+      if (Array.isArray(node.coordinates)) {
+        node.coordinates.forEach(line => {
+          if (Array.isArray(line) && line.length >= 4) {
+            fallbackLines.push(line);
+          }
+        });
+      }
+    } else if (node.type === 'GeometryCollection') {
+      if (Array.isArray(node.geometries)) {
+        node.geometries.forEach(g => traverse(g));
+      }
+    }
+  }
+
+  traverse(geojson);
+
+  if (rawRings.length === 0 && fallbackLines.length > 0) {
+    fallbackLines.forEach(line => rawRings.push(line));
+  }
+
+  if (rawRings.length === 0) {
+    throw new Error('未在文件中找到有效的 Polygon 或 MultiPolygon 坐标数据');
+  }
+
+  const ringInfos = [];
+  for (const rawRing of rawRings) {
+    const r = [];
+    let minLon = Infinity, maxLon = -Infinity, minLat = Infinity, maxLat = -Infinity;
+    for (let i = 0; i < rawRing.length; i++) {
+      const pt = rawRing[i];
+      if (!Array.isArray(pt) || pt.length < 2) continue;
+      const lon = Number(pt[0]);
+      const lat = Number(pt[1]);
+      if (!Number.isFinite(lon) || !Number.isFinite(lat)) continue;
+      r.push([lon, lat]);
+      if (lon < minLon) minLon = lon;
+      if (lon > maxLon) maxLon = lon;
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+    }
+    if (r.length < 3) continue;
+    const area = computeGeoRingApproxArea(r);
+    if (area <= 1e-12 || !Number.isFinite(area)) continue;
+    ringInfos.push({ ring: r, area, minLon, maxLon, minLat, maxLat });
+  }
+
+  if (ringInfos.length === 0) {
+    throw new Error('GeoJSON 坐标环面积无效');
+  }
+
+  const n = ringInfos.length;
+  const visited = new Uint8Array(n);
+  const geoClusters = [];
+  const marginDeg = 12.0;
+
+  for (let i = 0; i < n; i++) {
+    if (visited[i]) continue;
+    visited[i] = 1;
+    const cluster = [ringInfos[i]];
+    let clusterArea = ringInfos[i].area;
+    const q = [i];
+
+    while (q.length > 0) {
+      const currIdx = q.pop();
+      const a = ringInfos[currIdx];
+      for (let j = 0; j < n; j++) {
+        if (visited[j]) continue;
+        const b = ringInfos[j];
+        const overlapLon = (a.minLon - marginDeg <= b.maxLon) && (a.maxLon + marginDeg >= b.minLon);
+        const overlapLat = (a.minLat - marginDeg <= b.maxLat) && (a.maxLat + marginDeg >= b.minLat);
+        if (overlapLon && overlapLat) {
+          visited[j] = 1;
+          cluster.push(b);
+          clusterArea += b.area;
+          q.push(j);
+        }
+      }
+    }
+    geoClusters.push({ items: cluster, totalArea: clusterArea });
+  }
+
+  geoClusters.sort((a, b) => b.totalArea - a.totalArea);
+  const targetItems = geoClusters[0].items;
+
+  const sampleCoords = [];
+  let cMinLon = Infinity, cMaxLon = -Infinity, cMinLat = Infinity, cMaxLat = -Infinity;
+  for (const item of targetItems) {
+    const ring = item.ring;
+    const step = Math.max(1, Math.floor(ring.length / 150));
+    for (let i = 0; i < ring.length; i += step) {
+      const pt = ring[i];
+      sampleCoords.push(pt);
+      if (pt[0] < cMinLon) cMinLon = pt[0];
+      if (pt[0] > cMaxLon) cMaxLon = pt[0];
+      if (pt[1] < cMinLat) cMinLat = pt[1];
+      if (pt[1] > cMaxLat) cMaxLat = pt[1];
+    }
+  }
+  const centerLon = (cMinLon + cMaxLon) * 0.5;
+  const centerLat = (cMinLat + cMaxLat) * 0.5;
+  const parallels = [
+    Math.max(-85, Math.min(85, centerLat - 5)),
+    Math.max(-85, Math.min(85, centerLat + 5))
+  ];
+  const projection = d3.geoConicEqualArea()
+    .parallels(parallels)
+    .rotate([-centerLon, 0])
+    .fitExtent([[bounds.x0, bounds.y0], [bounds.x1, bounds.y1]], {
+      type: 'MultiPoint',
+      coordinates: sampleCoords
+    });
+
+  const projectedItems = [];
+  for (const item of targetItems) {
+    const pRing = [];
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (let i = 0; i < item.ring.length; i++) {
+      const pt = projection(item.ring[i]);
+      if (!pt || !Number.isFinite(pt[0]) || !Number.isFinite(pt[1])) continue;
+      pRing.push(pt);
+      if (pt[0] < minX) minX = pt[0];
+      if (pt[0] > maxX) maxX = pt[0];
+      if (pt[1] < minY) minY = pt[1];
+      if (pt[1] > maxY) maxY = pt[1];
+    }
+    if (pRing.length >= 3) {
+      projectedItems.push({
+        ring: pRing,
+        box: { minX, maxX, minY, maxY }
+      });
+    }
+  }
+
+  if (projectedItems.length === 0) {
+    throw new Error('投影转换后未生成有效的多边形坐标');
+  }
+
+  const allProjectedRings = projectedItems.map(it => it.ring);
+
+  if (!dissolveInternal) {
+    const cleanedAll = allProjectedRings
+      .map(r => cleanProjectedRing(r, 0.25))
+      .filter(r => r.length >= 3 && computePlanarRingArea(r) >= 0.15);
+    cleanedAll.sort((a, b) => computePlanarRingArea(b) - computePlanarRingArea(a));
+    return {
+      outerRings: cleanedAll,
+      internalRingsProjected: [],
+      subRegionCount: allProjectedRings.length,
+      islandAndEnclaveCount: Math.max(0, cleanedAll.length - 1)
+    };
+  }
+
+  const mCount = projectedItems.length;
+  const groupVisited = new Uint8Array(mCount);
+  const touchingGroups = [];
+
+  for (let i = 0; i < mCount; i++) {
+    if (groupVisited[i]) continue;
+    groupVisited[i] = 1;
+    const group = [projectedItems[i].ring];
+    const q = [i];
+
+    while (q.length > 0) {
+      const curr = q.pop();
+      for (let j = 0; j < mCount; j++) {
+        if (groupVisited[j]) continue;
+        if (projectedRingsShareBoundary(
+          projectedItems[curr].ring,
+          projectedItems[curr].box,
+          projectedItems[j].ring,
+          projectedItems[j].box,
+          0.45
+        )) {
+          groupVisited[j] = 1;
+          group.push(projectedItems[j].ring);
+          q.push(j);
+        }
+      }
+    }
+    touchingGroups.push(group);
+  }
+
+  let finalOuterRings = [];
+  for (const group of touchingGroups) {
+    if (group.length === 1) {
+      const cleaned = cleanProjectedRing(group[0], 0.22);
+      if (cleaned.length >= 3 && computePlanarRingArea(cleaned) >= 0.15) {
+        finalOuterRings.push(cleaned);
+      }
+    } else {
+      const dissolvedList = dissolveTouchingRingsToOuterBoundary(group, bounds);
+      for (const dr of dissolvedList) {
+        if (dr.length >= 3 && computePlanarRingArea(dr) >= 0.15) {
+          finalOuterRings.push(dr);
+        }
+      }
+    }
+  }
+
+  if (finalOuterRings.length === 0) {
+    finalOuterRings = [cleanProjectedRing(allProjectedRings[0], 0.25)];
+  }
+
+  finalOuterRings.sort((a, b) => computePlanarRingArea(b) - computePlanarRingArea(a));
+
+  return {
+    outerRings: finalOuterRings,
+    internalRingsProjected: allProjectedRings.length > finalOuterRings.length ? allProjectedRings : [],
+    subRegionCount: allProjectedRings.length,
+    islandAndEnclaveCount: Math.max(0, finalOuterRings.length - 1)
+  };
+}
+
+/**
+ * ============================================================================
+ * 4. 内置高还原度离线备用边界与【多行政区划 + 岛屿 + 飞地示例】生成器
+ * ============================================================================
+ */
+function buildProceduralCountryGeoJSON(countryName) {
+  if (countryName === 'MultiDistrictDemo') {
+    return buildMultiDistrictDemoGeoJSON();
+  }
+
+  const templates = {
+    Zambia: [
+      [[22.0, -13.0], [22.0, -16.2], [23.5, -17.6], [25.8, -17.9], [27.8, -16.5],
+       [28.9, -15.9], [30.4, -15.6], [30.2, -14.0], [32.9, -14.0], [33.7, -12.4],
+       [33.2, -10.5], [32.9, -9.4],  [31.1, -8.6],  [30.4, -8.5],  [29.3, -8.3],
+       [28.4, -9.2],  [28.6, -11.9], [29.8, -12.7], [28.2, -13.3], [26.4, -11.9],
+       [25.2, -11.8], [24.0, -10.9], [24.0, -12.6], [22.0, -13.0]]
+    ],
+    France: [
+      [[-4.8, 48.4], [-1.8, 47.2], [-1.2, 44.6], [-1.7, 43.4], [0.1, 42.7],
+       [3.1, 42.4],  [3.2, 43.3],  [4.8, 43.4],  [6.6, 43.2],  [7.5, 43.8],
+       [6.8, 45.1],  [7.0, 45.9],  [6.1, 46.3],  [6.9, 47.5],  [7.6, 47.6],
+       [8.2, 49.0],  [6.1, 49.5],  [4.2, 50.0],  [2.5, 51.1],  [1.6, 50.9],
+       [1.4, 49.9],  [0.1, 49.5],  [-1.9, 49.7], [-1.6, 48.6], [-4.8, 48.4]],
+      [[9.4, 43.0], [9.5, 42.1], [9.2, 41.4], [8.6, 41.6], [8.5, 42.5], [9.0, 42.8], [9.4, 43.0]]
+    ],
+    Australia: [
+      [[113.5, -24.5], [115.1, -34.3], [121.9, -33.9], [129.0, -31.7], [135.5, -34.8],
+       [137.8, -35.6], [140.9, -38.0], [146.3, -39.0], [150.0, -37.5], [153.6, -28.2],
+       [150.5, -22.5], [145.3, -15.4], [142.5, -10.7], [141.7, -12.6], [139.5, -17.6],
+       [136.8, -12.2], [132.5, -11.4], [129.5, -14.9], [126.1, -13.9], [122.2, -18.0],
+       [114.1, -21.8], [113.5, -24.5]],
+      [[144.6, -40.7], [145.2, -42.2], [146.8, -43.6], [148.3, -42.9], [148.3, -41.0], [146.5, -41.1], [144.6, -40.7]]
+    ]
+  };
+
+  const baseRings = templates[countryName] || templates.Zambia;
+  let seed = countryName.charCodeAt(0) * 137;
+  const rand = () => {
+    seed = (seed * 1664525 + 1013904223) % 4294967296;
+    return seed / 4294967296 - 0.5;
+  };
+
+  const multiCoords = baseRings.map((base, ringIdx) => {
+    let pts = base.slice(0, -1);
+    const subdivSteps = ringIdx === 0 ? 6 : 4;
+    for (let step = 0; step < subdivSteps; step++) {
+      const nextPts = [];
+      for (let i = 0; i < pts.length; i++) {
+        const p1 = pts[i];
+        const p2 = pts[(i + 1) % pts.length];
+        nextPts.push(p1);
+        const dx = p2[0] - p1[0];
+        const dy = p2[1] - p1[1];
+        const len = Math.hypot(dx, dy);
+        const offset = rand() * len * 0.20;
+        nextPts.push([
+          (p1[0] + p2[0]) / 2 - (dy / len) * offset,
+          (p1[1] + p2[1]) / 2 + (dx / len) * offset
+        ]);
+      }
+      pts = nextPts;
+    }
+    pts.push(pts[0]);
+    return [pts];
+  });
+
+  return {
+    type: 'Feature',
+    properties: { name: countryName },
+    geometry: { type: 'MultiPolygon', coordinates: multiCoords }
+  };
+}
+
+function buildMultiDistrictDemoGeoJSON() {
+  const cols = 3;
+  const rows = 4;
+  const baseLon = 110.0;
+  const baseLat = 26.0;
+  const stepLon = 1.6;
+  const stepLat = 1.35;
+
+  let seed = 9527;
+  const rand = () => {
+    seed = (seed * 1664525 + 1013904223) % 4294967296;
+    return seed / 4294967296 - 0.5;
+  };
+
+  const gridNodes = [];
+  for (let r = 0; r <= rows; r++) {
+    gridNodes[r] = [];
+    for (let c = 0; c <= cols; c++) {
+      const cx = (c - cols / 2) / (cols / 2);
+      const cy = (r - rows / 2) / (rows / 2);
+      const radialScale = 1 - 0.16 * (cx * cx + cy * cy);
+      const lon = baseLon + c * stepLon * radialScale + rand() * 0.35;
+      const lat = baseLat + r * stepLat * radialScale + rand() * 0.32;
+      gridNodes[r][c] = [lon, lat];
+    }
+  }
+
+  const edgeCache = new Map();
+  function getSharedEdge(r1, c1, r2, c2) {
+    const keyFwd = `${r1},${c1}->${r2},${c2}`;
+    const keyRev = `${r2},${c2}->${r1},${c1}`;
+    if (edgeCache.has(keyFwd)) return edgeCache.get(keyFwd);
+    if (edgeCache.has(keyRev)) return edgeCache.get(keyRev).slice().reverse();
+
+    let pts = [gridNodes[r1][c1], gridNodes[r2][c2]];
+    for (let step = 0; step < 5; step++) {
+      const next = [];
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p1 = pts[i];
+        const p2 = pts[i + 1];
+        next.push(p1);
+        const dx = p2[0] - p1[0];
+        const dy = p2[1] - p1[1];
+        const len = Math.hypot(dx, dy) || 1;
+        const off = rand() * len * 0.22;
+        next.push([
+          (p1[0] + p2[0]) * 0.5 - (dy / len) * off,
+          (p1[1] + p2[1]) * 0.5 + (dx / len) * off
+        ]);
+      }
+      next.push(pts[pts.length - 1]);
+      pts = next;
+    }
+    edgeCache.set(keyFwd, pts);
+    return pts;
+  }
+
+  const features = [];
+  let idCounter = 1;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (r === rows - 1 && c === cols - 1) continue;
+
+      const bottom = getSharedEdge(r, c, r, c + 1);
+      const right = getSharedEdge(r, c + 1, r + 1, c + 1);
+      const top = getSharedEdge(r + 1, c + 1, r + 1, c);
+      const left = getSharedEdge(r + 1, c, r, c);
+
+      const ring = [
+        ...bottom.slice(0, -1),
+        ...right.slice(0, -1),
+        ...top.slice(0, -1),
+        ...left
+      ];
+
+      features.push({
+        type: 'Feature',
+        properties: { name: `下辖行政区-${idCounter++}` },
+        geometry: {
+          type: 'Polygon',
+          coordinates: [ring]
+        }
+      });
+    }
+  }
+
+  function makeFractalIsland(centerLon, centerLat, radiusLon, radiusLat, subdiv = 4) {
+    let pts = [
+      [centerLon - radiusLon, centerLat - radiusLat * 0.4],
+      [centerLon - radiusLon * 0.2, centerLat - radiusLat],
+      [centerLon + radiusLon, centerLat - radiusLat * 0.5],
+      [centerLon + radiusLon * 0.8, centerLat + radiusLat * 0.7],
+      [centerLon - radiusLon * 0.3, centerLat + radiusLat]
+    ];
+    for (let s = 0; s < subdiv; s++) {
+      const next = [];
+      for (let i = 0; i < pts.length; i++) {
+        const p1 = pts[i];
+        const p2 = pts[(i + 1) % pts.length];
+        next.push(p1);
+        const dx = p2[0] - p1[0];
+        const dy = p2[1] - p1[1];
+        const len = Math.hypot(dx, dy) || 1;
+        const off = rand() * len * 0.22;
+        next.push([
+          (p1[0] + p2[0]) * 0.5 - (dy / len) * off,
+          (p1[1] + p2[1]) * 0.5 + (dx / len) * off
+        ]);
+      }
+      pts = next;
+    }
+    pts.push(pts[0]);
+    return pts;
+  }
+
+  features.push({
+    type: 'Feature',
+    properties: { name: '东南海岛县' },
+    geometry: { type: 'Polygon', coordinates: [makeFractalIsland(115.65, 27.2, 0.52, 0.42, 4)] }
+  });
+  features.push({
+    type: 'Feature',
+    properties: { name: '南部群岛区' },
+    geometry: { type: 'Polygon', coordinates: [makeFractalIsland(114.95, 25.55, 0.36, 0.28, 4)] }
+  });
+  features.push({
+    type: 'Feature',
+    properties: { name: '西北飞地特区' },
+    geometry: { type: 'Polygon', coordinates: [makeFractalIsland(108.9, 30.25, 0.40, 0.34, 4)] }
+  });
+
+  return {
+    type: 'FeatureCollection',
+    name: 'PROVINCE & ISLANDS',
+    features
+  };
+}
+
+/**
+ * ============================================================================
+ * 5. 主控制器与指数节奏动画引擎 + 画布模块拖拽与视频录制控制
+ * ============================================================================
+ */
+const canvasEl = document.getElementById('poster-canvas');
+const canvasWrapperEl = document.getElementById('canvas-wrapper');
+const renderer = new PosterCanvasRenderer(canvasEl);
+
+let simplifier = null;
+let currentGeoJSON = null;
+let currentRegionTitle = 'ZAMBIA';
+let currentSides = 3;
+let userMaxSidesCap = DEFAULT_MAX_SIDES_CAP;
+let isPlaying = true;
+let animTimer = null;
+let speedMultiplier = 1.0;
+let cachedWorldGeoJSON = null;
+
+// 视频录制状态
+let isRecordingVideo = false;
+let mediaRecorder = null;
+let recordedChunks = [];
+let holdFrameRafId = null;
+
+// DOM 引用
+const maxSidesInput = document.getElementById('max-sides-input');
+const applyMaxSidesBtn = document.getElementById('apply-max-sides-btn');
+const sliderEl = document.getElementById('sides-slider');
+const sliderReadout = document.getElementById('slider-readout');
+const dissolveToggle = document.getElementById('dissolve-toggle');
+const showInternalWrapper = document.getElementById('show-internal-wrapper');
+const showInternalToggle = document.getElementById('show-internal-toggle');
+const showModuleGuidesToggle = document.getElementById('show-module-guides-toggle');
+const resetLayoutBtn = document.getElementById('reset-layout-btn');
+const mergeInfoBadge = document.getElementById('merge-info-badge');
+const playBtn = document.getElementById('play-btn');
+const recordVideoBtn = document.getElementById('record-video-btn');
+const recordBtnText = document.getElementById('record-btn-text');
+const recDot = document.getElementById('rec-dot');
+const videoQualitySelect = document.getElementById('video-quality-select');
+const statSides = document.getElementById('stat-sides');
+const statActivePolys = document.getElementById('stat-active-polys');
+const statIoU = document.getElementById('stat-iou');
+const statTotal = document.getElementById('stat-total');
+const statPolyCount = document.getElementById('stat-poly-count');
+const milestonePills = document.getElementById('milestone-pills');
+const statusBadge = document.getElementById('status-badge');
+
+// 同步更新 Canvas 画面与左侧面板数据
+function updateView(k, hideGizmos = false) {
+  if (!simplifier) return;
+  k = Math.max(3, Math.min(simplifier.totalSides, Math.round(k)));
+  currentSides = k;
+
+  const iou = simplifier.iouScores.get(k) || 0;
+  const st = simplifier.states.get(k);
+  const totalPolys = simplifier.polyHierarchies ? simplifier.polyHierarchies.length : 1;
+  const activePolys = st ? st.activePolyCount : 1;
+
+  // 正在录制视频时强制隐藏模块拖拽虚线框，保证视频画面干净
+  renderer.render(
+    simplifier,
+    k,
+    showInternalToggle.checked,
+    hideGizmos || isRecordingVideo
+  );
+
+  sliderEl.value = k;
+  sliderReadout.textContent = `${k} / ${simplifier.totalSides} 边`;
+  statSides.textContent = `${k} 边`;
+  if (statActivePolys) {
+    statActivePolys.textContent = `${activePolys} / ${totalPolys} 区块`;
+  }
+  statIoU.textContent = formatMatchPercentage(iou);
+  statTotal.textContent = `${simplifier.totalSides} 边`;
+  if (statPolyCount) {
+    statPolyCount.textContent = totalPolys > 1
+      ? `上限${simplifier.maxSidesCap} · ${totalPolys}外边界`
+      : `上限${simplifier.maxSidesCap} · 1外边界`;
+  }
+}
+
+/**
+ * 切换页面长宽比并重新投影当前地图
+ */
+function applyAspectRatio(ratioKey) {
+  if (isRecordingVideo) {
+    showToast('正在录制视频，请等待录制完成后再切换长宽比', 'error');
+    return;
+  }
+  const preset = ASPECT_RATIO_PRESETS[ratioKey];
+  if (!preset) return;
+
+  document.querySelectorAll('.ratio-btn').forEach(btn => {
+    if (btn.dataset.ratio === ratioKey) {
+      btn.classList.add('text-amber-400', 'border-amber-500/50');
+      btn.classList.remove('text-gray-300', 'border-transparent');
+    } else {
+      btn.classList.remove('text-amber-400', 'border-amber-500/50');
+      btn.classList.add('text-gray-300', 'border-transparent');
+    }
+  });
+
+  canvasWrapperEl.style.aspectRatio = preset.cssAspect;
+  canvasWrapperEl.style.maxWidth = `${preset.maxWidthPx}px`;
+
+  renderer.setAspectRatio(ratioKey);
+
+  if (currentGeoJSON) {
+    loadGeoJSONData(currentGeoJSON, currentRegionTitle);
+  }
+}
+
+/**
+ * 画布上三个独立模块（SIDES、渐近线、% MATCH）的指针拖拽事件处理
+ */
+let dragStartLogical = { x: 0, y: 0 };
+let dragModuleInitialPos = { x: 0, y: 0 };
+
+function clientToLogicalCoords(clientX, clientY) {
+  const rect = canvasEl.getBoundingClientRect();
+  const scaleX = renderer.logicalWidth / rect.width;
+  const scaleY = renderer.logicalHeight / rect.height;
+  return {
+    x: (clientX - rect.left) * scaleX,
+    y: (clientY - rect.top) * scaleY
+  };
+}
+
+function handlePointerDown(clientX, clientY) {
+  const pt = clientToLogicalCoords(clientX, clientY);
+  const hitKey = renderer.hitTestModule(pt.x, pt.y);
+  if (hitKey) {
+    renderer.draggingModuleKey = hitKey;
+    renderer.hoveredModuleKey = hitKey;
+    dragStartLogical = pt;
+    dragModuleInitialPos = {
+      x: renderer.modules[hitKey].x,
+      y: renderer.modules[hitKey].y
+    };
+    canvasEl.style.cursor = 'grabbing';
+    updateView(currentSides);
+    return true;
+  }
+  return false;
+}
+
+function handlePointerMove(clientX, clientY) {
+  const pt = clientToLogicalCoords(clientX, clientY);
+
+  // 如果正在拖动某个模块，实时更新该模块的整体坐标
+  if (renderer.draggingModuleKey) {
+    const key = renderer.draggingModuleKey;
+    const mod = renderer.modules[key];
+    const dx = pt.x - dragStartLogical.x;
+    const dy = pt.y - dragStartLogical.y;
+
+    mod.x = Math.round(dragModuleInitialPos.x + dx);
+    mod.y = Math.round(dragModuleInitialPos.y + dy);
+
+    // 限制在画布安全范围内，防止拖出画布丢失
+    if (key === 'sides') {
+      mod.x = Math.max(150, Math.min(renderer.logicalWidth - 12, mod.x));
+      mod.y = Math.max(10, Math.min(renderer.logicalHeight - 105, mod.y));
+    } else if (key === 'chart') {
+      mod.x = Math.max(16, Math.min(renderer.logicalWidth - mod.width - 16, mod.x));
+      mod.y = Math.max(20, Math.min(renderer.logicalHeight - mod.height - 25, mod.y));
+    } else if (key === 'match') {
+      mod.x = Math.max(140, Math.min(renderer.logicalWidth - 12, mod.x));
+      mod.y = Math.max(10, Math.min(renderer.logicalHeight - 80, mod.y));
+    }
+
+    updateView(currentSides);
+    return;
+  }
+
+  // 未处于拖动状态时，检测悬停高亮并切换光标样式
+  const hitKey = renderer.hitTestModule(pt.x, pt.y);
+  if (hitKey !== renderer.hoveredModuleKey) {
+    renderer.hoveredModuleKey = hitKey;
+    canvasEl.style.cursor = hitKey ? 'grab' : 'default';
+    updateView(currentSides);
+  }
+}
+
+function handlePointerUp() {
+  if (renderer.draggingModuleKey) {
+    renderer.draggingModuleKey = null;
+    canvasEl.style.cursor = renderer.hoveredModuleKey ? 'grab' : 'default';
+    updateView(currentSides);
+  }
+}
+
+// 绑定鼠标拖拽事件
+canvasEl.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return;
+  handlePointerDown(e.clientX, e.clientY);
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (renderer.draggingModuleKey || e.target === canvasEl) {
+    handlePointerMove(e.clientX, e.clientY);
+  }
+});
+
+window.addEventListener('mouseup', () => {
+  handlePointerUp();
+});
+
+canvasEl.addEventListener('mouseleave', () => {
+  if (!renderer.draggingModuleKey && renderer.hoveredModuleKey) {
+    renderer.hoveredModuleKey = null;
+    canvasEl.style.cursor = 'default';
+    updateView(currentSides);
+  }
+});
+
+// 绑定触控屏拖拽事件
+canvasEl.addEventListener('touchstart', (e) => {
+  if (e.touches.length === 1) {
+    const touch = e.touches[0];
+    if (handlePointerDown(touch.clientX, touch.clientY)) {
+      e.preventDefault();
+    }
+  }
+}, { passive: false });
+
+window.addEventListener('touchmove', (e) => {
+  if (renderer.draggingModuleKey && e.touches.length === 1) {
+    e.preventDefault();
+    const touch = e.touches[0];
+    handlePointerMove(touch.clientX, touch.clientY);
+  }
+}, { passive: false });
+
+window.addEventListener('touchend', () => {
+  handlePointerUp();
+});
+
+// 重置三个可拖动模块到默认位置
+resetLayoutBtn.addEventListener('click', () => {
+  renderer.resetModulesToDefault();
+  updateView(currentSides);
+  showToast('已重置“条边”、“渐近线”与“匹配”模块的默认位置', 'info');
+});
+
+// 绑定页面长宽比切换按钮
+document.querySelectorAll('.ratio-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    applyAspectRatio(btn.dataset.ratio);
+  });
+});
+
+// 切换是否常显模块辅助框
+showModuleGuidesToggle.addEventListener('change', () => {
+  renderer.alwaysShowGuides = showModuleGuidesToggle.checked;
+  updateView(currentSides);
+});
+
+// 同步高亮最大边数快捷按钮状态
+function syncMaxCapPresetButtons(capVal) {
+  document.querySelectorAll('.max-cap-preset-btn').forEach(btn => {
+    const btnCap = parseInt(btn.dataset.cap, 10);
+    if (btnCap === capVal) {
+      btn.classList.add('text-amber-400', 'border-amber-500/40');
+      btn.classList.remove('text-gray-300', 'border-transparent');
+    } else {
+      btn.classList.remove('text-amber-400', 'border-amber-500/40');
+      btn.classList.add('text-gray-300', 'border-transparent');
+    }
+  });
+}
+
+// 动态应用用户修改的最大边数上限
+function applyUserMaxSidesCap(rawVal) {
+  const parsed = parseInt(rawVal, 10);
+  if (!Number.isFinite(parsed) || parsed < 3) {
+    showToast('最大边数上限必须是不小于 3 的整数', 'error');
+    maxSidesInput.value = userMaxSidesCap;
+    return;
+  }
+
+  userMaxSidesCap = Math.min(10000, Math.max(3, parsed));
+  maxSidesInput.value = userMaxSidesCap;
+  syncMaxCapPresetButtons(userMaxSidesCap);
+
+  if (!simplifier) return;
+
+  pauseAnimation();
+  simplifier.computeEvolutionAndMatch(
+    renderer.logicalWidth,
+    renderer.logicalHeight,
+    userMaxSidesCap
+  );
+
+  sliderEl.max = simplifier.totalSides;
+  const targetK = Math.min(currentSides, simplifier.totalSides);
+  renderMilestonePills();
+  updateView(targetK);
+
+  const finalIoU = formatMatchPercentage(simplifier.iouScores.get(simplifier.totalSides) || 0);
+  if (simplifier.totalSides < userMaxSidesCap) {
+    showToast(`上限设为 ${userMaxSidesCap} 边：在 ${simplifier.totalSides} 边已提前完全匹配 (${finalIoU})`, 'success');
+  } else {
+    showToast(`已应用上限 ${userMaxSidesCap} 边：在 ${simplifier.totalSides} 边处实际匹配度为 ${finalIoU}`, 'info');
+  }
+}
+
+// 渲染左侧里程碑快捷跳转按钮
+function renderMilestonePills() {
+  milestonePills.innerHTML = '';
+  if (!simplifier) return;
+
+  const startBtn = document.createElement('button');
+  startBtn.className = 'px-2.5 py-1 text-[11px] font-mono rounded-md bg-[#272c35] hover:bg-amber-500 hover:text-gray-950 text-gray-300 transition';
+  startBtn.textContent = '起点: 3 边';
+  startBtn.addEventListener('click', () => {
+    pauseAnimation();
+    updateView(3);
+  });
+  milestonePills.appendChild(startBtn);
+
+  simplifier.milestones.forEach(m => {
+    const btn = document.createElement('button');
+    btn.className = 'px-2.5 py-1 text-[11px] font-mono rounded-md bg-[#272c35] hover:bg-amber-500 hover:text-gray-950 text-gray-300 transition';
+    btn.textContent = `${m.label}边`;
+    btn.addEventListener('click', () => {
+      pauseAnimation();
+      updateView(m.k);
+    });
+    milestonePills.appendChild(btn);
+  });
+
+  const endIoU = simplifier.iouScores.get(simplifier.totalSides) || 0;
+  const endBtn = document.createElement('button');
+  endBtn.className = 'px-2.5 py-1 text-[11px] font-mono rounded-md bg-[#272c35] hover:bg-amber-500 hover:text-gray-950 text-amber-400/90 transition';
+  endBtn.textContent = `终点: ${simplifier.totalSides}边 (${formatMatchPercentage(endIoU)})`;
+  endBtn.addEventListener('click', () => {
+    pauseAnimation();
+    updateView(simplifier.totalSides);
+  });
+  milestonePills.appendChild(endBtn);
+}
+
+// 启动非线性（前慢后快）动画循环
+function startAnimation(onCompleteCallback = null) {
+  stopAnimationTimer();
+  isPlaying = true;
+  playBtn.innerHTML = '<span>⏸ 暂停</span>';
+
+  function tick() {
+    if (!isPlaying || !simplifier) return;
+    const maxK = simplifier.totalSides;
+
+    if (currentSides >= maxK) {
+      isPlaying = false;
+      playBtn.innerHTML = '<span>▶ 播放</span>';
+      if (typeof onCompleteCallback === 'function') {
+        onCompleteCallback();
+      }
+      return;
+    }
+
+    let nextK = currentSides + 1;
+    let baseDelay = 420;
+
+    if (currentSides < 10) {
+      nextK = currentSides + 1;
+      baseDelay = 420;
+    } else if (currentSides < 25) {
+      nextK = currentSides + 1;
+      baseDelay = 175;
+    } else if (currentSides < 60) {
+      nextK = currentSides + 2;
+      baseDelay = 85;
+    } else {
+      const jump = Math.max(1, Math.floor((currentSides - 40) * 0.085));
+      nextK = Math.min(maxK, currentSides + jump);
+      baseDelay = 45;
+    }
+
+    updateView(nextK);
+    animTimer = setTimeout(tick, Math.max(16, baseDelay / speedMultiplier));
+  }
+
+  animTimer = setTimeout(tick, 380 / speedMultiplier);
+}
+
+function pauseAnimation() {
+  stopAnimationTimer();
+  isPlaying = false;
+  playBtn.innerHTML = '<span>▶ 播放</span>';
+}
+
+function stopAnimationTimer() {
+  if (animTimer) {
+    clearTimeout(animTimer);
+    animTimer = null;
+  }
+}
+
+/**
+ * ============================================================================
+ * 完整演化视频录制引擎 (支持标清 720P / 高清 1080P / 超清 2K 原画选择)
+ * ============================================================================
+ */
+const VIDEO_QUALITY_CONFIGS = {
+  standard: { dpr: 1.35, bitrate: 6000000,  label: '标清 720P' },
+  high:     { dpr: 2.0,  bitrate: 16000000, label: '高清 1080P' },
+  ultra:    { dpr: 2.75, bitrate: 32000000, label: '超清 2K' }
+};
+
+function getSupportedMimeType() {
+  const candidates = [
+    'video/mp4;codecs=avc1.42E01E',
+    'video/mp4',
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm'
+  ];
+  for (const type of candidates) {
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported(type)) {
+      return type;
+    }
+  }
+  return '';
+}
+
+function startFullVideoRecording() {
+  if (!simplifier) {
+    showToast('请先加载有效的多边形数据', 'error');
+    return;
+  }
+  if (!window.MediaRecorder || !canvasEl.captureStream) {
+    showToast('当前浏览器不支持 Canvas 视频录制功能，请使用现代 Chrome / Edge 浏览器', 'error');
+    return;
+  }
+
+  const qualityKey = videoQualitySelect.value || 'high';
+  const qConfig = VIDEO_QUALITY_CONFIGS[qualityKey] || VIDEO_QUALITY_CONFIGS.high;
+  const mimeType = getSupportedMimeType();
+
+  pauseAnimation();
+  isRecordingVideo = true;
+  recordedChunks = [];
+
+  // 临时切换到录制对应的高清 DPR 分辨率
+  renderer.dpr = qConfig.dpr;
+  renderer.setupHiDPI();
+  updateView(3, true);
+
+  try {
+    const stream = canvasEl.captureStream(60);
+    const options = { videoBitsPerSecond: qConfig.bitrate };
+    if (mimeType) options.mimeType = mimeType;
+
+    mediaRecorder = new MediaRecorder(stream, options);
+
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) {
+        recordedChunks.push(e.data);
+      }
+    };
+
+    mediaRecorder.onstop = () => {
+      isRecordingVideo = false;
+      // 恢复正常屏幕 DPR
+      renderer.dpr = Math.max(window.devicePixelRatio || 1, 2);
+      renderer.setupHiDPI();
+      updateView(currentSides, false);
+
+      // 恢复录制按钮 UI
+      recordBtnText.textContent = '开始录制完整视频 (3边 → 终点)';
+      recordVideoBtn.classList.remove('bg-amber-500', 'hover:bg-amber-400', 'text-gray-950');
+      recordVideoBtn.classList.add('bg-rose-600', 'hover:bg-rose-500', 'text-white');
+      recDot.classList.remove('animate-ping');
+      statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> 就绪';
+
+      if (recordedChunks.length === 0) {
+        showToast('未捕获到视频帧数据', 'error');
+        return;
+      }
+
+      const finalMime = mediaRecorder.mimeType || mimeType || 'video/webm';
+      const ext = finalMime.includes('mp4') ? 'mp4' : 'webm';
+      const blob = new Blob(recordedChunks, { type: finalMime });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const cleanTitle = (currentRegionTitle || 'map').toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-');
+      link.href = url;
+      link.download = `${cleanTitle}-evolution-${renderer.aspectKey.replace(':', 'x')}-${qualityKey}.${ext}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+      showToast(`完整视频录制完成！已导出 ${qConfig.label} 视频 (.${ext})`, 'success');
+    };
+
+    mediaRecorder.start(100);
+
+    // 更新录制中按钮与状态栏 UI
+    recordBtnText.textContent = '⏹ 正在录制中... (点击可提前结束并保存)';
+    recordVideoBtn.classList.remove('bg-rose-600', 'hover:bg-rose-500', 'text-white');
+    recordVideoBtn.classList.add('bg-amber-500', 'hover:bg-amber-400', 'text-gray-950');
+    recDot.classList.add('animate-ping');
+    statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span> 正在录制完整视频...';
+    showToast(`开始录制 ${qConfig.label} 完整演化视频 (3 边 → ${simplifier.totalSides} 边)`, 'info');
+
+    // 从第 3 条边停留 300ms 后启动完整动画；到达终点后持续强制重绘保持 2 秒（2000ms）再输出视频
+    setTimeout(() => {
+      if (!isRecordingVideo) return;
+      startAnimation(() => {
+        if (!isRecordingVideo) return;
+
+        const finalSides = simplifier.totalSides;
+        updateView(finalSides, true);
+        recordBtnText.textContent = '⏹ 已达终点，画面保持 2 秒中...';
+
+        const holdDurationMs = 2000;
+        const holdStartTime = performance.now();
+
+        function keepFinalFrameAlive(now) {
+          if (!isRecordingVideo) return;
+
+          // 每帧强制重绘一次终点画面，确保 captureStream 持续向视频编码器写入真实的终点帧
+          renderer.render(
+            simplifier,
+            finalSides,
+            showInternalToggle.checked,
+            true
+          );
+
+          if (now - holdStartTime < holdDurationMs) {
+            holdFrameRafId = requestAnimationFrame(keepFinalFrameAlive);
+          } else {
+            holdFrameRafId = null;
+            stopVideoRecording();
+          }
+        }
+
+        holdFrameRafId = requestAnimationFrame(keepFinalFrameAlive);
+      });
+    }, 300);
+  } catch (err) {
+    isRecordingVideo = false;
+    renderer.dpr = Math.max(window.devicePixelRatio || 1, 2);
+    renderer.setupHiDPI();
+    updateView(currentSides, false);
+    showToast('启动视频录制失败: ' + err.message, 'error');
+  }
+}
+
+function cancelHoldFrameLoop() {
+  if (holdFrameRafId !== null) {
+    cancelAnimationFrame(holdFrameRafId);
+    holdFrameRafId = null;
+  }
+}
+
+function stopVideoRecording() {
+  cancelHoldFrameLoop();
+  pauseAnimation();
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    try {
+      mediaRecorder.requestData();
+    } catch (e) {}
+    mediaRecorder.stop();
+  }
+}
+
+recordVideoBtn.addEventListener('click', () => {
+  if (isRecordingVideo) {
+    stopVideoRecording();
+  } else {
+    startFullVideoRecording();
+  }
+});
+
+// 载入任意 GeoJSON 数据并初始化外边界提取（含岛屿与飞地）、算法与 Canvas
+function loadGeoJSONData(geojson, regionTitle = 'ZAMBIA') {
+  pauseAnimation();
+  currentGeoJSON = geojson;
+  currentRegionTitle = regionTitle;
+  statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span> 正在提取外边界与岛屿...';
+
+  setTimeout(() => {
+    try {
+      const dissolveEnabled = dissolveToggle.checked;
+      const result = extractAndProjectOuterBoundary(
+        geojson,
+        renderer.mapBounds,
+        dissolveEnabled
+      );
+
+      const outerRings = result.outerRings;
+      const totalPts = outerRings.reduce((sum, r) => sum + r.length, 0);
+      if (outerRings.length === 0 || totalPts < 3) {
+        showToast('该多边形有效顶点不足，无法进行渐进逼近演示', 'error');
+        return;
+      }
+
+      const polyCount = outerRings.length;
+      if (result.subRegionCount > 1 || polyCount > 1) {
+        mergeInfoBadge.classList.remove('hidden');
+        if (dissolveEnabled && result.subRegionCount > polyCount) {
+          mergeInfoBadge.textContent = `${result.subRegionCount} 区块 → 融合为 ${polyCount} 个外边界(含岛屿/飞地)`;
+        } else if (polyCount > 1) {
+          mergeInfoBadge.textContent = `共 ${polyCount} 个独立多边形 (主陆 + ${polyCount - 1} 岛屿/飞地)`;
+        } else {
+          mergeInfoBadge.textContent = `已融合 ${result.subRegionCount} 个内部区块 → 1 个外边界`;
+        }
+        if (result.internalRingsProjected.length > 1) {
+          showInternalWrapper.classList.remove('hidden');
+        } else {
+          showInternalWrapper.classList.add('hidden');
+        }
+      } else {
+        mergeInfoBadge.classList.add('hidden');
+        showInternalWrapper.classList.add('hidden');
+        showInternalToggle.checked = false;
+      }
+
+      simplifier = new VisvalingamSimplifier(
+        outerRings,
+        result.internalRingsProjected,
+        userMaxSidesCap
+      );
+      simplifier.computeEvolutionAndMatch(renderer.logicalWidth, renderer.logicalHeight, userMaxSidesCap);
+
+      sliderEl.max = simplifier.totalSides;
+      sliderEl.value = 3;
+
+      renderMilestonePills();
+      updateView(3);
+      startAnimation();
+
+      statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> 就绪';
+      const finalIoU = formatMatchPercentage(simplifier.iouScores.get(simplifier.totalSides) || 0);
+      const stopReason = simplifier.totalSides < userMaxSidesCap
+        ? `在 ${simplifier.totalSides} 边即完全匹配 (${finalIoU})`
+        : `达上限 ${userMaxSidesCap} 边，实际匹配度 ${finalIoU}`;
+      showToast(`已加载 ${regionTitle.toUpperCase()}：${stopReason}`, 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('解析 GeoJSON 失败: ' + err.message, 'error');
+      statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-400"></span> 解析异常';
+    }
+  }, 20);
+}
+
+// 加载预设国家或多行政区划示例
+async function loadPresetCountry(countryName) {
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    if (btn.dataset.preset === countryName) {
+      btn.classList.add('border-amber-500/50', 'text-white');
+      btn.classList.remove('border-transparent', 'text-gray-200');
+    } else {
+      btn.classList.remove('border-amber-500/50', 'text-white');
+      btn.classList.add('border-transparent', 'text-gray-200');
+    }
+  });
+
+  if (countryName === 'MultiDistrictDemo') {
+    const demoGeoJSON = buildMultiDistrictDemoGeoJSON();
+    loadGeoJSONData(demoGeoJSON, 'PROVINCE');
+    return;
+  }
+
+  try {
+    if (!cachedWorldGeoJSON) {
+      const response = await fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson');
+      if (response.ok) {
+        cachedWorldGeoJSON = await response.json();
+      }
+    }
+    if (cachedWorldGeoJSON && cachedWorldGeoJSON.features) {
+      const target = cachedWorldGeoJSON.features.find(f => {
+        const name = (f.properties.ADMIN || f.properties.name || '').toLowerCase();
+        return name === countryName.toLowerCase();
+      });
+      if (target) {
+        loadGeoJSONData(target, countryName);
+        return;
+      }
+    }
+  } catch (e) {
+    // 网络受限时静默使用内置高精度轮廓数据
+  }
+
+  const fallback = buildProceduralCountryGeoJSON(countryName);
+  loadGeoJSONData(fallback, countryName);
+}
+
+/**
+ * ============================================================================
+ * 6. 交互事件绑定（上传、拖拽、最大边数设置、播放控制、高清 PNG 导出）
+ * ============================================================================
+ */
+function handleUploadedFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const json = JSON.parse(e.target.result);
+      let name = file.name.replace(/\.(geo)?json$/i, '');
+
+      if (json.name) {
+        name = json.name;
+      } else if (json.features && json.features.length === 1 && json.features[0]?.properties) {
+        const p = json.features[0].properties;
+        name = p.name || p.NAME || p.ADMIN || p.id || name;
+      } else if (json.properties) {
+        name = json.properties.name || json.properties.NAME || name;
+      }
+      loadGeoJSONData(json, name);
+    } catch (err) {
+      showToast('无效的 JSON / GeoJSON 文件格式', 'error');
+    }
+  };
+  reader.readAsText(file);
+}
+
+document.getElementById('geojson-file').addEventListener('change', (e) => {
+  handleUploadedFile(e.target.files[0]);
+  e.target.value = '';
+});
+
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  dropZone.classList.add('border-amber-400', 'bg-[#202631]');
+});
+dropZone.addEventListener('dragleave', () => {
+  dropZone.classList.remove('border-amber-400', 'bg-[#202631]');
+});
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('border-amber-400', 'bg-[#202631]');
+  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+    handleUploadedFile(e.dataTransfer.files[0]);
+  }
+});
+
+dissolveToggle.addEventListener('change', () => {
+  if (currentGeoJSON) {
+    loadGeoJSONData(currentGeoJSON, currentRegionTitle);
+  }
+});
+
+showInternalToggle.addEventListener('change', () => {
+  updateView(currentSides);
+});
+
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => loadPresetCountry(btn.dataset.preset));
+});
+
+applyMaxSidesBtn.addEventListener('click', () => {
+  applyUserMaxSidesCap(maxSidesInput.value);
+});
+
+maxSidesInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    applyUserMaxSidesCap(maxSidesInput.value);
+  }
+});
+
+document.querySelectorAll('.max-cap-preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    applyUserMaxSidesCap(btn.dataset.cap);
+  });
+});
+
+playBtn.addEventListener('click', () => {
+  if (isPlaying) {
+    pauseAnimation();
+  } else {
+    if (simplifier && currentSides >= simplifier.totalSides) {
+      updateView(3);
+    }
+    startAnimation();
+  }
+});
+
+document.getElementById('restart-btn').addEventListener('click', () => {
+  updateView(3);
+  startAnimation();
+});
+
+document.getElementById('step-prev-btn').addEventListener('click', () => {
+  pauseAnimation();
+  updateView(currentSides - 1);
+});
+
+document.getElementById('step-next-btn').addEventListener('click', () => {
+  pauseAnimation();
+  updateView(currentSides + 1);
+});
+
+sliderEl.addEventListener('input', (e) => {
+  pauseAnimation();
+  updateView(parseInt(e.target.value, 10));
+});
+
+document.getElementById('speed-select').addEventListener('change', (e) => {
+  speedMultiplier = parseFloat(e.target.value) || 1.0;
+});
+
+// 导出当前 Canvas 为高清 PNG 海报（自动隐藏所有模块辅助虚线框）
+document.getElementById('download-btn').addEventListener('click', () => {
+  try {
+    updateView(currentSides, true);
+    const dataUrl = canvasEl.toDataURL('image/png');
+    updateView(currentSides, false);
+
+    const link = document.createElement('a');
+    const cleanTitle = (currentRegionTitle || 'map').toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-');
+    link.download = `${cleanTitle}-${currentSides}-sides.png`;
+    link.href = dataUrl;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    showToast(`已导出 ${currentSides} 边形高清海报 PNG`, 'success');
+  } catch (err) {
+    showToast('导出图片失败: ' + err.message, 'error');
+  }
+});
+
+window.onload = async () => {
+  if (document.fonts && document.fonts.ready) {
+    await document.fonts.ready;
+  }
+  loadPresetCountry('Zambia');
+};
+</script>
+</body>
+</html>

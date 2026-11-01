@@ -1,0 +1,2642 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D DEM 高程扫描可视化工作台</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- GeoTIFF.js for parsing local .tif/.tiff DEM files -->
+    <script src="https://cdn.jsdelivr.net/npm/geotiff@2.1.3/dist-browser/geotiff.js"></script>
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #050608;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+            color: #f3f4f6;
+        }
+        /* Custom Scrollbar for Sidebar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(17, 24, 39, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(75, 85, 99, 0.8);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(156, 163, 175, 1);
+        }
+
+        /* Video stage container */
+        #stage-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at center, #0c0f14 0%, #050608 100%);
+            padding: 16px;
+            transition: background 0.3s ease;
+        }
+        #stage-wrapper.theme-light {
+            background: radial-gradient(circle at center, #eef2f6 0%, #dde4ed 100%);
+        }
+        #stage-wrapper.is-fullscreen {
+            padding: 0;
+        }
+
+        /* Dynamic Aspect Ratio Video Frame */
+        #video-stage {
+            --hud-scale: 1;
+            position: relative;
+            background-color: #07080a;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: border-radius 0.25s ease, box-shadow 0.25s ease, background-color 0.3s ease;
+        }
+        #video-stage.theme-light {
+            background-color: #f6f8fb;
+        }
+        .stage-framed {
+            box-shadow: 0 0 80px rgba(0, 0, 0, 0.92), 0 0 0 1px rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        #video-stage.theme-light.stage-framed {
+            box-shadow: 0 25px 70px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(15, 23, 42, 0.1);
+        }
+        .stage-fullscreen {
+            width: 100vw !important;
+            height: 100vh !important;
+            border-radius: 0;
+            overflow: hidden;
+        }
+
+        /* Number tabular alignment to prevent jitter during fast elevation counting */
+        .tabular-nums {
+            font-variant-numeric: tabular-nums;
+            font-feature-settings: "tnum";
+        }
+
+        /* Subtle text glow for the main orange counter */
+        .elevation-glow {
+            color: #f5a623;
+            text-shadow: 0 0 35px rgba(245, 166, 35, 0.28);
+            transition: color 0.3s ease, text-shadow 0.3s ease;
+        }
+        #video-stage.theme-light .elevation-glow {
+            color: #d97706;
+            text-shadow: 0 4px 24px rgba(217, 119, 6, 0.22);
+        }
+        #video-stage.theme-light #hud-title {
+            color: rgba(15, 23, 42, 0.9);
+        }
+        #video-stage.theme-light #hud-subtitle {
+            color: rgba(30, 41, 59, 0.88);
+        }
+        #video-stage.theme-light #hud-min-label,
+        #video-stage.theme-light #hud-max-label {
+            color: rgba(15, 23, 42, 0.85);
+        }
+        #video-stage.theme-light #hud-bar-thumb-min,
+        #video-stage.theme-light #hud-bar-thumb-max {
+            background-color: #f6f8fb;
+        }
+        #video-stage.theme-light #hud-bar-thumb-max {
+            border-color: #94a3b8;
+            box-shadow: 0 0 10px rgba(100, 116, 139, 0.45);
+        }
+        /* Hypsometric Elevation Color Gradient Bar (Low -> High) */
+        .hypsometric-gradient-bar {
+            background: linear-gradient(
+                90deg,
+                #2b6152 0%,
+                #528a69 22%,
+                #6d9e6b 45%,
+                #94ab70 68%,
+                #a2927c 84%,
+                #d4d6da 94%,
+                #fcfdff 100%
+            );
+            box-shadow: 0 0 12px rgba(109, 158, 107, 0.38);
+        }
+        #video-stage.theme-light .hypsometric-gradient-bar {
+            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.14), 0 0 0 1px rgba(15, 23, 42, 0.12);
+        }
+        #video-stage.theme-light #stage-info-badge {
+            background-color: rgba(255, 255, 255, 0.78);
+            border-color: rgba(15, 23, 42, 0.12);
+            color: #334155;
+        }
+
+        /* Scaled HUD Elements based on stage dimensions */
+        .hud-top-wrapper {
+            padding-top: calc(36px * var(--hud-scale));
+            padding-left: calc(24px * var(--hud-scale));
+            padding-right: calc(24px * var(--hud-scale));
+        }
+        .hud-bottom-wrapper {
+            padding-bottom: calc(36px * var(--hud-scale));
+            padding-left: calc(40px * var(--hud-scale));
+            padding-right: calc(40px * var(--hud-scale));
+        }
+        .hud-title-text {
+            font-size: calc(15px * var(--hud-scale));
+        }
+        .hud-elev-text {
+            font-size: calc(56px * var(--hud-scale));
+            line-height: 1.05;
+        }
+        .hud-sub-text {
+            font-size: calc(11.5px * var(--hud-scale));
+        }
+        .hud-label-text {
+            font-size: calc(11.5px * var(--hud-scale));
+        }
+
+        /* Range input styling */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+            cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            background: rgba(55, 65, 81, 0.8);
+            height: 6px;
+            border-radius: 999px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            margin-top: -5px;
+            background-color: #f5a623;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(245, 166, 35, 0.8);
+            transition: transform 0.15s ease;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        /* Active Ratio Button Styling */
+        .ratio-btn.active {
+            background-color: #f5a623;
+            color: #030712;
+            font-weight: 700;
+            border-color: #f5a623;
+        }
+    </style>
+</head>
+<body class="relative w-full h-full select-none">
+
+    <!-- Main Center Stage Wrapper -->
+    <div id="stage-wrapper">
+        <!-- Interactive / Recordable Stage -->
+        <div id="video-stage" class="stage-framed">
+            
+            <!-- Three.js Canvas Mount Point -->
+            <div id="canvas-container" class="absolute inset-0 z-0 cursor-grab active:cursor-grabbing"></div>
+
+            <!-- Stage Resolution & Aspect Ratio Corner Badge (Hidden during clean mode) -->
+            <div id="stage-info-badge" class="absolute top-3 right-3 z-20 pointer-events-none px-2 py-0.5 rounded bg-black/50 border border-white/10 backdrop-blur-sm text-[10px] font-mono text-gray-300 flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                <span id="badge-ratio-res">9:16 · 1080×1920</span>
+            </div>
+
+            <!-- TOP HUD: Title, Dynamic Max Elevation Counter, and Extreme Point Subtitle -->
+            <div id="hud-top-layer" class="hud-top-wrapper relative z-10 flex flex-col items-center text-center pointer-events-none">
+                <!-- Top Header Title -->
+                <div id="hud-title" class="hud-title-text text-white/95 font-medium tracking-[0.14em] uppercase mb-1">
+                    FINLAND: HIGHEST POINT
+                </div>
+
+                <!-- Giant Gold Elevation Readout -->
+                <div id="hud-elevation" class="hud-elev-text elevation-glow tabular-nums font-extrabold tracking-tight my-1">
+                    1324 M
+                </div>
+
+                <!-- Dynamic Extreme Point Subtitle with indicator square -->
+                <div id="hud-subtitle-container" class="mt-2 flex items-center justify-center gap-2 min-h-[22px] transition-opacity duration-300 opacity-0">
+                    <span id="hud-subtitle-dot" class="w-1.5 h-1.5 bg-[#f5a623] rounded-[1px] inline-block shrink-0 shadow-[0_0_8px_#f5a623]"></span>
+                    <span id="hud-subtitle" class="hud-sub-text text-white/90 font-bold tracking-[0.12em] uppercase"></span>
+                </div>
+            </div>
+
+            <!-- BOTTOM HUD: Static Min & Max Elevation Scale Bar -->
+            <div id="hud-bottom-layer" class="hud-bottom-wrapper relative z-10 w-full pointer-events-none">
+                <div class="w-full max-w-md mx-auto">
+                    <!-- Static Hypsometric Gradient Track with Left (Min) and Right (Max) Glowing Points -->
+                    <div class="hypsometric-gradient-bar relative w-full h-[4px] rounded-full flex items-center justify-between">
+                        <!-- Left Endpoint: Lowest Elevation Point (Deep Teal-Green) -->
+                        <div id="hud-bar-thumb-min" class="w-3.5 h-3.5 rounded-full border-[2.5px] border-[#528a69] bg-[#07080a] -ml-1.5 shadow-[0_0_12px_rgba(82,138,105,0.95)] shrink-0"></div>
+                        <!-- Right Endpoint: Highest Elevation Point (Alpine Snow-White) -->
+                        <div id="hud-bar-thumb-max" class="w-3.5 h-3.5 rounded-full border-[2.5px] border-[#fcfdff] bg-[#07080a] -mr-1.5 shadow-[0_0_12px_rgba(252,253,255,0.95)] shrink-0"></div>
+                    </div>
+                    <!-- Labels: Min (Left) & Max (Right) -->
+                    <div class="hud-label-text flex justify-between items-center mt-2.5 font-semibold tracking-wider text-white/85 tabular-nums">
+                        <span id="hud-min-label">0 M</span>
+                        <span id="hud-max-label">1324 M</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading / Parsing Overlay -->
+            <div id="loading-overlay" class="hidden absolute inset-0 z-30 bg-black/80 backdrop-blur-sm flex-col items-center justify-center gap-3">
+                <div class="w-10 h-10 border-2 border-[#f5a623] border-t-transparent rounded-full animate-spin"></div>
+                <div id="loading-text" class="text-sm font-medium text-gray-200 tracking-wide">正在解析空间栅格与边界数据...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Quick-Action Bar (Top Left) -->
+    <div id="top-quick-bar" class="fixed top-4 left-4 z-40 flex flex-wrap items-center gap-2">
+        <button id="btn-toggle-panel" class="px-3.5 py-2 rounded-lg bg-gray-900/90 hover:bg-gray-800 text-gray-100 border border-gray-700/80 shadow-lg backdrop-blur-md flex items-center gap-2 text-xs font-semibold transition">
+            <svg class="w-4 h-4 text-[#f5a623]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+            </svg>
+            <span id="toggle-panel-text">隐藏控制台 (H)</span>
+        </button>
+
+        <button id="btn-play-quick" class="px-3.5 py-2 rounded-lg bg-[#f5a623] hover:bg-[#eab308] text-gray-950 shadow-lg flex items-center gap-1.5 text-xs font-bold transition">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path>
+            </svg>
+            <span>重新扫描</span>
+        </button>
+
+        <!-- Quick Light / Dark Theme Toggle Button -->
+        <button id="btn-theme-quick" class="px-3.5 py-2 rounded-lg bg-gray-900/90 hover:bg-gray-800 text-gray-100 border border-gray-700/80 shadow-lg backdrop-blur-md flex items-center gap-1.5 text-xs font-semibold transition">
+            <span id="theme-icon-sun" class="hidden text-amber-400">☀️</span>
+            <span id="theme-icon-moon" class="text-sky-300">🌙</span>
+            <span id="theme-toggle-text">暗色模式</span>
+        </button>
+
+        <!-- Quick Aspect Ratio Selector -->
+        <div class="hidden sm:flex items-center bg-gray-900/90 border border-gray-700/80 rounded-lg px-2.5 py-1.5 shadow-lg backdrop-blur-md gap-1.5 text-xs">
+            <span class="text-gray-400 font-medium">比例:</span>
+            <select id="quick-ratio-select" class="bg-transparent text-amber-400 font-bold focus:outline-none cursor-pointer">
+                <option value="9:16" class="bg-gray-900 text-white">9:16 竖屏</option>
+                <option value="16:9" class="bg-gray-900 text-white">16:9 横屏</option>
+                <option value="3:4" class="bg-gray-900 text-white">3:4 小红书</option>
+                <option value="4:3" class="bg-gray-900 text-white">4:3 经典</option>
+                <option value="1:1" class="bg-gray-900 text-white">1:1 方形</option>
+                <option value="21:9" class="bg-gray-900 text-white">21:9 电影</option>
+                <option value="custom" class="bg-gray-900 text-white">自定义长宽比</option>
+                <option value="fullscreen" class="bg-gray-900 text-white">全屏自适应</option>
+            </select>
+        </div>
+
+        <!-- Quick Clarity & Export Button -->
+        <button id="btn-export-quick" class="px-3.5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-gray-950 shadow-lg flex items-center gap-1.5 text-xs font-bold transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+            </svg>
+            <span id="quick-export-label">录制并下载视频 (1080P)</span>
+        </button>
+    </div>
+
+    <!-- Recording Progress Floating Banner (Top Right, visible during video export) -->
+    <div id="recording-banner" class="hidden fixed top-4 right-4 z-50 w-80 sm:w-96 p-4 rounded-2xl bg-gray-950/95 border border-red-500/60 shadow-2xl backdrop-blur-xl text-xs space-y-3">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping"></span>
+                <span class="font-bold text-white text-sm">正在合成并录制高清视频...</span>
+            </div>
+            <span id="rec-res-tag" class="px-2 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/30 font-mono text-[10px]">
+                1080×1920 · 60FPS
+            </span>
+        </div>
+        <div class="space-y-1">
+            <div class="flex justify-between text-[11px] text-gray-300">
+                <span id="rec-status-text">正在从北向南扫描渲染帧...</span>
+                <span id="rec-pct-text" class="font-mono text-amber-400 font-bold">0%</span>
+            </div>
+            <div class="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+                <div id="rec-progress-bar" class="h-full bg-gradient-to-r from-amber-500 to-emerald-400 transition-all duration-100" style="width: 0%;"></div>
+            </div>
+        </div>
+        <div class="flex items-center justify-between pt-1 gap-2">
+            <button id="btn-finish-rec-now" class="flex-1 py-1.5 px-3 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold text-center transition">
+                立即完成并下载
+            </button>
+            <button id="btn-cancel-rec" class="py-1.5 px-3 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold transition">
+                取消
+            </button>
+        </div>
+    </div>
+
+    <!-- Studio Control Drawer (Left Sidebar) -->
+    <aside id="control-panel" class="fixed top-16 left-4 bottom-4 w-80 sm:w-96 z-40 bg-gray-950/90 border border-gray-800/90 rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col overflow-hidden transition-transform duration-300">
+        
+        <!-- Drawer Header -->
+        <div class="px-5 py-3.5 border-b border-gray-800 flex items-center justify-between bg-gray-900/50">
+            <div>
+                <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-[#f5a623]"></span>
+                    高程可视化数据与导出工作台
+                </h2>
+                <p class="text-[11px] text-gray-400 mt-0.5">支持画幅长宽比调节、多档清晰度录制下载</p>
+            </div>
+            <span id="status-badge" class="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                内置演示已就绪
+            </span>
+        </div>
+
+        <!-- Scrollable Settings Content -->
+        <div class="flex-1 overflow-y-auto p-5 space-y-6 text-xs">
+
+            <!-- SECTION 1: Video Aspect Ratio & Resolution Export -->
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-bold text-amber-400 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                        1. 视频画幅长宽比与清晰度下载
+                    </h3>
+                    <span id="export-dimensions-preview" class="font-mono text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                        1080 × 1920 px
+                    </span>
+                </div>
+
+                <!-- 1.1 Aspect Ratio Grid -->
+                <div class="p-3.5 rounded-xl bg-gray-900/90 border border-gray-800 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-200 font-semibold">视频区长宽比 (画幅比例)</span>
+                        <span id="label-current-ratio" class="text-[11px] text-amber-400 font-mono font-semibold">9:16 竖屏</span>
+                    </div>
+
+                    <div class="grid grid-cols-4 gap-1.5" id="ratio-buttons-grid">
+                        <button data-ratio="9:16" class="ratio-btn active py-1.5 px-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 text-[11px] transition">9:16 竖屏</button>
+                        <button data-ratio="16:9" class="ratio-btn py-1.5 px-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 text-[11px] transition">16:9 横屏</button>
+                        <button data-ratio="3:4" class="ratio-btn py-1.5 px-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 text-[11px] transition">3:4 竖屏</button>
+                        <button data-ratio="4:3" class="ratio-btn py-1.5 px-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 text-[11px] transition">4:3 横屏</button>
+                        <button data-ratio="1:1" class="ratio-btn py-1.5 px-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 text-[11px] transition">1:1 方形</button>
+                        <button data-ratio="21:9" class="ratio-btn py-1.5 px-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 text-[11px] transition">21:9 宽屏</button>
+                        <button data-ratio="custom" class="ratio-btn py-1.5 px-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 text-[11px] transition">自定义</button>
+                        <button data-ratio="fullscreen" class="ratio-btn py-1.5 px-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 text-[11px] transition">全屏铺满</button>
+                    </div>
+
+                    <!-- Custom Ratio Inputs (Shown when 'custom' is active) -->
+                    <div id="custom-ratio-box" class="hidden pt-2 border-t border-gray-800 flex items-center justify-between gap-2">
+                        <span class="text-gray-400 text-[11px]">自定义宽:高</span>
+                        <div class="flex items-center gap-1.5">
+                            <input type="number" id="input-custom-w" min="1" max="100" value="9" class="w-14 px-2 py-1 rounded bg-gray-800 border border-gray-700 text-center font-mono text-amber-400 focus:outline-none focus:border-amber-400" />
+                            <span class="text-gray-400 font-bold">:</span>
+                            <input type="number" id="input-custom-h" min="1" max="100" value="16" class="w-14 px-2 py-1 rounded bg-gray-800 border border-gray-700 text-center font-mono text-amber-400 focus:outline-none focus:border-amber-400" />
+                            <button id="btn-apply-custom-ratio" class="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 font-semibold text-[11px]">应用</button>
+                        </div>
+                    </div>
+
+                    <!-- Stage Light / Dark Mode Switcher -->
+                    <div class="pt-2 border-t border-gray-800 flex items-center justify-between">
+                        <span class="text-gray-200 font-semibold">视频背景亮暗模式</span>
+                        <div class="flex rounded-lg bg-gray-800 p-0.5 border border-gray-700">
+                            <button id="btn-mode-dark" class="px-2.5 py-1 rounded-md bg-[#f5a623] text-gray-950 font-bold text-[11px] transition">🌙 暗色星空</button>
+                            <button id="btn-mode-light" class="px-2.5 py-1 rounded-md text-gray-300 font-medium text-[11px] transition">☀️ 亮色浅底</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 1.2 Video Clarity / Resolution & Download Controls -->
+                <div class="p-3.5 rounded-xl bg-gray-900/90 border border-gray-800 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <label class="text-gray-200 font-semibold">视频清晰度档位</label>
+                        <select id="select-clarity" class="bg-gray-800 border border-gray-700 rounded-lg px-2.5 py-1 text-amber-400 font-bold text-[11px] focus:outline-none focus:border-amber-400">
+                            <option value="720">720P 标准高清 (HD)</option>
+                            <option value="1080" selected>1080P 全高清 (FHD 推荐)</option>
+                            <option value="1440">2K 超清画质 (QHD)</option>
+                            <option value="2160">4K 影视级极清 (UHD)</option>
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-gray-400 text-[11px] mb-1">录制帧率 (FPS)</label>
+                            <select id="select-fps" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-gray-200 text-[11px] focus:outline-none focus:border-amber-400">
+                                <option value="30">30 FPS (流畅标准)</option>
+                                <option value="60" selected>60 FPS (丝滑高帧)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-gray-400 text-[11px] mb-1">视频码率品质</label>
+                            <select id="select-bitrate" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-gray-200 text-[11px] focus:outline-none focus:border-amber-400">
+                                <option value="12000000">标准码率 (12 Mbps)</option>
+                                <option value="25000000" selected>高画质 (25 Mbps)</option>
+                                <option value="50000000">大师级极清 (50 Mbps)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Include HUD Overlay Checkbox -->
+                    <label class="flex items-center justify-between pt-1 cursor-pointer">
+                        <span class="text-gray-300 text-[11px]">合成顶部标题、海拔读数与底部进度条</span>
+                        <input type="checkbox" id="check-include-hud" checked class="w-4 h-4 accent-[#f5a623] rounded cursor-pointer" />
+                    </label>
+
+                    <!-- Action Buttons: Record Video & Snapshot -->
+                    <div class="pt-1 flex gap-2">
+                        <button id="btn-start-export" class="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-[#f5a623] to-amber-500 hover:from-amber-400 hover:to-amber-500 text-gray-950 font-extrabold text-xs shadow-lg shadow-amber-500/10 flex items-center justify-center gap-1.5 transition">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                            </svg>
+                            <span>录制完整扫描视频并下载</span>
+                        </button>
+                        <button id="btn-snapshot" title="导出当前帧高清海报图 (PNG)" class="py-2.5 px-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 font-semibold text-xs flex items-center justify-center transition">
+                            截图
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 2: Data Upload (WGS84) -->
+            <div class="space-y-3 pt-2 border-t border-gray-800/80">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-bold text-gray-200 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                        2. 空间数据导入 (WGS84)
+                    </h3>
+                    <button id="btn-load-demo" class="text-[11px] text-[#f5a623] hover:underline font-medium">
+                        恢复默认演示数据
+                    </button>
+                </div>
+
+                <!-- 2.1 Main Region GeoJSON -->
+                <div class="p-3 rounded-xl bg-gray-900/90 border border-gray-800 space-y-1.5">
+                    <div class="flex justify-between items-center">
+                        <label class="font-semibold text-gray-200">① 主行政区边界 (必选 GeoJSON)</label>
+                        <span id="main-geojson-status" class="text-[10px] text-gray-400">未上传 (使用演示)</span>
+                    </div>
+                    <p class="text-[11px] text-gray-400 leading-relaxed">用于裁剪高程柱体，并以<span class="text-white font-semibold">亮白色实线</span>绘制主区域轮廓（如：成都市边界）。</p>
+                    <input type="file" id="input-main-geojson" accept=".geojson,.json" class="block w-full text-[11px] text-gray-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-gray-800 file:text-amber-400 hover:file:bg-gray-700 cursor-pointer mt-1" />
+                </div>
+
+                <!-- 2.2 DEM GeoTIFF -->
+                <div class="p-3 rounded-xl bg-gray-900/90 border border-gray-800 space-y-1.5">
+                    <div class="flex justify-between items-center">
+                        <label class="font-semibold text-gray-200">② 高程栅格数据 (必选 GeoTIFF)</label>
+                        <span id="dem-tiff-status" class="text-[10px] text-gray-400">未上传 (使用演示)</span>
+                    </div>
+                    <p class="text-[11px] text-gray-400 leading-relaxed">支持单波段高程 <code class="text-gray-300">.tif / .tiff</code> 文件，自动提取区域最高点与最低点高程矩阵。</p>
+                    <input type="file" id="input-dem-tiff" accept=".tif,.tiff" class="block w-full text-[11px] text-gray-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-gray-800 file:text-amber-400 hover:file:bg-gray-700 cursor-pointer mt-1" />
+                </div>
+
+                <!-- 2.3 Optional Background GeoJSON -->
+                <div class="p-3 rounded-xl bg-gray-900/90 border border-gray-800 space-y-1.5">
+                    <div class="flex justify-between items-center">
+                        <label class="font-semibold text-gray-200">③ 背景衬托底图 (可选 GeoJSON)</label>
+                        <button id="btn-clear-bg" class="text-[10px] text-red-400 hover:underline hidden">清除底图</button>
+                    </div>
+                    <p class="text-[11px] text-gray-400 leading-relaxed">可上传上级或周边行政区（如：四川省边界），将以<span class="text-gray-300 font-semibold">暗灰色细线</span>作为背景衬托，不传则留空。</p>
+                    <input type="file" id="input-bg-geojson" accept=".geojson,.json" class="block w-full text-[11px] text-gray-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-gray-800 file:text-gray-300 hover:file:bg-gray-700 cursor-pointer mt-1" />
+                </div>
+            </div>
+
+            <!-- SECTION 3: Animation & Playback Scrubbing -->
+            <div class="space-y-3 pt-2 border-t border-gray-800/80">
+                <h3 class="font-bold text-gray-200 uppercase tracking-wider text-[11px]">
+                    3. 扫描进度与三维参数控制
+                </h3>
+
+                <!-- Scrubbing Timeline -->
+                <div class="p-3 rounded-xl bg-gray-900/90 border border-gray-800 space-y-2.5">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-300 font-medium">当前纬度扫描进度</span>
+                        <span id="label-scrub-percent" class="font-mono text-[#f5a623] font-bold">0%</span>
+                    </div>
+                    <input type="range" id="slider-scrub" min="0" max="1000" value="0" class="w-full" />
+                    <div class="grid grid-cols-3 gap-2 pt-1">
+                        <button id="btn-play-pause" class="py-1.5 px-2 rounded-lg bg-[#f5a623] hover:bg-[#eab308] text-gray-950 font-bold text-center transition">
+                            暂停 / 继续
+                        </button>
+                        <button id="btn-restart" class="py-1.5 px-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 font-semibold text-center transition">
+                            从头播放
+                        </button>
+                        <button id="btn-reset-cam" class="py-1.5 px-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 font-semibold text-center transition">
+                            复位视角
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Visual Sliders -->
+                <div class="p-3 rounded-xl bg-gray-900/90 border border-gray-800 space-y-3">
+                    <!-- Grid Density -->
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-gray-300">体素柱网密度 (地形网格)</span>
+                            <span id="val-resolution" class="font-mono text-amber-400">115 × 115</span>
+                        </div>
+                        <input type="range" id="slider-resolution" min="50" max="180" step="5" value="115" class="w-full" />
+                    </div>
+
+                    <!-- Vertical Exaggeration -->
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-gray-300">高程拉伸夸张系数</span>
+                            <span id="val-exaggeration" class="font-mono text-amber-400">2.6x</span>
+                        </div>
+                        <input type="range" id="slider-exaggeration" min="0.5" max="6.0" step="0.1" value="2.6" class="w-full" />
+                    </div>
+
+                    <!-- Sweep Duration -->
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-gray-300">扫描总时长 (秒)</span>
+                            <span id="val-duration" class="font-mono text-amber-400">18 秒</span>
+                        </div>
+                        <input type="range" id="slider-duration" min="5" max="45" step="1" value="18" class="w-full" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 4: Editable Subtitles & Manual Elevation Inputs -->
+            <div class="space-y-3 pt-2 border-t border-gray-800/80">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-bold text-gray-200 uppercase tracking-wider text-[11px]">
+                        4. 标题、最低/最高高程与极值专属文案
+                    </h3>
+                </div>
+
+                <div class="p-3 rounded-xl bg-gray-900/90 border border-gray-800 space-y-3">
+                    <!-- Main Title Input -->
+                    <div>
+                        <label class="block text-gray-400 mb-1">顶部主标题文案</label>
+                        <input type="text" id="input-title" value="FINLAND: HIGHEST POINT" class="w-full px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-700 text-white font-medium focus:outline-none focus:border-[#f5a623]" />
+                    </div>
+
+                    <!-- Manual Giant Gold Display Input (Verbatim, No Thousands Separator) -->
+                    <div>
+                        <label class="block text-amber-400 font-semibold mb-1">顶部最大金色数字/文本显示 (手动输入，原样显示)</label>
+                        <input type="text" id="input-elevation-display" value="1324 M" placeholder="输入顶部大字内容..." class="w-full px-3 py-1.5 rounded-lg bg-gray-800 border border-amber-500/50 text-[#f5a623] font-bold focus:outline-none focus:border-[#f5a623]" />
+                    </div>
+
+                    <!-- Manual Min & Max Elevation Scale Bar Inputs -->
+                    <div class="space-y-1.5">
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-400 text-[11px]">底部刻度两端高程 (自动提取自 GeoTIFF，可随时手动修改)</span>
+                            <button id="btn-sync-dem-extremes" type="button" class="text-[10px] text-amber-400 hover:underline font-semibold">
+                                重新提取极值
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-sky-400 font-semibold mb-1">最低点高程 (左端刻度)</label>
+                                <input type="text" id="input-min-elevation" value="8 M" placeholder="如: 8 M" class="w-full px-2.5 py-1.5 rounded-lg bg-gray-800 border border-sky-500/40 text-white font-semibold focus:outline-none focus:border-sky-400" />
+                            </div>
+                            <div>
+                                <label class="block text-amber-400 font-semibold mb-1">最高点高程 (右端刻度)</label>
+                                <input type="text" id="input-max-elevation" value="1324 M" placeholder="如: 1324 M" class="w-full px-2.5 py-1.5 rounded-lg bg-gray-800 border border-amber-500/40 text-white font-semibold focus:outline-none focus:border-[#f5a623]" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Peak Triggered Caption -->
+                    <div>
+                        <label class="block text-amber-400/90 font-semibold mb-1">★ 触及最高峰时的专属文案 (触发雷达光圈时显示)</label>
+                        <input type="text" id="input-peak-caption" value="HALTI 1324 M - ONLY A SHOULDER OF THE MOUNTAIN" placeholder="输入触及最高点时显示的文案..." class="w-full px-3 py-1.5 rounded-lg bg-gray-800 border border-amber-500/40 text-white font-medium focus:outline-none focus:border-[#f5a623]" />
+                    </div>
+
+                    <!-- Lowest Point Triggered Caption (NEW) -->
+                    <div>
+                        <label class="block text-sky-400/95 font-semibold mb-1">★ 触及最低点时的专属文案 (触发声呐光圈时显示)</label>
+                        <input type="text" id="input-min-caption" value="BALTIC COAST 8 M - LOWEST POINT IN FINLAND" placeholder="输入触及最低点时显示的文案..." class="w-full px-3 py-1.5 rounded-lg bg-gray-800 border border-sky-500/40 text-white font-medium focus:outline-none focus:border-sky-400" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- Helper Tip -->
+            <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-200/90 text-[11px] leading-relaxed">
+                <strong>💡 交互与高清导出提示：</strong><br/>
+                • 调整长宽比后，三维地形与字幕会自动适配画幅比例。<br/>
+                • 点击「录制完整扫描视频并下载」将按所选清晰度（最高支持 4K）合成 3D 画面与极值动态文案并直接下载到本地。
+            </div>
+        </div>
+    </aside>
+
+    <!-- Application Logic -->
+    <script>
+        /********************************************************************
+         * 1. STATE & CONFIGURATION
+         ********************************************************************/
+        const AppState = {
+            // Uploaded or synthetic datasets
+            mainGeoJSON: null,
+            bgGeoJSON: null,
+            demRaster: null, // { data, width, height, bbox: [minLon, minLat, maxLon, maxLat], noData }
+            isDemoMode: true,
+
+            // Aspect Ratio & Clarity / Export settings
+            aspectMode: '9:16',       // '9:16', '16:9', '3:4', '4:3', '1:1', '21:9', 'custom', 'fullscreen'
+            customAspectW: 9,
+            customAspectH: 16,
+            clarityShortEdge: 1080,   // 720, 1080, 1440, 2160
+            exportFPS: 60,
+            exportBitrate: 25000000,
+            includeHUDInExport: true,
+            themeMode: 'dark',        // 'dark' or 'light'
+
+            // Recording State
+            isRecording: false,
+            holdEndTimer: 0,
+
+            // Parameters
+            gridResolution: 115,      // Number of columns/rows along longest axis
+            exaggeration: 2.6,        // Vertical height multiplier
+            sweepDuration: 18.0,      // Total animation seconds
+            baseMode: 'zero',         // 'zero' or 'min'
+
+            // Computed Terrain & Extremes
+            voxels: [],               // Array of { x, z, rowNorm, elevation, color, colIndex, rowIndex, isPeak, isMin }
+            totalRows: 100,
+            minElevation: 0,
+            maxElevation: 1324,
+            peakVoxel: null,          // Voxel with the highest elevation
+            peakReachedAtProgress: 1, // Progress [0..1] when peak row is scanned
+            minVoxel: null,           // Voxel with the lowest elevation
+            minReachedAtProgress: 1,  // Progress [0..1] when lowest row is scanned
+
+            // Playback state
+            isPlaying: true,
+            progress: 0,              // 0.0 (North) to 1.0 (South)
+            currentScanMaxElev: 0,    // Highest elevation discovered up to current progress
+            activeSubtitleText: "",   // Current extreme point subtitle text
+            activeSubtitleType: null, // 'peak' | 'min' | null
+            activeSubtitleOpacity: 0, // Smooth fade-in/out opacity [0..1] for canvas recording & HUD
+            peakCaptionTimer: -1,     // -1: not triggered; >= 0: seconds elapsed since peak caption triggered
+            minCaptionTimer: -1,      // -1: not triggered; >= 0: seconds elapsed since min caption triggered
+            beaconTimer: 0,           // Shared continuous timer for peak & min radar beacons
+
+            // Captions & Manual Display configuration (fully editable, verbatim)
+            title: "FINLAND: HIGHEST POINT",
+            customElevationText: "1324 M",
+            customMinElevationText: "8 M",
+            customMaxElevationText: "1324 M",
+            peakCaption: "HALTI 1324 M - ONLY A SHOULDER OF THE MOUNTAIN",
+            minCaption: "BALTIC COAST 8 M - LOWEST POINT IN FINLAND"
+        };
+
+        // Duration (in seconds) that peak/min captions stay visible before fading out
+        const CAPTION_DISPLAY_DURATION = 3.5;
+        const CAPTION_FADE_IN_DURATION = 0.25;
+        const CAPTION_FADE_OUT_DURATION = 0.45;
+
+        /********************************************************************
+         * 2. HYPSOMETRIC COLOR PALETTE (Exact Video Color Match)
+         ********************************************************************/
+        const COLOR_STOPS = [
+            { t: 0.00, r: 43/255,  g: 97/255,  b: 82/255  }, // #2b6152 Deep coastal teal-green
+            { t: 0.22, r: 82/255,  g: 138/255, b: 105/255 }, // #528a69 Lowland forest green
+            { t: 0.45, r: 109/255, g: 158/255, b: 107/255 }, // #6d9e6b Mid-elevation moss green
+            { t: 0.68, r: 148/255, g: 171/255, b: 112/255 }, // #94ab70 Highland yellow-green
+            { t: 0.84, r: 162/255, g: 146/255, b: 124/255 }, // #a2927c Sub-alpine brownish grey
+            { t: 0.94, r: 212/255, g: 214/255, b: 218/255 }, // #d4d6da Alpine light grey
+            { t: 1.00, r: 252/255, g: 253/255, b: 255/255 }  // #fcfdff Pure snow peak
+        ];
+
+        function getElevationColor(normElev) {
+            const t = Math.max(0, Math.min(1, normElev));
+            for (let i = 0; i < COLOR_STOPS.length - 1; i++) {
+                const c0 = COLOR_STOPS[i];
+                const c1 = COLOR_STOPS[i + 1];
+                if (t >= c0.t && t <= c1.t) {
+                    const localT = (t - c0.t) / (c1.t - c0.t || 1);
+                    return new THREE.Color(
+                        c0.r + (c1.r - c0.r) * localT,
+                        c0.g + (c1.g - c0.g) * localT,
+                        c0.b + (c1.b - c0.b) * localT
+                    );
+                }
+            }
+            return new THREE.Color(1, 1, 1);
+        }
+
+        /********************************************************************
+         * 3. THREE.JS SCENE, ORTHOGRAPHIC CAMERA & STARFIELD SETUP
+         ********************************************************************/
+        const stageWrapperEl = document.getElementById('stage-wrapper');
+        const stageEl = document.getElementById('video-stage');
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+
+        let baseFrustumSize = 24;
+        const initialAspect = 9 / 16;
+        const camera = new THREE.OrthographicCamera(
+            -baseFrustumSize * initialAspect / 2,
+             baseFrustumSize * initialAspect / 2,
+             baseFrustumSize / 2,
+            -baseFrustumSize / 2,
+            -200,
+            500
+        );
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        // Master root group so user can rotate/tilt the entire map & terrain smoothly
+        const worldGroup = new THREE.Group();
+        scene.add(worldGroup);
+
+        // Lighting tailored to bring out crisp 3D voxel facets
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.58);
+        scene.add(ambientLight);
+
+        const dirLightMain = new THREE.DirectionalLight(0xfffbeb, 0.78);
+        dirLightMain.position.set(-18, 35, 22);
+        scene.add(dirLightMain);
+
+        const dirLightFill = new THREE.DirectionalLight(0x93c5fd, 0.25);
+        dirLightFill.position.set(25, 15, -15);
+        scene.add(dirLightFill);
+
+        // Subtle background stars matching the video
+        let starfieldPoints = null;
+        function createStarfield() {
+            const starCount = 140;
+            const geom = new THREE.BufferGeometry();
+            const positions = new Float32Array(starCount * 3);
+            for (let i = 0; i < starCount; i++) {
+                positions[i * 3]     = (Math.random() - 0.5) * 70;
+                positions[i * 3 + 1] = (Math.random() - 0.5) * 70 - 10;
+                positions[i * 3 + 2] = (Math.random() - 0.5) * 70;
+            }
+            geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            const mat = new THREE.PointsMaterial({
+                color: 0xffffff,
+                size: 2.2,
+                sizeAttenuation: false,
+                transparent: true,
+                opacity: 0.45
+            });
+            starfieldPoints = new THREE.Points(geom, mat);
+            scene.add(starfieldPoints);
+        }
+        createStarfield();
+
+        // Camera spherical/isometric orbit state
+        const CamOrbit = {
+            yaw: -0.06,
+            pitch: 0.78,
+            zoom: 1.0,
+            panX: 0,
+            panY: -0.6,
+            isDragging: false,
+            lastX: 0,
+            lastY: 0
+        };
+
+        function updateCameraTransform() {
+            const dist = 60;
+            const x = dist * Math.sin(CamOrbit.yaw) * Math.cos(CamOrbit.pitch);
+            const y = dist * Math.sin(CamOrbit.pitch);
+            const z = dist * Math.cos(CamOrbit.yaw) * Math.cos(CamOrbit.pitch);
+
+            camera.position.set(x + CamOrbit.panX, y, z + CamOrbit.panY);
+            camera.lookAt(CamOrbit.panX, 0, CamOrbit.panY);
+            camera.zoom = CamOrbit.zoom;
+            camera.updateProjectionMatrix();
+        }
+
+        function resetCameraView() {
+            CamOrbit.yaw = -0.06;
+            CamOrbit.pitch = 0.78;
+            CamOrbit.zoom = 1.0;
+            CamOrbit.panX = 0;
+            CamOrbit.panY = -0.6;
+            updateCameraTransform();
+        }
+        resetCameraView();
+
+        // Mouse & Touch Orbit Controls on Canvas
+        container.addEventListener('pointerdown', (e) => {
+            if (AppState.isRecording) return;
+            CamOrbit.isDragging = true;
+            CamOrbit.lastX = e.clientX;
+            CamOrbit.lastY = e.clientY;
+        });
+        window.addEventListener('pointermove', (e) => {
+            if (!CamOrbit.isDragging || AppState.isRecording) return;
+            const dx = e.clientX - CamOrbit.lastX;
+            const dy = e.clientY - CamOrbit.lastY;
+            CamOrbit.lastX = e.clientX;
+            CamOrbit.lastY = e.clientY;
+
+            if (e.shiftKey || e.buttons === 2) {
+                CamOrbit.panX -= dx * 0.02 / CamOrbit.zoom;
+                CamOrbit.panY -= dy * 0.02 / CamOrbit.zoom;
+            } else {
+                CamOrbit.yaw -= dx * 0.007;
+                CamOrbit.pitch = Math.max(0.2, Math.min(1.48, CamOrbit.pitch + dy * 0.007));
+            }
+            updateCameraTransform();
+        });
+        window.addEventListener('pointerup', () => {
+            CamOrbit.isDragging = false;
+        });
+        container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            if (AppState.isRecording) return;
+            const factor = e.deltaY > 0 ? 0.92 : 1.08;
+            CamOrbit.zoom = Math.max(0.4, Math.min(4.0, CamOrbit.zoom * factor));
+            updateCameraTransform();
+        }, { passive: false });
+
+        /********************************************************************
+         * 4. ASPECT RATIO & CLARITY RESOLUTION ENGINE
+         ********************************************************************/
+        function getNumericAspectRatio() {
+            const mode = AppState.aspectMode;
+            if (mode === 'fullscreen') {
+                return window.innerWidth / Math.max(1, window.innerHeight);
+            }
+            if (mode === 'custom') {
+                const w = Math.max(1, Number(AppState.customAspectW) || 9);
+                const h = Math.max(1, Number(AppState.customAspectH) || 16);
+                return w / h;
+            }
+            const parts = mode.split(':').map(Number);
+            if (parts.length === 2 && parts[0] > 0 && parts[1] > 0) {
+                return parts[0] / parts[1];
+            }
+            return 9 / 16;
+        }
+
+        function getTargetExportDimensions() {
+            const aspect = getNumericAspectRatio();
+            const shortEdge = Number(AppState.clarityShortEdge) || 1080;
+            let width, height;
+            if (aspect >= 1) {
+                height = shortEdge;
+                width = Math.round(shortEdge * aspect);
+            } else {
+                width = shortEdge;
+                height = Math.round(shortEdge / aspect);
+            }
+            // Ensure even pixel dimensions for video encoders
+            width = Math.max(2, width + (width % 2));
+            height = Math.max(2, height + (height % 2));
+            return { width, height, aspect };
+        }
+
+        function updateCameraFrustumForAspect(aspect) {
+            // Adjust frustum so the 3D map and HUD never clip regardless of portrait or landscape ratio
+            const effectiveFrustumH = aspect >= 1 ? 21.5 : 24.0;
+            const effectiveFrustumW = effectiveFrustumH * aspect;
+            camera.left = -effectiveFrustumW / 2;
+            camera.right = effectiveFrustumW / 2;
+            camera.top = effectiveFrustumH / 2;
+            camera.bottom = -effectiveFrustumH / 2;
+            camera.updateProjectionMatrix();
+        }
+
+        function updateStageLayoutAndRenderer() {
+            if (AppState.isRecording) return;
+
+            const mode = AppState.aspectMode;
+            const aspect = getNumericAspectRatio();
+
+            if (mode === 'fullscreen') {
+                stageWrapperEl.classList.add('is-fullscreen');
+                stageEl.classList.remove('stage-framed');
+                stageEl.classList.add('stage-fullscreen');
+                stageEl.style.width = '100vw';
+                stageEl.style.height = '100vh';
+            } else {
+                stageWrapperEl.classList.remove('is-fullscreen');
+                stageEl.classList.remove('stage-fullscreen');
+                stageEl.classList.add('stage-framed');
+
+                const availW = Math.max(240, window.innerWidth - 32);
+                const availH = Math.max(240, window.innerHeight - 32);
+                let stageW = availW;
+                let stageH = stageW / aspect;
+
+                if (stageH > availH) {
+                    stageH = availH;
+                    stageW = stageH * aspect;
+                }
+
+                stageEl.style.width = `${Math.round(stageW)}px`;
+                stageEl.style.height = `${Math.round(stageH)}px`;
+            }
+
+            const rect = stageEl.getBoundingClientRect();
+            const w = Math.max(1, Math.round(rect.width));
+            const h = Math.max(1, Math.round(rect.height));
+
+            // Dynamic HUD scale variable so text & progress bar fit nicely in any frame size
+            const minStageDim = Math.min(w, h);
+            const hudScale = Math.max(0.52, Math.min(1.25, minStageDim / 500));
+            stageEl.style.setProperty('--hud-scale', hudScale.toFixed(3));
+
+            updateCameraFrustumForAspect(w / h);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(w, h);
+
+            // Update UI badges showing current aspect ratio and target export resolution
+            const { width: expW, height: expH } = getTargetExportDimensions();
+            const ratioLabel = mode === 'custom'
+                ? `${AppState.customAspectW}:${AppState.customAspectH}`
+                : (mode === 'fullscreen' ? '全屏' : mode);
+
+            const badgeRatioRes = document.getElementById('badge-ratio-res');
+            if (badgeRatioRes) badgeRatioRes.textContent = `${ratioLabel} · 导出 ${expW}×${expH}`;
+
+            const exportPreviewEl = document.getElementById('export-dimensions-preview');
+            if (exportPreviewEl) exportPreviewEl.textContent = `${expW} × ${expH} px`;
+
+            const labelCurrentRatio = document.getElementById('label-current-ratio');
+            if (labelCurrentRatio) labelCurrentRatio.textContent = `${ratioLabel}`;
+
+            const quickExportLabel = document.getElementById('quick-export-label');
+            if (quickExportLabel) {
+                const clarityTag = AppState.clarityShortEdge === 2160 ? '4K' : (AppState.clarityShortEdge === 1440 ? '2K' : `${AppState.clarityShortEdge}P`);
+                quickExportLabel.textContent = `录制并下载 (${clarityTag})`;
+            }
+        }
+
+        /********************************************************************
+         * 5. SCENE OBJECT HOLDERS (VOXELS, BORDERS, DISTINCT PEAK & MIN BEACONS)
+         ********************************************************************/
+        let voxelInstancedMesh = null;
+        let mainBorderGroup = new THREE.Group();
+        let bgBorderGroup = new THREE.Group();
+        let peakBeaconGroup = new THREE.Group();
+        let minBeaconGroup = new THREE.Group();
+
+        worldGroup.add(bgBorderGroup);
+        worldGroup.add(mainBorderGroup);
+        worldGroup.add(peakBeaconGroup);
+        worldGroup.add(minBeaconGroup);
+
+        const dummyMatrix = new THREE.Object3D();
+
+        let peakRadarRings = [];
+        let peakBeamMat = null;
+        let peakDotMat = null;
+        let minRadarRings = [];
+        let minCrystalMesh = null;
+        let minOrbitRingMesh = null;
+
+        // 5.1 Highest Point (Peak) Beacon: Tall Snow-White / Warm Gold Spire + Sky Circular Radar Rings
+        function buildPeakBeacon() {
+            while (peakBeaconGroup.children.length > 0) {
+                peakBeaconGroup.remove(peakBeaconGroup.children[0]);
+            }
+            peakRadarRings = [];
+
+            const isLight = AppState.themeMode === 'light';
+            const beamHeight = 2.75;
+            const beamGeom = new THREE.CylinderGeometry(0.032, 0.032, beamHeight, 12);
+            beamGeom.translate(0, beamHeight / 2, 0);
+            peakBeamMat = new THREE.MeshBasicMaterial({
+                color: isLight ? 0xd97706 : 0xffffff,
+                transparent: true,
+                opacity: 0.92
+            });
+            const beaconBeam = new THREE.Mesh(beamGeom, peakBeamMat);
+            peakBeaconGroup.add(beaconBeam);
+
+            // Top glowing white-gold sphere
+            const dotGeom = new THREE.SphereGeometry(0.12, 16, 16);
+            dotGeom.translate(0, beamHeight, 0);
+            peakDotMat = new THREE.MeshBasicMaterial({ color: isLight ? 0xd97706 : 0xffffff });
+            const dotMesh = new THREE.Mesh(dotGeom, peakDotMat);
+            peakBeaconGroup.add(dotMesh);
+
+            // 4 Concentric circular sky radar rings tilted toward camera
+            for (let i = 0; i < 4; i++) {
+                const ringGeom = new THREE.RingGeometry(0.18, 0.23, 48);
+                const ringMat = new THREE.MeshBasicMaterial({
+                    color: i % 2 === 0 ? (isLight ? 0x1e293b : 0xffffff) : 0xf5a623,
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 0.0
+                });
+                const ringMesh = new THREE.Mesh(ringGeom, ringMat);
+                ringMesh.position.set(0, beamHeight, 0);
+                ringMesh.rotation.x = -Math.PI / 4;
+                peakBeaconGroup.add(ringMesh);
+                peakRadarRings.push({ mesh: ringMesh, phaseOffset: i * 0.25, idx: i });
+            }
+
+            peakBeaconGroup.visible = false;
+        }
+
+        // 5.2 Lowest Point (Min) Beacon: Cyan/Aqua Energy Pillar + Rotating Floating Octahedron Crystal + Horizontal Hexagonal Sonar Waves
+        function buildMinBeacon() {
+            while (minBeaconGroup.children.length > 0) {
+                minBeaconGroup.remove(minBeaconGroup.children[0]);
+            }
+            minRadarRings = [];
+
+            const isLight = AppState.themeMode === 'light';
+            const beamHeight = 1.65;
+            // Inner glowing cyan core beam
+            const beamGeom = new THREE.CylinderGeometry(0.025, 0.055, beamHeight, 8);
+            beamGeom.translate(0, beamHeight / 2, 0);
+            const beamMat = new THREE.MeshBasicMaterial({
+                color: isLight ? 0x0284c7 : 0x38bdf8,
+                transparent: true,
+                opacity: 0.88
+            });
+            const beaconBeam = new THREE.Mesh(beamGeom, beamMat);
+            minBeaconGroup.add(beaconBeam);
+
+            // Rotating Floating Diamond Crystal (Octahedron) at top of cyan pillar
+            const crystalGroup = new THREE.Group();
+            crystalGroup.position.set(0, beamHeight + 0.15, 0);
+
+            const octGeom = new THREE.OctahedronGeometry(0.22, 0);
+            const octMat = new THREE.MeshBasicMaterial({
+                color: isLight ? 0x0284c7 : 0x00f2fe,
+                transparent: true,
+                opacity: 0.85
+            });
+            const octMesh = new THREE.Mesh(octGeom, octMat);
+            crystalGroup.add(octMesh);
+
+            // Crisp wireframe edges around the diamond crystal
+            const edgesGeom = new THREE.EdgesGeometry(octGeom);
+            const edgesMat = new THREE.LineBasicMaterial({
+                color: isLight ? 0x0f172a : 0xffffff,
+                transparent: true,
+                opacity: 0.95
+            });
+            const wireframe = new THREE.LineSegments(edgesGeom, edgesMat);
+            wireframe.scale.setScalar(1.06);
+            crystalGroup.add(wireframe);
+
+            minCrystalMesh = crystalGroup;
+            minBeaconGroup.add(crystalGroup);
+
+            // Tilted spinning orbital ring around the crystal
+            const orbitGeom = new THREE.RingGeometry(0.34, 0.38, 32);
+            const orbitMat = new THREE.MeshBasicMaterial({
+                color: isLight ? 0x0369a1 : 0x7dd3fc,
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: 0.85
+            });
+            minOrbitRingMesh = new THREE.Mesh(orbitGeom, orbitMat);
+            minOrbitRingMesh.position.set(0, beamHeight + 0.15, 0);
+            minOrbitRingMesh.rotation.x = Math.PI / 3;
+            minBeaconGroup.add(minOrbitRingMesh);
+
+            // 4 Horizontal Hexagonal (6-sided) Sonar Pulse Rings radiating in cyan-aqua
+            for (let i = 0; i < 4; i++) {
+                const hexGeom = new THREE.RingGeometry(0.16, 0.22, 6);
+                const hexMat = new THREE.MeshBasicMaterial({
+                    color: i % 2 === 0 ? (isLight ? 0x0284c7 : 0x38bdf8) : (isLight ? 0x0369a1 : 0x67e8f9),
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 0.0
+                });
+                const hexMesh = new THREE.Mesh(hexGeom, hexMat);
+                // Place sonar rings horizontally near the base/mid-pillar for distinct layered look
+                hexMesh.position.set(0, 0.12, 0);
+                hexMesh.rotation.x = -Math.PI / 2;
+                minBeaconGroup.add(hexMesh);
+                minRadarRings.push({ mesh: hexMesh, phaseOffset: i * 0.25 });
+            }
+
+            minBeaconGroup.visible = false;
+        }
+
+        function buildBeacons() {
+            buildPeakBeacon();
+            buildMinBeacon();
+        }
+        buildBeacons();
+
+        /********************************************************************
+         * 6. BUILT-IN PROCEDURAL DEMO DATA (REALISTIC FINLAND / NORDIC SHAPE)
+         ********************************************************************/
+        function generateDefaultFinlandDemo() {
+            const finlandRing = [
+                [20.55, 69.06], [20.85, 69.03], [21.35, 69.31], [21.65, 69.02], [22.30, 68.82],
+                [23.60, 68.90], [24.20, 68.75], [24.85, 68.95], [25.68, 69.70], [26.15, 69.95],
+                [27.02, 70.09], [27.90, 70.05], [28.45, 69.75], [29.15, 69.62], [28.80, 69.05],
+                [28.40, 68.80], [28.95, 68.40], [29.40, 67.95], [30.12, 67.65], [29.75, 67.10],
+                [29.15, 66.40], [29.70, 65.85], [29.95, 65.10], [30.45, 64.40], [30.15, 63.70],
+                [31.35, 63.15], [31.55, 62.65], [30.65, 62.10], [29.55, 61.50], [28.80, 61.10],
+                [27.80, 60.55], [26.40, 60.38], [25.10, 60.15], [24.00, 59.92], [22.85, 59.82],
+                [21.60, 60.15], [21.15, 60.75], [21.40, 61.55], [21.35, 62.35], [21.05, 63.05],
+                [22.15, 63.65], [23.35, 64.15], [24.30, 64.65], [25.25, 65.10], [24.90, 65.55],
+                [24.15, 65.82], [23.85, 66.35], [23.90, 67.05], [23.45, 67.60], [23.60, 67.95],
+                [22.90, 68.30], [21.95, 68.52], [21.05, 68.85], [20.55, 69.06]
+            ];
+
+            function fractalizeRing(ring, iterations = 2, roughness = 0.08) {
+                let current = ring.slice(0, -1);
+                let seed = 42;
+                const rand = () => {
+                    seed = (seed * 1664525 + 1013904223) % 4294967296;
+                    return (seed / 4294967296) - 0.5;
+                };
+                for (let iter = 0; iter < iterations; iter++) {
+                    const next = [];
+                    const scale = roughness / Math.pow(2, iter);
+                    for (let i = 0; i < current.length; i++) {
+                        const p1 = current[i];
+                        const p2 = current[(i + 1) % current.length];
+                        next.push(p1);
+                        const midLon = (p1[0] + p2[0]) * 0.5 + rand() * scale * 1.4;
+                        const midLat = (p1[1] + p2[1]) * 0.5 + rand() * scale * 0.7;
+                        next.push([midLon, midLat]);
+                    }
+                    current = next;
+                }
+                current.push(current[0]);
+                return current;
+            }
+
+            const detailedMainRing = fractalizeRing(finlandRing, 2, 0.14);
+
+            const mainGeo = {
+                type: "FeatureCollection",
+                features: [{
+                    type: "Feature",
+                    properties: { name: "Finland" },
+                    geometry: {
+                        type: "Polygon",
+                        coordinates: [detailedMainRing]
+                    }
+                }]
+            };
+
+            const norwaySwedenLines = [
+                [[20.55, 69.06], [19.2, 69.7], [18.0, 69.3], [16.2, 68.5], [14.5, 67.2], [13.5, 65.5], [12.0, 63.8]],
+                [[24.15, 65.82], [22.2, 65.6], [21.3, 64.7], [19.8, 63.6], [17.9, 62.4], [17.2, 60.8], [18.8, 59.4], [16.5, 57.5]],
+                [[27.80, 60.55], [29.2, 60.1], [28.1, 59.5], [24.7, 59.4], [22.2, 58.5], [21.0, 57.0]],
+                [[27.90, 70.05], [29.8, 70.4], [31.2, 69.8], [33.5, 69.2], [35.5, 68.5]]
+            ].map(line => fractalizeRing(line, 2, 0.18).slice(0, -1));
+
+            const bgGeo = {
+                type: "FeatureCollection",
+                features: norwaySwedenLines.map(coords => ({
+                    type: "Feature",
+                    properties: {},
+                    geometry: {
+                        type: "LineString",
+                        coordinates: coords
+                    }
+                }))
+            };
+
+            const width = 220, height = 220;
+            const bbox = [19.5, 59.5, 32.0, 70.5];
+            const data = new Float32Array(width * height);
+
+            for (let y = 0; y < height; y++) {
+                const lat = bbox[3] - (y / (height - 1)) * (bbox[3] - bbox[1]);
+                for (let x = 0; x < width; x++) {
+                    const lon = bbox[0] + (x / (width - 1)) * (bbox[2] - bbox[0]);
+
+                    const latNorm = (lat - 59.8) / (70.1 - 59.8);
+                    const lonNorm = (lon - 20.5) / (31.5 - 20.5);
+
+                    const n1 = Math.sin(lon * 2.7) * Math.cos(lat * 3.1);
+                    const n2 = Math.sin(lon * 6.3 + 1.2) * Math.sin(lat * 5.7);
+                    const n3 = Math.cos(lon * 13.5 - lat * 11.2) * 0.5;
+
+                    let elev = 65 + Math.pow(Math.max(0, latNorm), 1.45) * 420 + lonNorm * 110;
+                    elev += (n1 * 45 + n2 * 28 + n3 * 18);
+
+                    const dHalti = Math.hypot((lon - 21.25) * 0.85, (lat - 69.25) * 1.3);
+                    if (dHalti < 1.8) {
+                        elev += Math.pow(1 - dHalti / 1.8, 2.1) * 910;
+                    }
+
+                    const dFells = Math.hypot((lon - 27.2) * 0.7, (lat - 68.2) * 1.1);
+                    if (dFells < 2.2) {
+                        elev += Math.pow(1 - dFells / 2.2, 1.8) * 340;
+                    }
+
+                    const dRuka = Math.hypot((lon - 29.1) * 0.9, (lat - 66.15) * 1.0);
+                    if (dRuka < 1.6) {
+                        elev += Math.pow(1 - dRuka / 1.6, 1.7) * 260;
+                    }
+
+                    data[y * width + x] = Math.max(8, Math.min(1310, elev));
+                }
+            }
+
+            const haltiX = Math.round(((21.28 - bbox[0]) / (bbox[2] - bbox[0])) * (width - 1));
+            const haltiY = Math.round(((bbox[3] - 69.28) / (bbox[3] - bbox[1])) * (height - 1));
+            if (haltiX >= 0 && haltiX < width && haltiY >= 0 && haltiY < height) {
+                data[haltiY * width + haltiX] = 1324;
+            }
+
+            return {
+                mainGeoJSON: mainGeo,
+                bgGeoJSON: bgGeo,
+                demRaster: {
+                    data,
+                    width,
+                    height,
+                    bbox,
+                    noData: -9999
+                }
+            };
+        }
+
+        /********************************************************************
+         * 7. GEOJSON PARSING, BOUNDING BOX & OFFSCREEN MASKING
+         ********************************************************************/
+        function extractGeoJSONPrimitives(geojson) {
+            const polygons = [];
+            const lines = [];
+
+            function processGeometry(geom) {
+                if (!geom) return;
+                if (geom.type === 'Polygon') {
+                    polygons.push(geom.coordinates);
+                    geom.coordinates.forEach(ring => lines.push(ring));
+                } else if (geom.type === 'MultiPolygon') {
+                    geom.coordinates.forEach(poly => {
+                        polygons.push(poly);
+                        poly.forEach(ring => lines.push(ring));
+                    });
+                } else if (geom.type === 'LineString') {
+                    lines.push(geom.coordinates);
+                } else if (geom.type === 'MultiLineString') {
+                    geom.coordinates.forEach(line => lines.push(line));
+                } else if (geom.type === 'GeometryCollection' && geom.geometries) {
+                    geom.geometries.forEach(processGeometry);
+                }
+            }
+
+            if (geojson.type === 'FeatureCollection' && Array.isArray(geojson.features)) {
+                geojson.features.forEach(f => processGeometry(f.geometry));
+            } else if (geojson.type === 'Feature') {
+                processGeometry(geojson.geometry);
+            } else {
+                processGeometry(geojson);
+            }
+
+            let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity;
+            lines.forEach(ring => {
+                ring.forEach(pt => {
+                    const lon = pt[0], lat = pt[1];
+                    if (lon < minLon) minLon = lon;
+                    if (lat < minLat) minLat = lat;
+                    if (lon > maxLon) maxLon = lon;
+                    if (lat > maxLat) maxLat = lat;
+                });
+            });
+
+            return {
+                polygons,
+                lines,
+                bbox: [minLon, minLat, maxLon, maxLat]
+            };
+        }
+
+        function createGeoJSONMask(polygons, bbox, maskWidth = 1024, maskHeight = 1024) {
+            const canvas = document.createElement('canvas');
+            canvas.width = maskWidth;
+            canvas.height = maskHeight;
+            const ctx = canvas.getContext('2d');
+
+            const [minLon, minLat, maxLon, maxLat] = bbox;
+            const lonSpan = Math.max(1e-6, maxLon - minLon);
+            const latSpan = Math.max(1e-6, maxLat - minLat);
+
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, maskWidth, maskHeight);
+
+            ctx.fillStyle = '#ffffff';
+            polygons.forEach(poly => {
+                ctx.beginPath();
+                poly.forEach(ring => {
+                    ring.forEach((pt, idx) => {
+                        const x = ((pt[0] - minLon) / lonSpan) * (maskWidth - 1);
+                        const y = ((maxLat - pt[1]) / latSpan) * (maskHeight - 1);
+                        if (idx === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    });
+                    ctx.closePath();
+                });
+                ctx.fill('evenodd');
+            });
+
+            const imgData = ctx.getImageData(0, 0, maskWidth, maskHeight).data;
+
+            return function isInside(lon, lat) {
+                if (lon < minLon || lon > maxLon || lat < minLat || lat > maxLat) return false;
+                const px = Math.round(((lon - minLon) / lonSpan) * (maskWidth - 1));
+                const py = Math.round(((maxLat - lat) / latSpan) * (maskHeight - 1));
+                const idx = (py * maskWidth + px) * 4;
+                return imgData[idx] > 128;
+            };
+        }
+
+        /********************************************************************
+         * 8. CORE SCENE BUILDER (ALIGNING GEOJSON + GEOTIFF IN 3D)
+         ********************************************************************/
+        // Syncs extracted min/max elevation values from current DEM into manual UI inputs (without thousands separators)
+        function syncExtractedExtremesToInputs() {
+            const minStr = `${AppState.minElevation} M`;
+            const maxStr = `${AppState.maxElevation} M`;
+
+            AppState.customMinElevationText = minStr;
+            AppState.customMaxElevationText = maxStr;
+            AppState.customElevationText = maxStr;
+
+            const minInp = document.getElementById('input-min-elevation');
+            const maxInp = document.getElementById('input-max-elevation');
+            const topElevInp = document.getElementById('input-elevation-display');
+
+            if (minInp) minInp.value = minStr;
+            if (maxInp) maxInp.value = maxStr;
+            if (topElevInp) topElevInp.value = maxStr;
+
+            updateHUDLabels();
+        }
+
+        function rebuildVisualization(autoSyncExtremes = false) {
+            if (!AppState.mainGeoJSON || !AppState.demRaster) return;
+
+            const isLight = AppState.themeMode === 'light';
+            const mainParsed = extractGeoJSONPrimitives(AppState.mainGeoJSON);
+            const [minLon, minLat, maxLon, maxLat] = mainParsed.bbox;
+            const centerLon = (minLon + maxLon) * 0.5;
+            const centerLat = (minLat + maxLat) * 0.5;
+
+            const cosLat = Math.cos(centerLat * Math.PI / 180);
+            const geoWidth = Math.max(1e-5, (maxLon - minLon) * cosLat);
+            const geoHeight = Math.max(1e-5, maxLat - minLat);
+
+            const targetStageSpan = 13.5;
+            const worldScale = targetStageSpan / Math.max(geoWidth, geoHeight);
+
+            function projectLonLat(lon, lat) {
+                const x = (lon - centerLon) * cosLat * worldScale;
+                const z = -(lat - centerLat) * worldScale;
+                return { x, z };
+            }
+
+            // 1. Rebuild Main GeoJSON Outline (Crisp White in Dark Mode, Deep Slate in Light Mode)
+            while (mainBorderGroup.children.length > 0) {
+                const child = mainBorderGroup.children[0];
+                if (child.geometry) child.geometry.dispose();
+                mainBorderGroup.remove(child);
+            }
+
+            const mainLineMat = new THREE.LineBasicMaterial({
+                color: isLight ? 0x1e293b : 0xffffff,
+                transparent: true,
+                opacity: 0.92
+            });
+
+            mainParsed.lines.forEach(ring => {
+                const pts = [];
+                ring.forEach(pt => {
+                    const { x, z } = projectLonLat(pt[0], pt[1]);
+                    pts.push(new THREE.Vector3(x, 0.01, z));
+                });
+                const geom = new THREE.BufferGeometry().setFromPoints(pts);
+                mainBorderGroup.add(new THREE.Line(geom, mainLineMat));
+            });
+
+            // 2. Rebuild Optional Background Context GeoJSON
+            while (bgBorderGroup.children.length > 0) {
+                const child = bgBorderGroup.children[0];
+                if (child.geometry) child.geometry.dispose();
+                bgBorderGroup.remove(child);
+            }
+
+            if (AppState.bgGeoJSON) {
+                const bgParsed = extractGeoJSONPrimitives(AppState.bgGeoJSON);
+                const bgLineMat = new THREE.LineBasicMaterial({
+                    color: isLight ? 0x94a3b8 : 0x3b4049,
+                    transparent: true,
+                    opacity: isLight ? 0.75 : 0.65
+                });
+
+                bgParsed.lines.forEach(ring => {
+                    const pts = [];
+                    ring.forEach(pt => {
+                        const { x, z } = projectLonLat(pt[0], pt[1]);
+                        if (Math.abs(x) < 38 && Math.abs(z) < 38) {
+                            pts.push(new THREE.Vector3(x, -0.02, z));
+                        }
+                    });
+                    if (pts.length > 1) {
+                        const geom = new THREE.BufferGeometry().setFromPoints(pts);
+                        bgBorderGroup.add(new THREE.Line(geom, bgLineMat));
+                    }
+                });
+            }
+
+            // 3. Rasterize Mask & Resample DEM into Voxel Columns
+            const isInsideMask = createGeoJSONMask(mainParsed.polygons, mainParsed.bbox, 1024, 1024);
+
+            const maxRes = AppState.gridResolution;
+            const aspectRatio = geoWidth / geoHeight;
+            const cols = aspectRatio >= 1 ? maxRes : Math.max(20, Math.round(maxRes * aspectRatio));
+            const rows = aspectRatio >= 1 ? Math.max(20, Math.round(maxRes / aspectRatio)) : maxRes;
+            AppState.totalRows = rows;
+
+            const lonStep = (maxLon - minLon) / cols;
+            const latStep = (maxLat - minLat) / rows;
+
+            const voxelWidth = (geoWidth * worldScale) / cols;
+            const voxelDepth = (geoHeight * worldScale) / rows;
+
+            const dem = AppState.demRaster;
+            const [demMinLon, demMinLat, demMaxLon, demMaxLat] = dem.bbox;
+            const demLonSpan = Math.max(1e-6, demMaxLon - demMinLon);
+            const demLatSpan = Math.max(1e-6, demMaxLat - demMinLat);
+
+            function sampleDEMCellMax(lon0, lat0, lon1, lat1) {
+                const px0 = Math.max(0, Math.min(dem.width - 1, Math.floor(((lon0 - demMinLon) / demLonSpan) * (dem.width - 1))));
+                const px1 = Math.max(0, Math.min(dem.width - 1, Math.ceil(((lon1 - demMinLon) / demLonSpan) * (dem.width - 1))));
+                const py0 = Math.max(0, Math.min(dem.height - 1, Math.floor(((demMaxLat - lat1) / demLatSpan) * (dem.height - 1))));
+                const py1 = Math.max(0, Math.min(dem.height - 1, Math.ceil(((demMaxLat - lat0) / demLatSpan) * (dem.height - 1))));
+
+                let cellMax = -Infinity;
+                for (let py = py0; py <= py1; py++) {
+                    const rowOffset = py * dem.width;
+                    for (let px = px0; px <= px1; px++) {
+                        const val = dem.data[rowOffset + px];
+                        if (val !== undefined && !Number.isNaN(val) && val !== dem.noData && val > -1000 && val < 12000) {
+                            if (val > cellMax) cellMax = val;
+                        }
+                    }
+                }
+                return cellMax === -Infinity ? null : cellMax;
+            }
+
+            const voxels = [];
+            let minElev = Infinity;
+            let maxElev = -Infinity;
+
+            for (let r = 0; r < rows; r++) {
+                const latTop = maxLat - r * latStep;
+                const latBot = latTop - latStep;
+                const latCenter = (latTop + latBot) * 0.5;
+
+                for (let c = 0; c < cols; c++) {
+                    const lonLeft = minLon + c * lonStep;
+                    const lonRight = lonLeft + lonStep;
+                    const lonCenter = (lonLeft + lonRight) * 0.5;
+
+                    if (!isInsideMask(lonCenter, latCenter)) continue;
+
+                    const elev = sampleDEMCellMax(lonLeft, latBot, lonRight, latTop);
+                    if (elev === null) continue;
+
+                    if (elev < minElev) minElev = elev;
+                    if (elev > maxElev) maxElev = elev;
+
+                    const { x, z } = projectLonLat(lonCenter, latCenter);
+                    voxels.push({
+                        x,
+                        z,
+                        rowIndex: r,
+                        colIndex: c,
+                        rowNorm: r / Math.max(1, rows - 1),
+                        elevation: elev,
+                        isPeak: false,
+                        isMin: false
+                    });
+                }
+            }
+
+            if (voxels.length === 0) {
+                minElev = 0;
+                maxElev = 100;
+            }
+
+            AppState.minElevation = Math.round(minElev);
+            AppState.maxElevation = Math.round(maxElev);
+
+            let peakVoxel = null;
+            let minVoxel = null;
+            for (let i = 0; i < voxels.length; i++) {
+                if (!peakVoxel || voxels[i].elevation > peakVoxel.elevation) {
+                    peakVoxel = voxels[i];
+                }
+                if (!minVoxel || voxels[i].elevation < minVoxel.elevation) {
+                    minVoxel = voxels[i];
+                }
+            }
+            if (peakVoxel) {
+                peakVoxel.isPeak = true;
+                AppState.peakVoxel = peakVoxel;
+                AppState.peakReachedAtProgress = peakVoxel.rowNorm;
+            }
+            if (minVoxel) {
+                minVoxel.isMin = true;
+                AppState.minVoxel = minVoxel;
+                AppState.minReachedAtProgress = minVoxel.rowNorm;
+            }
+
+            if (voxelInstancedMesh) {
+                worldGroup.remove(voxelInstancedMesh);
+                voxelInstancedMesh.geometry.dispose();
+                voxelInstancedMesh.material.dispose();
+            }
+
+            const boxGeom = new THREE.BoxGeometry(voxelWidth * 0.96, 1.0, voxelDepth * 0.96);
+            boxGeom.translate(0, 0.5, 0);
+
+            const boxMat = new THREE.MeshLambertMaterial({
+                color: 0xffffff
+            });
+
+            voxelInstancedMesh = new THREE.InstancedMesh(boxGeom, boxMat, voxels.length);
+            voxelInstancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+            const elevSpan = Math.max(1, maxElev - minElev);
+            for (let i = 0; i < voxels.length; i++) {
+                const v = voxels[i];
+                const normElev = (v.elevation - minElev) / elevSpan;
+                v.normElev = normElev;
+                const color = getElevationColor(normElev);
+                if (v.isPeak) {
+                    color.setHex(0xffffff); // Snow white highlight for highest point
+                } else if (v.isMin) {
+                    color.setHex(0x38bdf8); // Bright cyan-aqua highlight for lowest point
+                }
+                voxelInstancedMesh.setColorAt(i, color);
+            }
+            if (voxelInstancedMesh.instanceColor) {
+                voxelInstancedMesh.instanceColor.needsUpdate = true;
+            }
+
+            worldGroup.add(voxelInstancedMesh);
+            AppState.voxels = voxels;
+
+            // Automatically populate the min/max scale bar inputs from extracted GeoTIFF data when requested
+            if (autoSyncExtremes) {
+                syncExtractedExtremesToInputs();
+            } else {
+                updateHUDLabels();
+            }
+
+            updateSweepFrame(AppState.progress);
+        }
+
+        /********************************************************************
+         * 9. FRAME-BY-FRAME NORTH-TO-SOUTH SWEEP & HUD SYNCHRONIZATION
+         ********************************************************************/
+        const hudTitleEl = document.getElementById('hud-title');
+        const hudElevationEl = document.getElementById('hud-elevation');
+        const hudSubtitleContainerEl = document.getElementById('hud-subtitle-container');
+        const hudSubtitleDotEl = document.getElementById('hud-subtitle-dot');
+        const hudSubtitleEl = document.getElementById('hud-subtitle');
+        const hudMinLabelEl = document.getElementById('hud-min-label');
+        const hudMaxLabelEl = document.getElementById('hud-max-label');
+        const sliderScrubEl = document.getElementById('slider-scrub');
+        const labelScrubPercentEl = document.getElementById('label-scrub-percent');
+
+        function updateHUDLabels() {
+            hudTitleEl.textContent = AppState.title;
+            hudElevationEl.textContent = AppState.customElevationText;
+            hudMinLabelEl.textContent = AppState.customMinElevationText;
+            hudMaxLabelEl.textContent = AppState.customMaxElevationText;
+        }
+
+        // Calculates smooth fade-in / fade-out opacity within [0, CAPTION_DISPLAY_DURATION]
+        function computeCaptionAlpha(timer) {
+            if (timer < 0 || timer >= CAPTION_DISPLAY_DURATION) return 0;
+            if (timer < CAPTION_FADE_IN_DURATION) {
+                return Math.max(0, Math.min(1, timer / CAPTION_FADE_IN_DURATION));
+            }
+            const remaining = CAPTION_DISPLAY_DURATION - timer;
+            if (remaining < CAPTION_FADE_OUT_DURATION) {
+                return Math.max(0, Math.min(1, remaining / CAPTION_FADE_OUT_DURATION));
+            }
+            return 1.0;
+        }
+
+        // Returns true if either the highest-point or lowest-point caption is still displaying
+        function isAnyCaptionVisible() {
+            const peakText = (AppState.peakCaption || "").trim();
+            const minText = (AppState.minCaption || "").trim();
+
+            const peakActive = peakBeaconGroup.visible &&
+                AppState.peakCaptionTimer >= 0 &&
+                AppState.peakCaptionTimer < CAPTION_DISPLAY_DURATION &&
+                peakText !== "";
+
+            const minActive = minBeaconGroup.visible &&
+                AppState.minCaptionTimer >= 0 &&
+                AppState.minCaptionTimer < CAPTION_DISPLAY_DURATION &&
+                minText !== "";
+
+            return Boolean(peakActive || minActive);
+        }
+
+        // Evaluates whether peak or min caption is within its 3.5s reading window and updates HUD
+        function syncExtremeCaptionHUD() {
+            const peakText = (AppState.peakCaption || "").trim();
+            const minText = (AppState.minCaption || "").trim();
+
+            const peakActive = peakBeaconGroup.visible &&
+                AppState.peakCaptionTimer >= 0 &&
+                AppState.peakCaptionTimer < CAPTION_DISPLAY_DURATION &&
+                peakText !== "";
+
+            const minActive = minBeaconGroup.visible &&
+                AppState.minCaptionTimer >= 0 &&
+                AppState.minCaptionTimer < CAPTION_DISPLAY_DURATION &&
+                minText !== "";
+
+            let activeText = "";
+            let activeType = null;
+            let activeTimer = -1;
+
+            if (peakActive && minActive) {
+                // Prioritize whichever extreme point was triggered more recently
+                if (AppState.minCaptionTimer <= AppState.peakCaptionTimer) {
+                    activeText = minText;
+                    activeType = 'min';
+                    activeTimer = AppState.minCaptionTimer;
+                } else {
+                    activeText = peakText;
+                    activeType = 'peak';
+                    activeTimer = AppState.peakCaptionTimer;
+                }
+            } else if (peakActive) {
+                activeText = peakText;
+                activeType = 'peak';
+                activeTimer = AppState.peakCaptionTimer;
+            } else if (minActive) {
+                activeText = minText;
+                activeType = 'min';
+                activeTimer = AppState.minCaptionTimer;
+            }
+
+            AppState.activeSubtitleText = activeText;
+            AppState.activeSubtitleType = activeType;
+            AppState.activeSubtitleOpacity = activeText ? computeCaptionAlpha(activeTimer) : 0;
+
+            if (activeText) {
+                hudSubtitleEl.textContent = activeText;
+                hudSubtitleContainerEl.classList.remove('opacity-0');
+                if (activeType === 'min') {
+                    hudSubtitleDotEl.style.backgroundColor = '#38bdf8';
+                    hudSubtitleDotEl.style.boxShadow = '0 0 8px #38bdf8';
+                } else {
+                    hudSubtitleDotEl.style.backgroundColor = '#f5a623';
+                    hudSubtitleDotEl.style.boxShadow = '0 0 8px #f5a623';
+                }
+            } else {
+                hudSubtitleContainerEl.classList.add('opacity-0');
+            }
+        }
+
+        function updateSweepFrame(progress, syncTimersFromProgress = false) {
+            if (!voxelInstancedMesh || AppState.voxels.length === 0) return;
+
+            const voxels = AppState.voxels;
+            const maxElev = Math.max(1, AppState.maxElevation);
+            const minElev = AppState.minElevation;
+            const baseElev = AppState.baseMode === 'zero' ? 0 : minElev;
+
+            const maxWorldHeight = 1.65 * AppState.exaggeration;
+            const waveBand = 0.035;
+            // Ensure that when progress reaches 1.0, even voxels on the southernmost row (rowNorm = 1.0) complete their pop-up animation
+            const effectiveProgress = progress >= 1.0 ? 1.0 + waveBand : progress;
+            let discoveredMax = baseElev;
+            let peakIsVisible = false;
+            let minIsVisible = false;
+
+            for (let i = 0; i < voxels.length; i++) {
+                const v = voxels[i];
+
+                if (progress <= 0.001 || v.rowNorm > progress) {
+                    dummyMatrix.position.set(v.x, 0, v.z);
+                    dummyMatrix.scale.set(0.0001, 0.0001, 0.0001);
+                    dummyMatrix.updateMatrix();
+                    voxelInstancedMesh.setMatrixAt(i, dummyMatrix.matrix);
+                } else {
+                    const rowAge = (effectiveProgress - v.rowNorm) / waveBand;
+                    const popFactor = Math.min(1.0, Math.max(0.05, 1 - Math.pow(1 - Math.min(1, rowAge), 3)));
+
+                    if (v.elevation > discoveredMax) {
+                        discoveredMax = v.elevation;
+                    }
+
+                    const elevRatio = AppState.baseMode === 'zero'
+                        ? (v.elevation / maxElev)
+                        : ((v.elevation - minElev) / Math.max(1, maxElev - minElev));
+
+                    const targetHeight = Math.max(0.08, elevRatio * maxWorldHeight) * popFactor;
+
+                    dummyMatrix.position.set(v.x, 0, v.z);
+                    dummyMatrix.scale.set(1, targetHeight, 1);
+                    dummyMatrix.updateMatrix();
+                    voxelInstancedMesh.setMatrixAt(i, dummyMatrix.matrix);
+
+                    if (v.isPeak && (popFactor > 0.85 || progress >= 1.0)) {
+                        peakIsVisible = true;
+                        peakBeaconGroup.position.set(v.x, targetHeight, v.z);
+                    }
+                    if (v.isMin && (popFactor > 0.85 || progress >= 1.0)) {
+                        minIsVisible = true;
+                        minBeaconGroup.position.set(v.x, targetHeight, v.z);
+                    }
+                }
+            }
+
+            voxelInstancedMesh.instanceMatrix.needsUpdate = true;
+
+            AppState.currentScanMaxElev = discoveredMax;
+            // Display exact manual inputs on HUD
+            hudElevationEl.textContent = AppState.customElevationText;
+            hudMinLabelEl.textContent = AppState.customMinElevationText;
+            hudMaxLabelEl.textContent = AppState.customMaxElevationText;
+
+            // Once highest point or lowest point is triggered, keep its 3D beacon animation active until the end
+            const sincePeak = progress - AppState.peakReachedAtProgress;
+            const peakTriggered = Boolean(peakIsVisible && sincePeak >= 0);
+            peakBeaconGroup.visible = peakTriggered;
+
+            const sinceMin = progress - AppState.minReachedAtProgress;
+            const minTriggered = Boolean(minIsVisible && sinceMin >= 0);
+            minBeaconGroup.visible = minTriggered;
+
+            // Manage caption timers so each extreme point caption only stays for CAPTION_DISPLAY_DURATION seconds
+            if (!peakTriggered) {
+                AppState.peakCaptionTimer = -1;
+            } else if (syncTimersFromProgress) {
+                AppState.peakCaptionTimer = Math.max(0, sincePeak * AppState.sweepDuration);
+            } else if (AppState.peakCaptionTimer < 0) {
+                AppState.peakCaptionTimer = 0;
+            }
+
+            if (!minTriggered) {
+                AppState.minCaptionTimer = -1;
+            } else if (syncTimersFromProgress) {
+                AppState.minCaptionTimer = Math.max(0, sinceMin * AppState.sweepDuration);
+            } else if (AppState.minCaptionTimer < 0) {
+                AppState.minCaptionTimer = 0;
+            }
+
+            syncExtremeCaptionHUD();
+
+            const pct = progress * 100;
+            sliderScrubEl.value = Math.round(progress * 1000);
+            labelScrubPercentEl.textContent = `${Math.round(pct)}%`;
+        }
+
+        /********************************************************************
+         * 10. HIGH-RESOLUTION COMPOSITE CANVAS RENDERER FOR VIDEO EXPORT
+         ********************************************************************/
+        const compositeCanvas = document.createElement('canvas');
+        const compositeCtx = compositeCanvas.getContext('2d');
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let recordingCanceled = false;
+
+        // Draws the complete frame (Background + 3D WebGL + Optional Top/Bottom HUD) onto compositeCanvas at target resolution
+        function renderCompositeFrame(targetW, targetH) {
+            if (compositeCanvas.width !== targetW || compositeCanvas.height !== targetH) {
+                compositeCanvas.width = targetW;
+                compositeCanvas.height = targetH;
+            }
+
+            const isLight = AppState.themeMode === 'light';
+            const ctx = compositeCtx;
+            ctx.save();
+
+            // 1. Stage Background (Matches active Dark or Light theme)
+            const grad = ctx.createRadialGradient(
+                targetW * 0.5, targetH * 0.5, targetW * 0.05,
+                targetW * 0.5, targetH * 0.5, Math.max(targetW, targetH) * 0.75
+            );
+            if (isLight) {
+                grad.addColorStop(0, '#ffffff');
+                grad.addColorStop(1, '#eef2f6');
+            } else {
+                grad.addColorStop(0, '#0c0f14');
+                grad.addColorStop(1, '#07080a');
+            }
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, targetW, targetH);
+
+            // 2. Draw 3D WebGL Canvas
+            ctx.drawImage(renderer.domElement, 0, 0, targetW, targetH);
+
+            // 3. Draw HUD Overlay if enabled
+            if (AppState.includeHUDInExport) {
+                const minDim = Math.min(targetW, targetH);
+                const s = minDim / 1080; // Scale factor relative to 1080p short edge
+
+                const centerX = targetW * 0.5;
+                const topPad = Math.round(88 * s);
+
+                // 3.1 Top Header Title
+                const titleFontPx = Math.round(32 * s);
+                ctx.font = `600 ${titleFontPx}px "Inter", "PingFang SC", "Microsoft YaHei", sans-serif`;
+                ctx.fillStyle = isLight ? 'rgba(15, 23, 42, 0.92)' : 'rgba(255, 255, 255, 0.95)';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                if ('letterSpacing' in ctx) ctx.letterSpacing = `${Math.round(4 * s)}px`;
+                ctx.fillText((AppState.title || '').toUpperCase(), centerX, topPad);
+
+                // 3.2 Giant Gold Elevation Readout (Verbatim manual text, no thousands separator)
+                const elevFontPx = Math.round(126 * s);
+                const elevY = topPad + Math.round(52 * s);
+                ctx.font = `800 ${elevFontPx}px "Inter", "JetBrains Mono", "PingFang SC", "Microsoft YaHei", sans-serif`;
+                ctx.fillStyle = isLight ? '#d97706' : '#f5a623';
+                ctx.shadowColor = isLight ? 'rgba(217, 119, 6, 0.25)' : 'rgba(245, 166, 35, 0.38)';
+                ctx.shadowBlur = Math.round(45 * s);
+                if ('letterSpacing' in ctx) ctx.letterSpacing = `${Math.round(-1 * s)}px`;
+                ctx.fillText(String(AppState.customElevationText ?? ''), centerX, elevY);
+                ctx.shadowBlur = 0;
+
+                // 3.3 Dynamic Extreme Point Subtitle + Indicator Square
+                const subText = (AppState.activeSubtitleText || '').toUpperCase();
+                const subAlpha = AppState.activeSubtitleOpacity ?? 1.0;
+                if (subText && subAlpha > 0.01) {
+                    ctx.save();
+                    ctx.globalAlpha = subAlpha;
+
+                    const subFontPx = Math.round(25 * s);
+                    const subY = elevY + elevFontPx + Math.round(24 * s);
+                    ctx.font = `700 ${subFontPx}px "Inter", "PingFang SC", "Microsoft YaHei", sans-serif`;
+                    if ('letterSpacing' in ctx) ctx.letterSpacing = `${Math.round(2.5 * s)}px`;
+
+                    const textMetrics = ctx.measureText(subText);
+                    const dotSize = Math.round(13 * s);
+                    const gap = Math.round(16 * s);
+                    const totalSubW = dotSize + gap + textMetrics.width;
+                    const startX = centerX - totalSubW * 0.5;
+
+                    // Indicator square with glow (Gold for Peak, Cyan for Lowest Point)
+                    const dotColor = AppState.activeSubtitleType === 'min' ? '#38bdf8' : '#f5a623';
+                    ctx.shadowColor = dotColor;
+                    ctx.shadowBlur = Math.round(14 * s);
+                    ctx.fillStyle = dotColor;
+                    ctx.fillRect(startX, subY + (subFontPx - dotSize) * 0.45, dotSize, dotSize);
+                    ctx.shadowBlur = 0;
+
+                    // Subtitle text
+                    ctx.fillStyle = isLight ? 'rgba(30, 41, 59, 0.90)' : 'rgba(255, 255, 255, 0.92)';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(subText, startX + dotSize + gap, subY);
+
+                    ctx.restore();
+                }
+
+                // 3.4 Bottom Static Hypsometric Gradient Scale Bar & Left/Right Endpoint Thumbs
+                const bottomPad = Math.round(115 * s);
+                const barY = targetH - bottomPad;
+                const barMaxW = Math.min(targetW * 0.78, Math.round(860 * s));
+                const barLeft = centerX - barMaxW * 0.5;
+                const barRight = barLeft + barMaxW;
+                const barHeight = Math.max(5, Math.round(7 * s));
+
+                // Full Static Hypsometric Elevation Gradient Line (Low -> High matching 3D terrain COLOR_STOPS)
+                const barGrad = ctx.createLinearGradient(barLeft, barY, barRight, barY);
+                barGrad.addColorStop(0.00, '#2b6152');
+                barGrad.addColorStop(0.22, '#528a69');
+                barGrad.addColorStop(0.45, '#6d9e6b');
+                barGrad.addColorStop(0.68, '#94ab70');
+                barGrad.addColorStop(0.84, '#a2927c');
+                barGrad.addColorStop(0.94, '#d4d6da');
+                barGrad.addColorStop(1.00, '#fcfdff');
+
+                ctx.shadowColor = isLight ? 'rgba(15, 23, 42, 0.18)' : 'rgba(109, 158, 107, 0.42)';
+                ctx.shadowBlur = Math.round(12 * s);
+                ctx.fillStyle = barGrad;
+                ctx.beginPath();
+                ctx.roundRect(barLeft, barY, barMaxW, barHeight, barHeight);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                if (isLight) {
+                    ctx.strokeStyle = 'rgba(15, 23, 42, 0.14)';
+                    ctx.lineWidth = Math.max(1, Math.round(1.5 * s));
+                    ctx.stroke();
+                }
+
+                // Left & Right Glowing Endpoint Thumb Circles (Min Endpoint & Max Endpoint)
+                const thumbY = barY + barHeight * 0.5;
+                const thumbRadius = Math.round(12 * s);
+                const thumbConfigs = [
+                    {
+                        x: barLeft,
+                        stroke: '#528a69',
+                        shadow: 'rgba(82, 138, 105, 0.92)'
+                    },
+                    {
+                        x: barRight,
+                        stroke: isLight ? '#94a3b8' : '#fcfdff',
+                        shadow: isLight ? 'rgba(100, 116, 139, 0.55)' : 'rgba(252, 253, 255, 0.95)'
+                    }
+                ];
+
+                thumbConfigs.forEach(cfg => {
+                    ctx.shadowColor = cfg.shadow;
+                    ctx.shadowBlur = Math.round(20 * s);
+                    ctx.fillStyle = isLight ? '#f6f8fb' : '#07080a';
+                    ctx.strokeStyle = cfg.stroke;
+                    ctx.lineWidth = Math.max(3, Math.round(5 * s));
+                    ctx.beginPath();
+                    ctx.arc(cfg.x, thumbY, thumbRadius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                });
+                ctx.shadowBlur = 0;
+
+                // Min & Max Elevation Labels (Verbatim from external inputs)
+                const labelFontPx = Math.round(25 * s);
+                const labelY = barY + Math.round(24 * s);
+                ctx.font = `600 ${labelFontPx}px "Inter", "JetBrains Mono", "PingFang SC", "Microsoft YaHei", sans-serif`;
+                if ('letterSpacing' in ctx) ctx.letterSpacing = `${Math.round(1.5 * s)}px`;
+                ctx.fillStyle = isLight ? 'rgba(15, 23, 42, 0.86)' : 'rgba(255, 255, 255, 0.85)';
+
+                ctx.textAlign = 'left';
+                ctx.fillText(String(AppState.customMinElevationText ?? ''), barLeft, labelY);
+
+                ctx.textAlign = 'right';
+                ctx.fillText(String(AppState.customMaxElevationText ?? ''), barRight, labelY);
+            }
+
+            ctx.restore();
+        }
+
+        // Select best supported MIME type for MediaRecorder
+        function getBestSupportedMimeType() {
+            const candidates = [
+                { mime: 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', ext: 'mp4' },
+                { mime: 'video/mp4;codecs=avc1', ext: 'mp4' },
+                { mime: 'video/mp4', ext: 'mp4' },
+                { mime: 'video/webm;codecs=vp9', ext: 'webm' },
+                { mime: 'video/webm;codecs=vp8', ext: 'webm' },
+                { mime: 'video/webm', ext: 'webm' }
+            ];
+            for (const c of candidates) {
+                if (window.MediaRecorder && MediaRecorder.isTypeSupported(c.mime)) {
+                    return c;
+                }
+            }
+            return { mime: '', ext: 'webm' };
+        }
+
+        function startHighResVideoExport() {
+            if (AppState.isRecording) return;
+
+            const { width, height, aspect } = getTargetExportDimensions();
+            const fps = Number(AppState.exportFPS) || 60;
+            const bitrate = Number(AppState.exportBitrate) || 25000000;
+
+            // Configure Three.js internal drawing buffer to exact export resolution while keeping CSS layout unchanged
+            updateCameraFrustumForAspect(aspect);
+            renderer.setPixelRatio(1);
+            renderer.setSize(width, height, false);
+
+            // Reset animation to 0% and start recording
+            AppState.progress = 0;
+            AppState.holdEndTimer = 0;
+            AppState.peakCaptionTimer = -1;
+            AppState.minCaptionTimer = -1;
+            AppState.isPlaying = true;
+            AppState.isRecording = true;
+            recordingCanceled = false;
+            recordedChunks = [];
+
+            updateSweepFrame(0, true);
+            renderer.render(scene, camera);
+            renderCompositeFrame(width, height);
+
+            const stream = compositeCanvas.captureStream(fps);
+            const formatInfo = getBestSupportedMimeType();
+
+            const options = { videoBitsPerSecond: bitrate };
+            if (formatInfo.mime) {
+                options.mimeType = formatInfo.mime;
+            }
+
+            try {
+                mediaRecorder = new MediaRecorder(stream, options);
+            } catch (e) {
+                mediaRecorder = new MediaRecorder(stream);
+            }
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data && e.data.size > 0) {
+                    recordedChunks.push(e.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                AppState.isRecording = false;
+                document.getElementById('recording-banner').classList.add('hidden');
+                updateStageLayoutAndRenderer();
+
+                if (recordingCanceled || recordedChunks.length === 0) return;
+
+                const blob = new Blob(recordedChunks, { type: formatInfo.mime || 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                const safeTitle = (AppState.title || 'DEM_Scan').replace(/[^a-zA-Z0-9_\u4e00-\u9fa5]/g, '_').slice(0, 24);
+                const ratioTag = AppState.aspectMode.replace(':', 'x');
+                a.href = url;
+                a.download = `${safeTitle}_${width}x${height}_${fps}fps_${ratioTag}.${formatInfo.ext}`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 10000);
+            };
+
+            mediaRecorder.start(100);
+
+            // Show Recording UI Banner
+            document.getElementById('rec-res-tag').textContent = `${width}×${height} · ${fps}FPS`;
+            document.getElementById('rec-pct-text').textContent = `0%`;
+            document.getElementById('rec-progress-bar').style.width = `0%`;
+            document.getElementById('recording-banner').classList.remove('hidden');
+        }
+
+        function stopVideoExport(cancel = false) {
+            if (!AppState.isRecording) return;
+            recordingCanceled = cancel;
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            } else {
+                AppState.isRecording = false;
+                document.getElementById('recording-banner').classList.add('hidden');
+                updateStageLayoutAndRenderer();
+            }
+        }
+
+        // Export High-Resolution PNG Snapshot of current frame
+        function exportHighResSnapshot() {
+            const { width, height, aspect } = getTargetExportDimensions();
+            updateCameraFrustumForAspect(aspect);
+            renderer.setPixelRatio(1);
+            renderer.setSize(width, height, false);
+            renderer.render(scene, camera);
+            renderCompositeFrame(width, height);
+
+            const dataURL = compositeCanvas.toDataURL('image/png');
+            const a = document.createElement('a');
+            const safeTitle = (AppState.title || 'DEM_Snapshot').replace(/[^a-zA-Z0-9_\u4e00-\u9fa5]/g, '_').slice(0, 24);
+            a.href = dataURL;
+            a.download = `${safeTitle}_${width}x${height}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+
+            updateStageLayoutAndRenderer();
+        }
+
+        /********************************************************************
+         * 11. MAIN ANIMATION LOOP
+         ********************************************************************/
+        let lastTime = performance.now();
+
+        function animate(now) {
+            requestAnimationFrame(animate);
+
+            const dt = Math.min(0.1, (now - lastTime) / 1000);
+            lastTime = now;
+
+            // Advance active extreme point caption timers so captions auto-hide after 3.5 seconds
+            // Continues ticking when playing or when scan has reached 100%
+            let captionTimerChanged = false;
+            if (AppState.isPlaying || AppState.progress >= 1.0) {
+                if (AppState.peakCaptionTimer >= 0 && AppState.peakCaptionTimer <= CAPTION_DISPLAY_DURATION + 0.5) {
+                    AppState.peakCaptionTimer += dt;
+                    captionTimerChanged = true;
+                }
+                if (AppState.minCaptionTimer >= 0 && AppState.minCaptionTimer <= CAPTION_DISPLAY_DURATION + 0.5) {
+                    AppState.minCaptionTimer += dt;
+                    captionTimerChanged = true;
+                }
+            }
+            if (captionTimerChanged) {
+                syncExtremeCaptionHUD();
+            }
+
+            if (AppState.isPlaying) {
+                if (AppState.progress < 1.0) {
+                    AppState.progress += dt / AppState.sweepDuration;
+                    if (AppState.progress >= 1.0) {
+                        AppState.progress = 1.0;
+                    }
+                    updateSweepFrame(AppState.progress, false);
+                } else {
+                    // Keep the 100% completed terrain frame active while waiting for captions to disappear
+                    updateSweepFrame(1.0, false);
+
+                    if (AppState.isRecording) {
+                        if (isAnyCaptionVisible()) {
+                            // Wait until both peak and min captions have finished their 3.5s display and disappeared
+                            AppState.holdEndTimer = 0;
+                            document.getElementById('rec-status-text').textContent = "等待极值字幕展示并隐退...";
+                        } else {
+                            // Captions have disappeared; hold clean 100% terrain for 1.2s before finalizing video
+                            AppState.holdEndTimer += dt;
+                            document.getElementById('rec-status-text').textContent = "字幕已隐退，正在封装纯净尾帧...";
+                            if (AppState.holdEndTimer >= 1.2) {
+                                AppState.isPlaying = false;
+                                stopVideoExport(false);
+                            }
+                        }
+                    } else {
+                        // In normal preview mode, stop playing once 100% is reached and all captions have disappeared
+                        if (!isAnyCaptionVisible()) {
+                            AppState.isPlaying = false;
+                        }
+                    }
+                }
+            }
+
+            // Continuously animate Peak Beacon (Sky Radar) and Min Beacon (Crystal + Hexagonal Ground Sonar) once triggered
+            if (peakBeaconGroup.visible || minBeaconGroup.visible) {
+                AppState.beaconTimer += dt * 0.85;
+
+                // 1. Peak Animation: Expanding circular rings high in the sky
+                if (peakBeaconGroup.visible) {
+                    peakRadarRings.forEach(r => {
+                        const phase = (AppState.beaconTimer + r.phaseOffset) % 1.0;
+                        const scale = 0.6 + phase * 5.2;
+                        r.mesh.scale.set(scale, scale, 1);
+                        r.mesh.material.opacity = (1.0 - phase) * 0.78;
+                    });
+                }
+
+                // 2. Min Animation: Rotating & bobbing cyan diamond crystal + orbital ring + rotating hexagonal sonar waves
+                if (minBeaconGroup.visible) {
+                    if (minCrystalMesh) {
+                        minCrystalMesh.rotation.y += dt * 2.4;
+                        minCrystalMesh.position.y = 1.65 + 0.15 + Math.sin(AppState.beaconTimer * Math.PI * 2.5) * 0.12;
+                    }
+                    if (minOrbitRingMesh) {
+                        minOrbitRingMesh.rotation.z -= dt * 1.8;
+                        minOrbitRingMesh.rotation.y += dt * 1.1;
+                        minOrbitRingMesh.position.y = 1.65 + 0.15 + Math.sin(AppState.beaconTimer * Math.PI * 2.5) * 0.12;
+                    }
+                    minRadarRings.forEach((r, idx) => {
+                        const phase = (AppState.beaconTimer * 1.15 + r.phaseOffset) % 1.0;
+                        const scale = 0.45 + phase * 4.2;
+                        r.mesh.scale.set(scale, scale, 1);
+                        r.mesh.rotation.z = phase * Math.PI * (idx % 2 === 0 ? 0.5 : -0.5);
+                        r.mesh.material.opacity = Math.sin(phase * Math.PI) * 0.82;
+                    });
+                }
+            }
+
+            renderer.render(scene, camera);
+
+            // If recording, composite 3D + HUD into the offscreen high-res stream every frame
+            if (AppState.isRecording) {
+                const { width, height } = getTargetExportDimensions();
+                renderCompositeFrame(width, height);
+                const pct = Math.round(AppState.progress * 100);
+                document.getElementById('rec-pct-text').textContent = `${pct}%`;
+                document.getElementById('rec-progress-bar').style.width = `${pct}%`;
+                if (AppState.progress < 1.0) {
+                    document.getElementById('rec-status-text').textContent = `正在渲染高程帧 (${pct}%)...`;
+                }
+            }
+        }
+
+        /********************************************************************
+         * 12. FILE UPLOAD HANDLERS (GEOTIFF & GEOJSON)
+         ********************************************************************/
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const loadingText = document.getElementById('loading-text');
+        const statusBadge = document.getElementById('status-badge');
+
+        function showLoading(msg) {
+            loadingText.textContent = msg;
+            loadingOverlay.classList.remove('hidden');
+            loadingOverlay.classList.add('flex');
+        }
+        function hideLoading() {
+            loadingOverlay.classList.add('hidden');
+            loadingOverlay.classList.remove('flex');
+        }
+
+        document.getElementById('input-main-geojson').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            showLoading(`正在读取主区域边界: ${file.name}...`);
+            try {
+                const text = await file.text();
+                const json = JSON.parse(text);
+                AppState.mainGeoJSON = json;
+
+                if (AppState.isDemoMode) {
+                    AppState.bgGeoJSON = null;
+                    AppState.isDemoMode = false;
+                }
+
+                if (!document.getElementById('input-dem-tiff').files[0]) {
+                    const parsed = extractGeoJSONPrimitives(json);
+                    AppState.demRaster = createFallbackDEMForBBox(parsed.bbox);
+                }
+
+                document.getElementById('main-geojson-status').textContent = file.name;
+                document.getElementById('main-geojson-status').className = "text-[10px] text-emerald-400 font-semibold truncate max-w-[130px]";
+                statusBadge.textContent = "自定义区域已加载";
+
+                rebuildVisualization(true);
+                restartAnimation();
+            } catch (err) {
+                console.error(err);
+                statusBadge.textContent = "GeoJSON 解析失败";
+            } finally {
+                hideLoading();
+            }
+        });
+
+        document.getElementById('input-dem-tiff').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            showLoading(`正在解析高程 GeoTIFF: ${file.name}...`);
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
+                const image = await tiff.getImage();
+                const bbox = image.getBoundingBox();
+                const width = image.getWidth();
+                const height = image.getHeight();
+                const noData = image.getGDALNoData();
+
+                const rasters = await image.readRasters();
+                const elevationBand = rasters[0];
+
+                AppState.demRaster = {
+                    data: elevationBand,
+                    width,
+                    height,
+                    bbox,
+                    noData: noData !== null ? noData : -9999
+                };
+
+                if (AppState.isDemoMode && !document.getElementById('input-main-geojson').files[0]) {
+                    AppState.mainGeoJSON = {
+                        type: "FeatureCollection",
+                        features: [{
+                            type: "Feature",
+                            properties: {},
+                            geometry: {
+                                type: "Polygon",
+                                coordinates: [[
+                                    [bbox[0], bbox[3]],
+                                    [bbox[2], bbox[3]],
+                                    [bbox[2], bbox[1]],
+                                    [bbox[0], bbox[1]],
+                                    [bbox[0], bbox[3]]
+                                ]]
+                            }
+                        }]
+                    };
+                    AppState.bgGeoJSON = null;
+                    AppState.isDemoMode = false;
+                }
+
+                document.getElementById('dem-tiff-status').textContent = `${width}×${height} 栅格`;
+                document.getElementById('dem-tiff-status').className = "text-[10px] text-emerald-400 font-semibold";
+                statusBadge.textContent = "真实 DEM 已加载";
+
+                rebuildVisualization(true);
+                restartAnimation();
+            } catch (err) {
+                console.error(err);
+                statusBadge.textContent = "GeoTIFF 解析失败";
+            } finally {
+                hideLoading();
+            }
+        });
+
+        const btnClearBg = document.getElementById('btn-clear-bg');
+        document.getElementById('input-bg-geojson').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            showLoading(`正在加载背景底图: ${file.name}...`);
+            try {
+                const text = await file.text();
+                AppState.bgGeoJSON = JSON.parse(text);
+                btnClearBg.classList.remove('hidden');
+                rebuildVisualization();
+            } catch (err) {
+                console.error(err);
+            } finally {
+                hideLoading();
+            }
+        });
+
+        btnClearBg.addEventListener('click', () => {
+            AppState.bgGeoJSON = null;
+            document.getElementById('input-bg-geojson').value = "";
+            btnClearBg.classList.add('hidden');
+            rebuildVisualization();
+        });
+
+        function createFallbackDEMForBBox(bbox) {
+            const w = 150, h = 150;
+            const data = new Float32Array(w * h);
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    const nx = x / w, ny = y / h;
+                    const hills = Math.sin(nx * 8) * Math.cos(ny * 8) * 350 + (1 - nx) * 1800 + (1 - ny) * 600;
+                    data[y * w + x] = Math.max(200, Math.round(hills + 400));
+                }
+            }
+            return { data, width: w, height: h, bbox, noData: -9999 };
+        }
+
+        /********************************************************************
+         * 13. UI CONTROLS, ASPECT RATIO, CLARITY & CAPTIONS MANAGEMENT
+         ********************************************************************/
+        const quickRatioSelect = document.getElementById('quick-ratio-select');
+        const customRatioBox = document.getElementById('custom-ratio-box');
+        const ratioBtns = document.querySelectorAll('.ratio-btn');
+
+        function setAspectRatioMode(mode) {
+            AppState.aspectMode = mode;
+            quickRatioSelect.value = mode;
+
+            ratioBtns.forEach(btn => {
+                if (btn.dataset.ratio === mode) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+
+            if (mode === 'custom') {
+                customRatioBox.classList.remove('hidden');
+            } else {
+                customRatioBox.classList.add('hidden');
+            }
+
+            updateStageLayoutAndRenderer();
+        }
+
+        ratioBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                setAspectRatioMode(btn.dataset.ratio);
+            });
+        });
+
+        quickRatioSelect.addEventListener('change', (e) => {
+            setAspectRatioMode(e.target.value);
+        });
+
+        document.getElementById('btn-apply-custom-ratio').addEventListener('click', () => {
+            const w = Math.max(1, parseInt(document.getElementById('input-custom-w').value) || 9);
+            const h = Math.max(1, parseInt(document.getElementById('input-custom-h').value) || 16);
+            AppState.customAspectW = w;
+            AppState.customAspectH = h;
+            setAspectRatioMode('custom');
+        });
+
+        // Theme Mode Switching (Dark Starfield vs Light Clean Paper)
+        const btnThemeQuick = document.getElementById('btn-theme-quick');
+        const btnModeDark = document.getElementById('btn-mode-dark');
+        const btnModeLight = document.getElementById('btn-mode-light');
+        const themeIconSun = document.getElementById('theme-icon-sun');
+        const themeIconMoon = document.getElementById('theme-icon-moon');
+        const themeToggleText = document.getElementById('theme-toggle-text');
+
+        function applyThemeMode(mode) {
+            AppState.themeMode = mode === 'light' ? 'light' : 'dark';
+            const isLight = AppState.themeMode === 'light';
+
+            if (isLight) {
+                stageWrapperEl.classList.add('theme-light');
+                stageEl.classList.add('theme-light');
+                themeIconSun.classList.remove('hidden');
+                themeIconMoon.classList.add('hidden');
+                themeToggleText.textContent = '亮色模式';
+                btnModeLight.className = "px-2.5 py-1 rounded-md bg-[#f5a623] text-gray-950 font-bold text-[11px] transition";
+                btnModeDark.className = "px-2.5 py-1 rounded-md text-gray-300 font-medium text-[11px] transition";
+            } else {
+                stageWrapperEl.classList.remove('theme-light');
+                stageEl.classList.remove('theme-light');
+                themeIconSun.classList.add('hidden');
+                themeIconMoon.classList.remove('hidden');
+                themeToggleText.textContent = '暗色模式';
+                btnModeDark.className = "px-2.5 py-1 rounded-md bg-[#f5a623] text-gray-950 font-bold text-[11px] transition";
+                btnModeLight.className = "px-2.5 py-1 rounded-md text-gray-300 font-medium text-[11px] transition";
+            }
+
+            if (starfieldPoints) {
+                starfieldPoints.visible = !isLight;
+            }
+
+            // Update 3D borders and beacons to ensure crisp contrast on light or dark backgrounds
+            buildBeacons();
+            rebuildVisualization(false);
+        }
+
+        btnThemeQuick.addEventListener('click', () => {
+            applyThemeMode(AppState.themeMode === 'dark' ? 'light' : 'dark');
+        });
+        btnModeDark.addEventListener('click', () => applyThemeMode('dark'));
+        btnModeLight.addEventListener('click', () => applyThemeMode('light'));
+
+        // Clarity & Export Settings Listeners
+        document.getElementById('select-clarity').addEventListener('change', (e) => {
+            AppState.clarityShortEdge = parseInt(e.target.value) || 1080;
+            updateStageLayoutAndRenderer();
+        });
+
+        document.getElementById('select-fps').addEventListener('change', (e) => {
+            AppState.exportFPS = parseInt(e.target.value) || 60;
+        });
+
+        document.getElementById('select-bitrate').addEventListener('change', (e) => {
+            AppState.exportBitrate = parseInt(e.target.value) || 25000000;
+        });
+
+        document.getElementById('check-include-hud').addEventListener('change', (e) => {
+            AppState.includeHUDInExport = e.target.checked;
+        });
+
+        document.getElementById('btn-start-export').addEventListener('click', startHighResVideoExport);
+        document.getElementById('btn-export-quick').addEventListener('click', startHighResVideoExport);
+        document.getElementById('btn-snapshot').addEventListener('click', exportHighResSnapshot);
+
+        document.getElementById('btn-finish-rec-now').addEventListener('click', () => {
+            stopVideoExport(false);
+        });
+        document.getElementById('btn-cancel-rec').addEventListener('click', () => {
+            stopVideoExport(true);
+        });
+
+        // Title, Manual Elevation & Extreme Point Captions Listeners
+        document.getElementById('input-title').addEventListener('input', (e) => {
+            AppState.title = e.target.value;
+            hudTitleEl.textContent = AppState.title;
+        });
+
+        document.getElementById('input-elevation-display').addEventListener('input', (e) => {
+            AppState.customElevationText = e.target.value;
+            hudElevationEl.textContent = AppState.customElevationText;
+        });
+
+        document.getElementById('input-min-elevation').addEventListener('input', (e) => {
+            AppState.customMinElevationText = e.target.value;
+            hudMinLabelEl.textContent = AppState.customMinElevationText;
+        });
+
+        document.getElementById('input-max-elevation').addEventListener('input', (e) => {
+            AppState.customMaxElevationText = e.target.value;
+            hudMaxLabelEl.textContent = AppState.customMaxElevationText;
+        });
+
+        document.getElementById('btn-sync-dem-extremes').addEventListener('click', () => {
+            syncExtractedExtremesToInputs();
+        });
+
+        document.getElementById('input-peak-caption').addEventListener('input', (e) => {
+            AppState.peakCaption = e.target.value;
+            if (peakBeaconGroup.visible) {
+                AppState.peakCaptionTimer = 0;
+            }
+            syncExtremeCaptionHUD();
+        });
+
+        document.getElementById('input-min-caption').addEventListener('input', (e) => {
+            AppState.minCaption = e.target.value;
+            if (minBeaconGroup.visible) {
+                AppState.minCaptionTimer = 0;
+            }
+            syncExtremeCaptionHUD();
+        });
+
+        // Playback Controls
+        function restartAnimation() {
+            AppState.progress = 0;
+            AppState.peakCaptionTimer = -1;
+            AppState.minCaptionTimer = -1;
+            AppState.isPlaying = true;
+            updateSweepFrame(0, true);
+        }
+
+        document.getElementById('btn-restart').addEventListener('click', restartAnimation);
+        document.getElementById('btn-play-quick').addEventListener('click', restartAnimation);
+
+        document.getElementById('btn-play-pause').addEventListener('click', () => {
+            if (AppState.progress >= 1.0) {
+                restartAnimation();
+            } else {
+                AppState.isPlaying = !AppState.isPlaying;
+            }
+        });
+
+        document.getElementById('btn-reset-cam').addEventListener('click', resetCameraView);
+
+        sliderScrubEl.addEventListener('input', (e) => {
+            AppState.isPlaying = false;
+            AppState.progress = parseInt(e.target.value) / 1000;
+            updateSweepFrame(AppState.progress, true);
+        });
+
+        // Parameter Sliders
+        document.getElementById('slider-resolution').addEventListener('change', (e) => {
+            const val = parseInt(e.target.value);
+            AppState.gridResolution = val;
+            document.getElementById('val-resolution').textContent = `${val} × ${val}`;
+            rebuildVisualization();
+        });
+
+        document.getElementById('slider-exaggeration').addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            AppState.exaggeration = val;
+            document.getElementById('val-exaggeration').textContent = `${val.toFixed(1)}x`;
+            updateSweepFrame(AppState.progress);
+        });
+
+        document.getElementById('slider-duration').addEventListener('input', (e) => {
+            const val = parseInt(e.target.value);
+            AppState.sweepDuration = val;
+            document.getElementById('val-duration').textContent = `${val} 秒`;
+        });
+
+        window.addEventListener('resize', updateStageLayoutAndRenderer);
+
+        // Toggle Control Panel (Button & 'H' Shortcut for clean recording)
+        const controlPanel = document.getElementById('control-panel');
+        const togglePanelText = document.getElementById('toggle-panel-text');
+        const stageInfoBadge = document.getElementById('stage-info-badge');
+        let panelVisible = true;
+
+        function toggleControlPanel() {
+            panelVisible = !panelVisible;
+            if (panelVisible) {
+                controlPanel.classList.remove('-translate-x-[120%]');
+                stageInfoBadge.classList.remove('hidden');
+                togglePanelText.textContent = "隐藏控制台 (H)";
+            } else {
+                controlPanel.classList.add('-translate-x-[120%]');
+                stageInfoBadge.classList.add('hidden');
+                togglePanelText.textContent = "展开控制台 (H)";
+            }
+        }
+
+        document.getElementById('btn-toggle-panel').addEventListener('click', toggleControlPanel);
+        window.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+            if (e.key.toLowerCase() === 'h') {
+                toggleControlPanel();
+            } else if (e.code === 'Space') {
+                e.preventDefault();
+                AppState.isPlaying = !AppState.isPlaying;
+            }
+        });
+
+        // Load Demo Button
+        function loadDefaultDemo() {
+            const demo = generateDefaultFinlandDemo();
+            AppState.mainGeoJSON = demo.mainGeoJSON;
+            AppState.bgGeoJSON = demo.bgGeoJSON;
+            AppState.demRaster = demo.demRaster;
+            AppState.isDemoMode = true;
+            btnClearBg.classList.remove('hidden');
+            statusBadge.textContent = "内置演示已就绪";
+            document.getElementById('main-geojson-status').textContent = "未上传 (使用演示)";
+            document.getElementById('main-geojson-status').className = "text-[10px] text-gray-400";
+            document.getElementById('dem-tiff-status').textContent = "未上传 (使用演示)";
+            document.getElementById('dem-tiff-status').className = "text-[10px] text-gray-400";
+            rebuildVisualization(true);
+            restartAnimation();
+        }
+
+        document.getElementById('btn-load-demo').addEventListener('click', loadDefaultDemo);
+
+        /********************************************************************
+         * 14. INITIALIZATION ON WINDOW LOAD
+         ********************************************************************/
+        window.onload = function () {
+            loadDefaultDemo();
+            updateStageLayoutAndRenderer();
+            requestAnimationFrame(animate);
+        };
+    </script>
+</body>
+</html>
