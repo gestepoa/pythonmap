@@ -1,0 +1,4312 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>profpi · Fourier Explorer Pro — 双区域 SVG 复数单链本轮绘图仪 (双轨完播同步递进版)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            canvasDark: '#05070b',
+            panelDark: '#0d1119',
+            borderDark: '#1e2738',
+            accentCyan: '#38bdf8',
+            accentEmerald: '#34d399',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.25);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(56, 189, 248, 0.5);
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.28);
+    }
+    .dark input[type="range"]::-webkit-slider-runnable-track {
+      background: #1e293b;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      background: #0284c7;
+      margin-top: -4.5px;
+      box-shadow: 0 0 8px rgba(2, 132, 199, 0.5);
+      transition: transform 0.15s ease, background-color 0.15s ease;
+    }
+    .dark input[type="range"]::-webkit-slider-thumb {
+      background: #38bdf8;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.65);
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+      background: #38bdf8;
+    }
+
+    .glass-panel {
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    /* Offscreen SVG container for accurate geometry calculation */
+    #offscreen-svg-host {
+      position: fixed;
+      left: -99999px;
+      top: -99999px;
+      width: 2000px;
+      height: 2000px;
+      visibility: hidden;
+      pointer-events: none;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-[#05070b] dark:text-slate-100 font-sans min-h-screen flex flex-col selection:bg-sky-500 selection:text-white transition-colors duration-200">
+
+  <!-- Hidden Offscreen SVG Mount for Geometry & CTM Computation -->
+  <div id="offscreen-svg-host" aria-hidden="true"></div>
+
+  <!-- Top Navigation Header -->
+  <header class="sticky top-0 z-30 border-b border-slate-200 dark:border-[#1a2232] bg-white/85 dark:bg-[#080b12]/85 glass-panel">
+    <div class="max-w-[1600px] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
+      <!-- Left Brand -->
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2">
+          <span class="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-400 to-emerald-500 flex items-center justify-center text-white font-mono font-bold text-lg shadow-md shadow-sky-500/20">π</span>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="font-bold tracking-tight text-slate-900 dark:text-white text-sm sm:text-base">profpi</span>
+              <span class="text-slate-400 dark:text-slate-600">/</span>
+              <span class="font-semibold text-sky-600 dark:text-sky-400 text-sm sm:text-base">Dual SVG Epicycle Studio</span>
+              <span class="hidden md:inline-block text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">仅复数单链 · 双 SVG 同步完播锁</span>
+            </div>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">双区域独立上传 SVG 矢量地图 · 同时开画 · 确保双图在当前本轮数均完播后再进入下一阶参数</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center Formula Badge (Complex Single-Chain Only) -->
+      <div class="hidden xl:flex items-center gap-3 px-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-[#111726] border border-slate-200/80 dark:border-slate-800 text-xs font-mono">
+        <span class="text-sky-600 dark:text-sky-400">z<sub>A</sub>(t) = ∑ c<sub>k</sub><sup>(A)</sup> e<sup>2πikt</sup></span>
+        <span class="text-slate-300 dark:text-slate-700">∥</span>
+        <span class="text-emerald-600 dark:text-emerald-400">z<sub>B</sub>(t) = ∑ c<sub>k</sub><sup>(B)</sup> e<sup>2πikt</sup></span>
+      </div>
+
+      <!-- Right Quick Actions -->
+      <div class="flex items-center gap-2">
+        <button id="btn-sound-toggle" type="button" title="切换完成周期提示音" class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900/80 hover:border-sky-500/50 flex items-center gap-1.5 transition">
+          <span id="sound-icon">🔇</span>
+          <span class="hidden sm:inline" id="sound-label">完播音效: 关</span>
+        </button>
+
+        <button id="btn-export-png" type="button" title="导出当前双地图画布为超清 PNG" class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900/80 hover:border-sky-500/50 flex items-center gap-1.5 transition">
+          <span>📷</span>
+          <span class="hidden sm:inline">超清截图</span>
+        </button>
+
+        <button id="btn-header-record" type="button" title="录制并下载双地图绘图动画视频" class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-sky-500/40 bg-sky-500/15 text-sky-600 dark:text-sky-300 hover:bg-sky-500/25 flex items-center gap-1.5 transition">
+          <span id="header-record-icon">🎥</span>
+          <span class="hidden sm:inline" id="header-record-label">录制双图视频</span>
+        </button>
+
+        <button id="btn-theme-toggle" type="button" title="切换深色/浅色模式" class="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900/80 hover:border-sky-500/50 text-slate-700 dark:text-slate-300 flex items-center gap-1.5 text-xs font-medium transition">
+          <svg class="w-4 h-4 hidden dark:block text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="5"></circle>
+            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
+          </svg>
+          <svg class="w-4 h-4 block dark:hidden text-indigo-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+          <span id="theme-mode-label" class="hidden md:inline">亮色舞台</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 max-w-[1600px] w-full mx-auto px-3 sm:px-6 py-4 pb-6 flex flex-col gap-5">
+
+    <!-- Top Quick Sample Pair Bar & Live Sync Barrier Status -->
+    <section class="bg-white dark:bg-[#0d1119] border border-slate-200 dark:border-[#1e2738] rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-sm">
+      <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+        <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mr-1 flex items-center gap-1">
+          <svg class="w-3.5 h-3.5 text-sky-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+          快速示例双图 (Demo Pairs):
+        </span>
+        <button data-pair="islands" class="pair-preset-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-sky-500/15 text-sky-600 dark:text-sky-300 border border-sky-500/40 hover:bg-sky-500/25 transition">
+          🗺️ 示例1: 复杂大陆轮廓 vs 星群岛屿 (不同周长)
+        </button>
+        <button data-pair="continents" class="pair-preset-btn px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800/70 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/40 transition">
+          🌍 示例2: 六边形疆域 vs 靴形半岛
+        </button>
+        <button data-pair="geometry" class="pair-preset-btn px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800/70 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/40 transition">
+          🦋 示例3: 蝴蝶曲线 vs 爱心曲线
+        </button>
+      </div>
+
+      <!-- Status Toast -->
+      <div id="status-toast" class="text-xs font-mono px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span id="status-text">已就绪：默认亮色 3:4 竖屏 · 左右横向双动画区排版</span>
+      </div>
+    </section>
+
+    <!-- Main 2-Column Interactive Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+
+      <!-- LEFT COLUMN: Dual SVG Uploaders & Controls (5 cols on desktop) -->
+      <aside class="lg:col-span-5 flex flex-col gap-4">
+
+        <!-- Card 1: Dual SVG Upload Module (Track A & Track B) -->
+        <div class="bg-white dark:bg-[#0d1119] border border-slate-200 dark:border-[#1e2738] rounded-xl p-4 flex flex-col gap-4 shadow-sm">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              导入 SVG (Dual SVG Import)
+            </h2>
+            <span class="text-[11px] font-mono px-2 py-0.5 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
+              无大小限制 · 仅支持 .svg
+            </span>
+          </div>
+
+          <!-- Two Side-by-Side Upload Cards for Region A and Region B -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+            <!-- TRACK A UPLOADER -->
+            <div class="rounded-xl border border-sky-500/30 bg-sky-500/5 p-3 flex flex-col gap-2.5">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-sky-600 dark:text-sky-400 flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+                  动画区 A (左侧 SVG)
+                </span>
+                <button id="btn-paste-toggle-a" type="button" class="text-[11px] text-sky-500 hover:underline font-mono">粘贴源码</button>
+              </div>
+
+              <input id="file-input-a" type="file" accept=".svg,image/svg+xml,*/*" class="hidden" />
+              <div id="dropzone-a" role="button" tabindex="0" class="group cursor-pointer border-2 border-dashed border-sky-500/40 hover:border-sky-400 rounded-lg p-3 text-center transition bg-white/60 dark:bg-[#090d14]/70 hover:bg-sky-500/10 flex flex-col items-center justify-center gap-1.5 select-none">
+                <svg class="w-5 h-5 text-sky-500 group-hover:scale-110 transition pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                </svg>
+                <p class="text-xs font-semibold text-slate-700 dark:text-slate-200 pointer-events-none">
+                  点击选择或拖入 <span class="text-sky-500 underline">.svg 矢量文件</span>
+                </p>
+                <p id="meta-summary-a" class="text-[10px] font-mono text-slate-500 dark:text-slate-400 truncate max-w-full pointer-events-none">
+                  当前: 苍穹大陆轮廓.svg
+                </p>
+              </div>
+
+              <!-- Collapsible Paste Box A -->
+              <div id="paste-box-a" class="hidden flex-col gap-1.5">
+                <textarea id="raw-textarea-a" rows="3" placeholder="在此粘贴 <svg>...</svg> 源码或 <path d='...'/> 字符串" class="w-full rounded bg-white dark:bg-[#111726] border border-slate-200 dark:border-slate-700 p-1.5 text-[10px] font-mono text-slate-700 dark:text-slate-200 focus:outline-none focus:border-sky-500"></textarea>
+                <button id="btn-parse-raw-a" type="button" class="w-full py-1 rounded bg-sky-500 hover:bg-sky-600 text-white font-medium text-[11px] transition">解析粘贴的 SVG 代码</button>
+              </div>
+
+              <!-- SVG File Info Readout A -->
+              <div id="svg-info-card-a" class="hidden bg-sky-500/10 border border-sky-500/30 rounded-lg p-2 text-[10px] font-mono text-slate-700 dark:text-sky-200 flex-col gap-0.5">
+                <div class="flex justify-between">
+                  <span class="text-slate-500 dark:text-slate-400">文件名:</span>
+                  <span id="info-filename-a" class="font-semibold truncate max-w-[110px]">mapA.svg</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-slate-500 dark:text-slate-400">大小/耗时:</span>
+                  <span id="info-filesize-a">--</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-slate-500 dark:text-slate-400">子路径/周长:</span>
+                  <span id="info-subpaths-a">--</span>
+                </div>
+              </div>
+
+              <!-- Speed Multiplier for Track A -->
+              <div class="flex items-center justify-between text-[11px] pt-1 border-t border-sky-500/20">
+                <span class="text-slate-500 dark:text-slate-400">A 独立速率倍率:</span>
+                <div class="flex items-center gap-1.5">
+                  <input id="slider-speed-a" type="range" min="0.4" max="2.5" step="0.05" value="1.0" class="w-20" />
+                  <span id="label-speed-a" class="font-mono text-sky-500 font-semibold w-8 text-right">1.0x</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- TRACK B UPLOADER -->
+            <div class="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 flex flex-col gap-2.5">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  动画区 B (右侧 SVG)
+                </span>
+                <button id="btn-paste-toggle-b" type="button" class="text-[11px] text-emerald-500 hover:underline font-mono">粘贴源码</button>
+              </div>
+
+              <input id="file-input-b" type="file" accept=".svg,image/svg+xml,*/*" class="hidden" />
+              <div id="dropzone-b" role="button" tabindex="0" class="group cursor-pointer border-2 border-dashed border-emerald-500/40 hover:border-emerald-400 rounded-lg p-3 text-center transition bg-white/60 dark:bg-[#090d14]/70 hover:bg-emerald-500/10 flex flex-col items-center justify-center gap-1.5 select-none">
+                <svg class="w-5 h-5 text-emerald-500 group-hover:scale-110 transition pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                </svg>
+                <p class="text-xs font-semibold text-slate-700 dark:text-slate-200 pointer-events-none">
+                  点击选择或拖入 <span class="text-emerald-500 underline">.svg 矢量文件</span>
+                </p>
+                <p id="meta-summary-b" class="text-[10px] font-mono text-slate-500 dark:text-slate-400 truncate max-w-full pointer-events-none">
+                  当前: 翡翠千岛群岛.svg
+                </p>
+              </div>
+
+              <!-- Collapsible Paste Box B -->
+              <div id="paste-box-b" class="hidden flex-col gap-1.5">
+                <textarea id="raw-textarea-b" rows="3" placeholder="在此粘贴 <svg>...</svg> 源码或 <path d='...'/> 字符串" class="w-full rounded bg-white dark:bg-[#111726] border border-slate-200 dark:border-slate-700 p-1.5 text-[10px] font-mono text-slate-700 dark:text-slate-200 focus:outline-none focus:border-emerald-500"></textarea>
+                <button id="btn-parse-raw-b" type="button" class="w-full py-1 rounded bg-emerald-500 hover:bg-emerald-600 text-white font-medium text-[11px] transition">解析粘贴的 SVG 代码</button>
+              </div>
+
+              <!-- SVG File Info Readout B -->
+              <div id="svg-info-card-b" class="hidden bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-2 text-[10px] font-mono text-slate-700 dark:text-emerald-200 flex-col gap-0.5">
+                <div class="flex justify-between">
+                  <span class="text-slate-500 dark:text-slate-400">文件名:</span>
+                  <span id="info-filename-b" class="font-semibold truncate max-w-[110px]">mapB.svg</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-slate-500 dark:text-slate-400">大小/耗时:</span>
+                  <span id="info-filesize-b">--</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-slate-500 dark:text-slate-400">子路径/周长:</span>
+                  <span id="info-subpaths-b">--</span>
+                </div>
+              </div>
+
+              <!-- Speed Multiplier for Track B -->
+              <div class="flex items-center justify-between text-[11px] pt-1 border-t border-emerald-500/20">
+                <span class="text-slate-500 dark:text-slate-400">B 独立速率倍率:</span>
+                <div class="flex items-center gap-1.5">
+                  <input id="slider-speed-b" type="range" min="0.4" max="2.5" step="0.05" value="1.0" class="w-20" />
+                  <span id="label-speed-b" class="font-mono text-emerald-500 font-semibold w-8 text-right">1.0x</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Multi-Path & Extraction Settings -->
+          <div class="bg-slate-50 dark:bg-[#090d14] border border-slate-200/80 dark:border-slate-800/80 rounded-lg p-3 flex flex-col gap-2.5 text-xs">
+            <div class="flex items-center justify-between">
+              <label for="svg-path-strategy" class="font-medium text-slate-600 dark:text-slate-300">多路径提取策略:</label>
+              <select id="svg-path-strategy" class="bg-white dark:bg-[#131b29] border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-sky-500">
+                <option value="stitch" selected>智能连接所有子路径 (最近邻拼接)</option>
+                <option value="longest">仅提取最长主轮廓 (适合剪影/地图主岛)</option>
+              </select>
+            </div>
+
+            <div class="flex items-center justify-between">
+              <label for="svg-min-subpath" class="font-medium text-slate-600 dark:text-slate-300">忽略极小噪点碎片:</label>
+              <select id="svg-min-subpath" class="bg-white dark:bg-[#131b29] border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-sky-500">
+                <option value="0">保留全部子路径 (0%)</option>
+                <option value="0.001" selected>过滤 &lt; 0.1% 总长的碎片</option>
+                <option value="0.005">过滤 &lt; 0.5% 总长的碎片</option>
+                <option value="0.02">过滤 &lt; 2.0% 总长的碎片</option>
+              </select>
+            </div>
+
+            <label class="flex items-center justify-between cursor-pointer select-none pt-0.5">
+              <span class="font-medium text-slate-600 dark:text-slate-300">自动剔除全画幅外框矩形:</span>
+              <input id="svg-filter-rect" type="checkbox" checked class="w-4 h-4 accent-sky-500 rounded cursor-pointer" />
+            </label>
+          </div>
+        </div>
+
+        <!-- Card 2: Dual-Track Synchronization & Timing Mode -->
+        <div class="bg-white dark:bg-[#0d1119] border border-slate-200 dark:border-[#1e2738] rounded-xl p-4 flex flex-col gap-3 shadow-sm">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              双图完播同步屏障 (Synchronization Barrier)
+            </h2>
+            <span id="sync-lock-badge" class="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30">
+              完播屏障已激活
+            </span>
+          </div>
+
+          <!-- Timing Mode Selector -->
+          <div class="flex flex-col gap-1.5 text-xs">
+            <label for="select-timing-mode" class="font-medium text-slate-700 dark:text-slate-200">双地图绘制耗时计算方式:</label>
+            <select id="select-timing-mode" class="bg-slate-100 dark:bg-[#090d14] border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-2 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-sky-500">
+              <option value="perimeter" selected>按边界总周长自适应耗时 (不同时结束 · 先画完的等待后画完的)</option>
+              <option value="isochronous">恒定周期时长 (若 A/B 倍率相同则同时结束)</option>
+            </select>
+          </div>
+
+          <!-- Real-Time Dual Completion Progress Bars -->
+          <div class="bg-slate-50 dark:bg-[#090d14] border border-slate-200/80 dark:border-slate-800 rounded-xl p-3 flex flex-col gap-2.5 text-xs">
+            <!-- Track A Progress -->
+            <div class="flex flex-col gap-1">
+              <div class="flex items-center justify-between font-mono text-[11px]">
+                <span class="text-sky-600 dark:text-sky-400 font-semibold" id="prog-title-a">区域 A 进度: 0.0%</span>
+                <span id="prog-status-a" class="px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-600 dark:text-sky-300">绘制中...</span>
+              </div>
+              <div class="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                <div id="prog-bar-a" class="h-full bg-sky-500 transition-all duration-75" style="width: 0%"></div>
+              </div>
+            </div>
+
+            <!-- Track B Progress -->
+            <div class="flex flex-col gap-1">
+              <div class="flex items-center justify-between font-mono text-[11px]">
+                <span class="text-emerald-600 dark:text-emerald-400 font-semibold" id="prog-title-b">区域 B 进度: 0.0%</span>
+                <span id="prog-status-b" class="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-300">绘制中...</span>
+              </div>
+              <div class="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                <div id="prog-bar-b" class="h-full bg-emerald-500 transition-all duration-75" style="width: 0%"></div>
+              </div>
+            </div>
+
+            <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed pt-1 border-t border-slate-200/60 dark:border-slate-800/80">
+              🔒 <strong>同步递进保障</strong>：在多本轮连续动画（如 $1 \to 2 \to \dots \to 1024$）时，系统会实时检测 <code class="text-sky-500">doneA &amp;&amp; doneB</code>。先画完的地图将保持完整轮廓高亮静止等待，直到另一幅地图也 100% 完播并经过短暂展示后，双图才会在同一帧切换至下一个本轮数量 $N$。
+            </p>
+          </div>
+        </div>
+
+        <!-- Card 3: Aspect Ratio & 4-Zone Layout Studio (animA, animB, formula, text) -->
+        <div class="bg-white dark:bg-[#0d1119] border border-slate-200 dark:border-[#1e2738] rounded-xl p-4 flex flex-col gap-3.5 shadow-sm">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-violet-500"></span>
+              画布比例与双图分区排版 (Ratio &amp; Dual Layout)
+            </h2>
+            <span id="layout-active-badge" class="text-[11px] font-mono px-2 py-0.5 rounded bg-violet-500/15 text-violet-600 dark:text-violet-300 border border-violet-500/30">
+              画布可直接拖拽四区
+            </span>
+          </div>
+
+          <!-- Aspect Ratio Buttons (Default 3:4) -->
+          <div class="flex flex-col gap-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-medium text-slate-700 dark:text-slate-200">画布长宽比 (Aspect Ratio):</span>
+              <span id="ratio-dim-readout" class="font-mono text-[11px] text-sky-600 dark:text-sky-400 font-semibold">3:4 (1080×1440)</span>
+            </div>
+            <div class="grid grid-cols-6 gap-1.5">
+              <button type="button" data-ratio="9:16" class="ratio-preset-btn py-1.5 px-1 rounded-lg text-[11px] font-mono font-medium bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:border-sky-500/40 border border-transparent transition">9:16</button>
+              <button type="button" data-ratio="3:4" class="ratio-preset-btn py-1.5 px-1 rounded-lg text-[11px] font-mono font-semibold bg-sky-500 text-white shadow-sm shadow-sky-500/20 transition">3:4</button>
+              <button type="button" data-ratio="1:1" class="ratio-preset-btn py-1.5 px-1 rounded-lg text-[11px] font-mono font-medium bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:border-sky-500/40 border border-transparent transition">1:1</button>
+              <button type="button" data-ratio="4:3" class="ratio-preset-btn py-1.5 px-1 rounded-lg text-[11px] font-mono font-medium bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:border-sky-500/40 border border-transparent transition">4:3</button>
+              <button type="button" data-ratio="16:9" class="ratio-preset-btn py-1.5 px-1 rounded-lg text-[11px] font-mono font-medium bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:border-sky-500/40 border border-transparent transition">16:9</button>
+              <button type="button" data-ratio="custom" class="ratio-preset-btn py-1.5 px-1 rounded-lg text-[11px] font-medium bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:border-sky-500/40 border border-transparent transition">自定义</button>
+            </div>
+
+            <div id="custom-ratio-box" class="hidden items-center justify-between gap-2 pt-1.5 px-2.5 py-2 rounded-lg bg-slate-50 dark:bg-[#090d14] border border-slate-200 dark:border-slate-800 text-xs">
+              <span class="text-slate-600 dark:text-slate-300 font-medium">自定义宽高比:</span>
+              <div class="flex items-center gap-1.5">
+                <input id="input-ratio-w" type="number" min="1" max="100" step="0.5" value="3" class="w-14 px-2 py-1 rounded bg-white dark:bg-[#131b29] border border-slate-200 dark:border-slate-700 font-mono text-xs text-center text-sky-600 dark:text-sky-400 font-bold" />
+                <span class="font-mono font-bold text-slate-400">:</span>
+                <input id="input-ratio-h" type="number" min="1" max="100" step="0.5" value="4" class="w-14 px-2 py-1 rounded bg-white dark:bg-[#131b29] border border-slate-200 dark:border-slate-700 font-mono text-xs text-center text-sky-600 dark:text-sky-400 font-bold" />
+                <button id="btn-apply-custom-ratio" type="button" class="px-2.5 py-1 rounded bg-sky-500 hover:bg-sky-600 text-white text-xs font-medium transition">应用</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dual Movable & Deletable Text Annotation Boxes (两个可移动、可删除标注文本框) -->
+          <div class="pt-2.5 border-t border-slate-200/70 dark:border-slate-800/80 flex flex-col gap-2.5">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                <span>📌</span>
+                <span>双自由标注文本框 (可拖拽 · 可删除 · 双击改字)</span>
+              </span>
+              <span class="text-[10px] font-mono text-slate-400">画布悬停可点 × 删除</span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <!-- Annotation Box 1 -->
+              <div class="rounded-xl border border-sky-500/30 bg-sky-500/5 p-2.5 flex flex-col gap-2">
+                <div id="note-a-active-panel" class="flex flex-col gap-2">
+                  <div class="flex items-center justify-between text-[11px]">
+                    <span class="font-bold text-sky-600 dark:text-sky-400 flex items-center gap-1">
+                      <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+                      <span>标注框 1</span>
+                    </span>
+                    <div class="flex items-center gap-1.5">
+                      <label class="flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400 cursor-pointer">
+                        <input id="chk-note-a-bg" type="checkbox" checked class="w-3 h-3 accent-sky-500 rounded" />
+                        <span>底框</span>
+                      </label>
+                      <select id="select-note-a-color" class="bg-white dark:bg-[#131b29] border border-slate-200 dark:border-slate-700 rounded px-1 py-0.5 text-[10px] text-slate-700 dark:text-slate-200 focus:outline-none">
+                        <option value="sky" selected>天蓝</option>
+                        <option value="emerald">翠绿</option>
+                        <option value="amber">琥珀金</option>
+                        <option value="rose">珊瑚红</option>
+                        <option value="violet">紫罗兰</option>
+                        <option value="neutral">深灰/纯白</option>
+                      </select>
+                      <button id="btn-delete-note-a" type="button" title="删除标注框 1" class="px-1.5 py-0.5 rounded bg-rose-500/15 hover:bg-rose-500 text-rose-600 dark:text-rose-400 hover:text-white border border-rose-500/30 text-[10px] font-semibold transition flex items-center gap-0.5">
+                        <span>🗑️</span>
+                        <span>删除</span>
+                      </button>
+                    </div>
+                  </div>
+                  <textarea id="input-note-a-text" rows="2" placeholder="输入标注框 1 文字（可在画布拖动或点击×删除）..." class="w-full rounded-lg bg-white dark:bg-[#0d131f] border border-slate-200 dark:border-slate-700/80 px-2 py-1.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-sky-500 resize-y">标注 1：可自由拖动或点 × 删除</textarea>
+                </div>
+
+                <!-- Deleted State Banner for Box 1 -->
+                <div id="note-a-deleted-panel" class="hidden items-center justify-between py-2 px-1 text-xs">
+                  <span class="text-slate-400 dark:text-slate-500 font-mono text-[11px]">标注框 1 已从画布删除</span>
+                  <button id="btn-restore-note-a" type="button" class="px-2 py-1 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 text-sky-600 dark:text-sky-300 border border-sky-500/30 text-[11px] font-semibold transition">
+                    ＋ 恢复标注框 1
+                  </button>
+                </div>
+              </div>
+
+              <!-- Annotation Box 2 -->
+              <div class="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-2.5 flex flex-col gap-2">
+                <div id="note-b-active-panel" class="flex flex-col gap-2">
+                  <div class="flex items-center justify-between text-[11px]">
+                    <span class="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                      <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                      <span>标注框 2</span>
+                    </span>
+                    <div class="flex items-center gap-1.5">
+                      <label class="flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400 cursor-pointer">
+                        <input id="chk-note-b-bg" type="checkbox" checked class="w-3 h-3 accent-emerald-500 rounded" />
+                        <span>底框</span>
+                      </label>
+                      <select id="select-note-b-color" class="bg-white dark:bg-[#131b29] border border-slate-200 dark:border-slate-700 rounded px-1 py-0.5 text-[10px] text-slate-700 dark:text-slate-200 focus:outline-none">
+                        <option value="sky">天蓝</option>
+                        <option value="emerald" selected>翠绿</option>
+                        <option value="amber">琥珀金</option>
+                        <option value="rose">珊瑚红</option>
+                        <option value="violet">紫罗兰</option>
+                        <option value="neutral">深灰/纯白</option>
+                      </select>
+                      <button id="btn-delete-note-b" type="button" title="删除标注框 2" class="px-1.5 py-0.5 rounded bg-rose-500/15 hover:bg-rose-500 text-rose-600 dark:text-rose-400 hover:text-white border border-rose-500/30 text-[10px] font-semibold transition flex items-center gap-0.5">
+                        <span>🗑️</span>
+                        <span>删除</span>
+                      </button>
+                    </div>
+                  </div>
+                  <textarea id="input-note-b-text" rows="2" placeholder="输入标注框 2 文字（可在画布拖动或点击×删除）..." class="w-full rounded-lg bg-white dark:bg-[#0d131f] border border-slate-200 dark:border-slate-700/80 px-2 py-1.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-emerald-500 resize-y">标注 2：双击画布文字可直接编辑</textarea>
+                </div>
+
+                <!-- Deleted State Banner for Box 2 -->
+                <div id="note-b-deleted-panel" class="hidden items-center justify-between py-2 px-1 text-xs">
+                  <span class="text-slate-400 dark:text-slate-500 font-mono text-[11px]">标注框 2 已从画布删除</span>
+                  <button id="btn-restore-note-b" type="button" class="px-2 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30 text-[11px] font-semibold transition">
+                    ＋ 恢复标注框 2
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 6-Zone Selector Tabs (animA, animB, noteA, noteB, formula, text) -->
+          <div class="pt-2 border-t border-slate-200/70 dark:border-slate-800/80 flex flex-col gap-2.5">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-medium text-slate-700 dark:text-slate-200">选择要微调位置/缩放的分区:</span>
+              <label class="flex items-center gap-1.5 cursor-pointer select-none text-[11px] text-violet-600 dark:text-violet-400 font-medium">
+                <input id="chk-canvas-drag-zones" type="checkbox" checked class="w-3.5 h-3.5 accent-violet-500 rounded" />
+                <span>允许在画布上直接拖拽各区</span>
+              </label>
+            </div>
+
+            <div class="grid grid-cols-3 sm:grid-cols-6 gap-1 p-1 rounded-xl bg-slate-100 dark:bg-[#080b11] border border-slate-200/80 dark:border-slate-800 text-[11px]">
+              <button type="button" data-zone-tab="animA" class="zone-tab-btn py-1.5 px-1 rounded-lg font-semibold bg-violet-500 text-white shadow-sm transition truncate">🗺️ 动画A</button>
+              <button type="button" data-zone-tab="animB" class="zone-tab-btn py-1.5 px-1 rounded-lg font-medium text-slate-600 dark:text-slate-300 hover:text-violet-500 transition truncate">🗺️ 动画B</button>
+              <button type="button" data-zone-tab="noteA" class="zone-tab-btn py-1.5 px-1 rounded-lg font-medium text-slate-600 dark:text-slate-300 hover:text-violet-500 transition truncate">📌 标注1</button>
+              <button type="button" data-zone-tab="noteB" class="zone-tab-btn py-1.5 px-1 rounded-lg font-medium text-slate-600 dark:text-slate-300 hover:text-violet-500 transition truncate">📌 标注2</button>
+              <button type="button" data-zone-tab="formula" class="zone-tab-btn py-1.5 px-1 rounded-lg font-medium text-slate-600 dark:text-slate-300 hover:text-violet-500 transition truncate">🧮 公式区</button>
+              <button type="button" data-zone-tab="text" class="zone-tab-btn py-1.5 px-1 rounded-lg font-medium text-slate-600 dark:text-slate-300 hover:text-violet-500 transition truncate">📝 标题区</button>
+            </div>
+
+            <div class="bg-slate-50 dark:bg-[#090d14] border border-slate-200/80 dark:border-slate-800 rounded-xl p-3 flex flex-col gap-2.5 text-xs">
+              <div class="flex items-center justify-between">
+                <span id="zone-editor-title" class="font-semibold text-violet-600 dark:text-violet-300 flex items-center gap-1.5">
+                  🗺️ 当前调整：动画演示区 A
+                </span>
+                <label id="zone-visible-wrapper" class="hidden items-center gap-1.5 cursor-pointer text-[11px] text-slate-600 dark:text-slate-300">
+                  <input id="chk-zone-visible" type="checkbox" checked class="w-3.5 h-3.5 accent-violet-500 rounded" />
+                  <span>显示该区</span>
+                </label>
+              </div>
+
+              <div class="flex flex-col gap-1">
+                <div class="flex justify-between text-[11px]">
+                  <span class="text-slate-500 dark:text-slate-400">水平位置 (X 坐标):</span>
+                  <span id="label-zone-x" class="font-mono text-sky-600 dark:text-sky-400 font-semibold">26.0%</span>
+                </div>
+                <input id="slider-zone-x" type="range" min="5" max="95" step="0.5" value="26" class="w-full" />
+              </div>
+
+              <div class="flex flex-col gap-1">
+                <div class="flex justify-between text-[11px]">
+                  <span class="text-slate-500 dark:text-slate-400">垂直位置 (Y 坐标):</span>
+                  <span id="label-zone-y" class="font-mono text-sky-600 dark:text-sky-400 font-semibold">52.0%</span>
+                </div>
+                <input id="slider-zone-y" type="range" min="4" max="96" step="0.5" value="52" class="w-full" />
+              </div>
+
+              <div class="flex flex-col gap-1">
+                <div class="flex justify-between text-[11px]">
+                  <span class="text-slate-500 dark:text-slate-400">区域大小缩放 (Scale):</span>
+                  <span id="label-zone-scale" class="font-mono text-sky-600 dark:text-sky-400 font-semibold">78%</span>
+                </div>
+                <input id="slider-zone-scale" type="range" min="30" max="250" step="1" value="78" class="w-full" />
+              </div>
+
+              <!-- Quick Dual-Map Layout Presets -->
+              <div class="flex flex-wrap items-center justify-between gap-1.5 pt-1.5 border-t border-slate-200/70 dark:border-slate-800">
+                <div class="flex flex-wrap items-center gap-1">
+                  <span class="text-[11px] text-slate-400 mr-0.5">双图排版:</span>
+                  <button type="button" data-layout-preset="horizontal" class="layout-preset-btn px-2 py-1 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-violet-400 text-[11px] text-slate-700 dark:text-slate-200 transition">左右横向并排 (默认)</button>
+                  <button type="button" data-layout-preset="vertical" class="layout-preset-btn px-2 py-1 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-violet-400 text-[11px] text-slate-700 dark:text-slate-200 transition">上下双图</button>
+                  <button type="button" data-layout-preset="diagonal" class="layout-preset-btn px-2 py-1 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-violet-400 text-[11px] text-slate-700 dark:text-slate-200 transition">对角双星</button>
+                </div>
+                <button id="btn-reset-zone-layout" type="button" class="px-2 py-1 rounded bg-violet-500/15 hover:bg-violet-500/25 text-violet-600 dark:text-violet-300 border border-violet-500/30 text-[11px] font-medium transition">
+                  ↺ 复位
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 4: Harmonics (Circles) & Sampling Controls -->
+        <div class="bg-white dark:bg-[#0d1119] border border-slate-200 dark:border-[#1e2738] rounded-xl p-4 flex flex-col gap-4 shadow-sm">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+              复数本轮阶数控制 (Complex Epicycles N)
+            </h2>
+            <span id="fidelity-badge" class="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+              A/B 还原度: 99.9%
+            </span>
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+              <label for="slider-circles" class="text-xs font-medium text-slate-700 dark:text-slate-200">
+                当前每幅地图本轮数量 (<span class="font-mono text-sky-500 dark:text-sky-400">N</span>):
+              </label>
+              <div class="flex items-center gap-1.5">
+                <input id="input-circles" type="number" min="1" max="4096" value="128" class="w-20 px-2 py-1 rounded bg-slate-100 dark:bg-[#090d14] border border-slate-200 dark:border-slate-700 font-mono text-xs text-right text-sky-600 dark:text-sky-400 font-bold focus:outline-none focus:border-sky-500" />
+                <span id="label-max-circles" class="text-xs font-mono text-slate-400">/ 1024</span>
+              </div>
+            </div>
+
+            <input id="slider-circles" type="range" min="1" max="1024" value="128" class="w-full" />
+
+            <div class="flex flex-wrap items-center justify-between gap-1 pt-1">
+              <button type="button" data-circle-set="1" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/30 hover:bg-sky-500/10 text-[11px] font-mono transition">1</button>
+              <button type="button" data-circle-set="2" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/30 hover:bg-sky-500/10 text-[11px] font-mono transition">2</button>
+              <button type="button" data-circle-set="4" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/30 hover:bg-sky-500/10 text-[11px] font-mono transition">4</button>
+              <button type="button" data-circle-set="8" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/30 hover:bg-sky-500/10 text-[11px] font-mono transition">8</button>
+              <button type="button" data-circle-set="16" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/30 hover:bg-sky-500/10 text-[11px] font-mono transition">16</button>
+              <button type="button" data-circle-set="32" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/30 hover:bg-sky-500/10 text-[11px] font-mono transition">32</button>
+              <button type="button" data-circle-set="128" class="circle-quick-btn px-2 py-1 rounded bg-sky-500/20 text-sky-600 dark:text-sky-300 border border-sky-500/50 font-semibold text-[11px] font-mono shadow-sm shadow-sky-500/10 transition">128</button>
+              <button type="button" data-circle-set="1024" class="circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/30 hover:bg-sky-500/10 text-[11px] font-mono transition">1024</button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2.5 pt-2 border-t border-slate-200/70 dark:border-slate-800/80 text-xs">
+            <div class="flex flex-col gap-1">
+              <label for="select-samples" class="text-slate-500 dark:text-slate-400 font-medium">采样点精度 (FFT M):</label>
+              <select id="select-samples" class="bg-slate-100 dark:bg-[#090d14] border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-sky-500">
+                <option value="256">256 点 (极速)</option>
+                <option value="512">512 点 (标准)</option>
+                <option value="1024">1024 点 (精细)</option>
+                <option value="2048" selected>2048 点 (支持1024本轮)</option>
+                <option value="4096">4096 点 (超清SVG)</option>
+                <option value="8192">8192 点 (5MB+巨型图)</option>
+              </select>
+            </div>
+
+            <div class="flex flex-col gap-1">
+              <label for="select-shown-circles" class="text-slate-500 dark:text-slate-400 font-medium">每区最多渲染圆环:</label>
+              <select id="select-shown-circles" class="bg-slate-100 dark:bg-[#090d14] border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-sky-500">
+                <option value="64">前 64 个大圆</option>
+                <option value="128" selected>前 128 个圆 (推荐)</option>
+                <option value="256">前 256 个圆</option>
+                <option value="512">前 512 个圆</option>
+                <option value="99999">显示全部圆环</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 5: Playback, Synchronized Auto-Step & Ultra-HD Video Export -->
+        <div class="bg-white dark:bg-[#0d1119] border border-slate-200 dark:border-[#1e2738] rounded-xl p-4 flex flex-col gap-4 shadow-sm">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
+              同步动画控制与视频导出 (Playback &amp; Export)
+            </h2>
+            <span id="cycle-progress-label" class="text-[11px] font-mono text-slate-400">tA=0.00 | tB=0.00</span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <button id="btn-play-pause" type="button" class="py-2.5 px-3 rounded-lg bg-sky-500 hover:bg-sky-600 text-white font-semibold text-xs transition flex items-center justify-center gap-2 shadow-sm shadow-sky-500/20">
+              <span id="play-icon">⏸</span>
+              <span id="play-label">暂停双图 (Pause)</span>
+            </button>
+            <button id="btn-reset-cycle" type="button" class="py-2.5 px-3 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs transition flex items-center justify-center gap-1.5">
+              <span>↺</span>
+              <span>双图同时重绘当前阶</span>
+            </button>
+          </div>
+
+          <!-- Synchronized Multi-Step Progression Button -->
+          <div class="flex flex-col gap-1.5">
+            <button id="btn-autostep" type="button" class="w-full py-2.5 px-3 rounded-lg border border-sky-500/40 bg-gradient-to-r from-sky-500/15 via-emerald-500/15 to-sky-500/15 hover:from-sky-500/25 hover:to-emerald-500/25 text-sky-600 dark:text-sky-300 font-semibold text-xs transition flex items-center justify-between">
+              <span class="flex items-center gap-2">
+                <span id="autostep-dot" class="w-2 h-2 rounded-full bg-slate-400"></span>
+                <span>🎬 双图完播同步递增演示 (1 → 1024)</span>
+              </span>
+              <span id="autostep-status" class="font-mono text-[11px] px-1.5 py-0.5 rounded bg-slate-200/70 dark:bg-slate-900/40 text-slate-600 dark:text-slate-300">OFF</span>
+            </button>
+            <div class="text-[11px] font-mono text-slate-500 dark:text-slate-400 px-1 flex items-center justify-between">
+              <span>同步递增序列:</span>
+              <span class="text-sky-600 dark:text-sky-400 font-semibold">1 → 2 → 4 → 8 → 16 → 32 → 128 → 1024</span>
+            </div>
+          </div>
+
+          <!-- Video Export Options -->
+          <div class="p-3 rounded-xl bg-slate-50 dark:bg-[#090d14] border border-slate-200/80 dark:border-slate-800 flex flex-col gap-2.5">
+            <div class="flex items-center justify-between text-xs gap-2">
+              <span class="font-semibold text-slate-700 dark:text-slate-200 shrink-0">📐 视频清晰度:</span>
+              <select id="select-video-res" class="bg-white dark:bg-[#131b29] border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1 text-[11px] font-mono text-sky-600 dark:text-sky-300 font-semibold focus:outline-none focus:border-sky-500 w-full">
+                <option value="1080" selected>1080P 全高清基准 (短边 1080P · 30 Mbps)</option>
+                <option value="1440">2K 超清画质 (短边 1440P · 45 Mbps)</option>
+                <option value="2160">4K 极清大师级 (短边 2160P · 60 Mbps)</option>
+              </select>
+            </div>
+
+            <div class="flex items-center justify-between text-xs gap-2">
+              <span class="font-semibold text-slate-700 dark:text-slate-200 shrink-0">🎥 录制模式:</span>
+              <select id="select-record-mode" class="bg-white dark:bg-[#131b29] border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1 text-[11px] text-slate-700 dark:text-slate-200 focus:outline-none focus:border-sky-500 w-full">
+                <option value="autostep" selected>完整递增 (每阶双图均完播后递进 1→1024)</option>
+                <option value="cycle">当前本轮数单周期 (双图均完播即停止)</option>
+                <option value="manual">手动控制开始/停止</option>
+              </select>
+            </div>
+
+            <button id="btn-download-anim" type="button" class="w-full py-2.5 px-3 rounded-lg bg-gradient-to-r from-emerald-500 to-sky-500 hover:from-emerald-600 hover:to-sky-600 text-white font-semibold text-xs transition flex items-center justify-center gap-2 shadow-sm shadow-sky-500/20">
+              <span id="record-btn-dot" class="w-2 h-2 rounded-full bg-white"></span>
+              <span id="record-btn-text">一键录制 1→1024 双图完播同步视频</span>
+            </button>
+          </div>
+
+          <!-- Global Speed Slider -->
+          <div class="flex flex-col gap-1.5">
+            <div class="flex justify-between text-xs">
+              <label for="slider-speed" class="text-slate-600 dark:text-slate-300 font-medium">全局主绘制速度 (Master Speed):</label>
+              <span id="label-speed" class="font-mono text-sky-500 font-semibold">1.00x</span>
+            </div>
+            <input id="slider-speed" type="range" min="0.1" max="4.0" step="0.05" value="1.0" class="w-full" />
+          </div>
+
+          <!-- Visibility Checkboxes -->
+          <div class="pt-2 border-t border-slate-200/70 dark:border-slate-800/80 grid grid-cols-2 gap-2 text-xs">
+            <label class="flex items-center gap-2 cursor-pointer select-none p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/50">
+              <input id="chk-show-circles" type="checkbox" checked class="w-4 h-4 accent-sky-500 rounded" />
+              <span>显示复数本轮圆环</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer select-none p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/50">
+              <input id="chk-show-radii" type="checkbox" checked class="w-4 h-4 accent-sky-500 rounded" />
+              <span>显示旋转向量链</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer select-none p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/50">
+              <input id="chk-show-original" type="checkbox" class="w-4 h-4 accent-sky-500 rounded" />
+              <span>显示原始地理轮廓底图</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer select-none p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/50">
+              <input id="chk-video-hud" type="checkbox" checked class="w-4 h-4 accent-sky-500 rounded" />
+              <span>显示公式区与底部标题区</span>
+            </label>
+            <label class="col-span-2 flex items-center gap-2 cursor-pointer select-none p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/50 text-sky-600 dark:text-sky-400 font-medium">
+              <input id="chk-show-zone-frames" type="checkbox" checked class="w-4 h-4 accent-sky-500 rounded" />
+              <span>🖼️ 显示双动画演示区边框、地图名称与完播状态角标</span>
+            </label>
+          </div>
+        </div>
+      </aside>
+
+      <!-- RIGHT COLUMN: Dual-Region Stage & Dual Frequency Spectrum (7 cols on desktop) -->
+      <section class="lg:col-span-7 flex flex-col gap-4 lg:sticky lg:top-20">
+
+        <!-- Main Showcase Card -->
+        <div class="relative bg-white dark:bg-[#070a11] border border-slate-200 dark:border-[#1e2738] rounded-2xl overflow-hidden shadow-xl flex flex-col transition-colors duration-200">
+
+          <!-- Top Stage Bar -->
+          <div class="px-4 py-2.5 bg-slate-100/95 dark:bg-slate-900/95 border-b border-slate-200 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
+            <div class="flex flex-wrap items-center gap-2 text-xs font-mono text-slate-700 dark:text-slate-200">
+              <span class="px-2 py-0.5 rounded bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/30 font-semibold" id="res-pill-badge">3:4 · 1080×1440</span>
+              <span class="text-sky-600 dark:text-sky-400 font-semibold" id="top-bar-circles">复数单链: N = 128</span>
+              <span class="text-slate-300 dark:text-slate-600">·</span>
+              <span id="top-bar-rms">A误差 0.1240% | B误差 0.1580%</span>
+            </div>
+
+            <div class="flex items-center gap-1.5">
+              <button id="btn-swap-maps" type="button" title="互换区域 A 与区域 B 的地图数据" class="px-2.5 h-7 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-700 dark:text-emerald-300 flex items-center justify-center gap-1 text-xs font-medium transition">
+                <span>⇄</span>
+                <span>互换 A/B 地图</span>
+              </button>
+              <button id="btn-zoom-in" type="button" title="放大当前选中区" class="w-7 h-7 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 flex items-center justify-center text-sm font-mono transition">+</button>
+              <button id="btn-zoom-out" type="button" title="缩小当前选中区" class="w-7 h-7 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 flex items-center justify-center text-sm font-mono transition">−</button>
+              <button id="btn-reset-view" type="button" title="重置四区位置与缩放" class="px-2.5 h-7 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 flex items-center justify-center text-xs transition">
+                重置排版
+              </button>
+            </div>
+          </div>
+
+          <!-- Centered Stage Area (Default 3:4 Portrait) -->
+          <div id="stage-backdrop" class="w-full py-4 px-3 sm:px-6 flex items-center justify-center bg-gradient-to-b from-slate-100 via-slate-50 to-slate-100 dark:from-[#080c14] dark:via-[#05070b] dark:to-[#080c14] transition-colors duration-200">
+            <div id="canvas-wrapper" style="aspect-ratio: 3 / 4; max-width: 540px;" class="relative w-full mx-auto rounded-2xl overflow-hidden border border-slate-300 dark:border-sky-500/30 shadow-[0_12px_40px_rgba(15,23,42,0.12)] dark:shadow-[0_0_50px_rgba(2,132,199,0.18)] bg-[#f8fafc] dark:bg-[#05070b] select-none cursor-grab active:cursor-grabbing transition-[max-width,background-color,border-color,box-shadow] duration-200">
+              <canvas id="epicycle-canvas" width="1080" height="1440" class="block w-full h-full"></canvas>
+
+              <!-- On-Canvas Floating Inline Editor (Appears when double-clicking a movable text box) -->
+              <div id="inline-note-editor-wrap" class="hidden absolute z-30 p-2.5 rounded-xl bg-white/95 dark:bg-slate-900/95 border border-violet-500 shadow-2xl flex-col gap-1.5 min-w-[220px]">
+                <div class="flex items-center justify-between gap-2 text-[10px] font-mono text-violet-600 dark:text-violet-300">
+                  <span id="inline-note-editor-label" class="font-bold">✏️ 编辑标注框</span>
+                  <div class="flex items-center gap-1.5">
+                    <button id="btn-inline-delete-note" type="button" class="px-1.5 py-0.5 rounded bg-rose-500 hover:bg-rose-600 text-white font-sans font-semibold text-[10px] transition">
+                      🗑️ 删除此框
+                    </button>
+                  </div>
+                </div>
+                <textarea id="inline-note-textarea" rows="2" class="w-full rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 px-2 py-1 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500 resize"></textarea>
+                <div class="text-[10px] text-slate-400 flex justify-between">
+                  <span>按 Ctrl+Enter 完成</span>
+                  <span>或点击外部关闭</span>
+                </div>
+              </div>
+
+              <!-- Loading Overlay for Huge 5MB+ SVG Parsing -->
+              <div id="svg-loading-overlay" class="hidden absolute inset-0 bg-white/90 dark:bg-slate-950/85 glass-panel z-20 flex-col items-center justify-center gap-3 text-center p-6">
+                <div class="w-10 h-10 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+                <p id="loading-title" class="text-sm font-semibold text-slate-900 dark:text-white">正在解析大型 SVG 矢量路径...</p>
+                <p id="loading-subtitle" class="text-xs font-mono text-sky-600 dark:text-sky-300">正在提取几何矩阵与执行快速傅里叶变换 (FFT)</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Canvas Hint Bar -->
+          <div class="px-4 py-2 bg-slate-100/95 dark:bg-slate-900/95 border-t border-slate-200 dark:border-slate-800/80 text-[11px] text-slate-600 dark:text-slate-400 flex flex-wrap items-center justify-between gap-2">
+            <span>💡 交互提示：画布各区均可直接拖拽与滚轮缩放；悬停在「标注框 1/2」上可点击左上角红色 × 直接删除，或按 Delete 键删除。</span>
+            <span id="terms-used-readout" class="font-mono text-slate-700 dark:text-slate-300">双图各参与计算 128 个复数本轮</span>
+          </div>
+        </div>
+
+        <!-- Dual Frequency Spectrum Card -->
+        <div class="bg-white dark:bg-[#0d1119] border border-slate-200 dark:border-[#1e2738] rounded-xl p-4 flex flex-col gap-3 shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                <span>📊 双区域复数傅里叶频谱对比图 (|c<sub>k</sub><sup>(A)</sup>| vs |c<sub>k</sub><sup>(B)</sup>|)</span>
+              </h3>
+              <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                横轴为旋转频率 k（负频率顺时针，正频率逆时针），并列对比 <span class="text-sky-500 font-semibold">区域 A 振幅 |c<sub>k</sub><sup>(A)</sup>| (天蓝)</span> 与 <span class="text-emerald-500 font-semibold">区域 B 振幅 |c<sub>k</sub><sup>(B)</sup>| (翡翠绿)</span>。
+              </p>
+            </div>
+            <button id="btn-spectrum-scale" type="button" class="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-[11px] hover:border-sky-500 border border-transparent transition">
+              纵轴: 对数刻度 (Log)
+            </button>
+          </div>
+
+          <div class="w-full h-32 sm:h-36 bg-slate-50 dark:bg-[#070a10] border border-slate-200/70 dark:border-slate-800/80 rounded-lg overflow-hidden relative">
+            <canvas id="spectrum-canvas" class="block w-full h-full"></canvas>
+          </div>
+        </div>
+
+      </section>
+    </div>
+
+  </main>
+
+  <script>
+    /**
+     * ============================================================================
+     * PROFPI · DUAL SVG COMPLEX EPICYCLE STUDIO
+     * Core Architectural Features:
+     * 1. Light Mode by default, 3:4 Portrait Aspect Ratio by default.
+     * 2. Two Animation Regions (Track A & Track B) arranged side-by-side horizontally
+     *    by default, with 4 movable/scalable zones (animA, animB, formula, text).
+     * 3. Dual-Completion Barrier Synchronization:
+     *    Both maps start at t = 0 simultaneously and wait until BOTH maps have
+     *    completed 100% of their cycle (doneA && doneB) before advancing together.
+     * ============================================================================
+     */
+
+    const VIDEO_AUTO_STEPS = [1, 2, 4, 8, 16, 32, 128, 1024];
+
+    const VIDEO_QUALITY_TIERS = {
+      1080: { baseShortSide: 1080, bitrate: 30000000, label: '1080P' },
+      1440: { baseShortSide: 1440, bitrate: 45000000, label: '2K' },
+      2160: { baseShortSide: 2160, bitrate: 60000000, label: '4K' }
+    };
+
+    // Default 6-Zone Horizontal Side-by-Side Layout for 3:4 Portrait
+    const DEFAULT_HORIZONTAL_ZONES = {
+      formula: { x: 0.50, y: 0.130, scale: 1.0, visible: true, label: '🧮 顶部双图公式区 (Formula Zone)' },
+      animA:   { x: 0.26, y: 0.540, scale: 0.78, visible: true, label: '🗺️ 动画演示区 A (左侧 Map A)' },
+      animB:   { x: 0.74, y: 0.540, scale: 0.78, visible: true, label: '🗺️ 动画演示区 B (右侧 Map B)' },
+      noteA:   { x: 0.26, y: 0.275, scale: 1.0, visible: true, label: '📌 自由标注文本框 1 (可移动/可删除)' },
+      noteB:   { x: 0.74, y: 0.275, scale: 1.0, visible: true, label: '📌 自由标注文本框 2 (可移动/可删除)' },
+      text:    { x: 0.50, y: 0.890, scale: 1.0, visible: true, label: '📝 底部标题与同步状态区 (Caption Zone)' }
+    };
+
+    function createEmptyTrack(id, defaultName, colorTheme) {
+      return {
+        id,
+        name: defaultName,
+        colorTheme, // 'sky' | 'emerald'
+        rawSubpaths: [],
+        totalPerimeter: 1,
+        sampledPoints: [],
+        harmonics: [],
+        harmonicsByFreq: [],
+        dcTerm: { re: 0, im: 0 },
+        totalVarianceEnergy: 1,
+        generalFormula: '',
+        expansionFormulaX: '',
+        expansionFormulaY: '',
+        speedMultiplier: 1.0,
+        t: 0,
+        completed: false,
+        trail: [],
+        lastPenTip: { x: 0, y: 0 }
+      };
+    }
+
+    const state = {
+      trackA: createEmptyTrack('A', '苍穹大陆 (MAP A)', 'sky'),
+      trackB: createEmptyTrack('B', '翡翠千岛 (MAP B)', 'emerald'),
+
+      sampleCount: 2048,
+      numCircles: 128,
+      maxShownCircles: 128,
+
+      // Playback & Dual Synchronization Barrier
+      isPlaying: true,
+      masterSpeed: 1.0,
+      timingMode: 'perimeter', // 'perimeter' (adaptive duration by total length) | 'isochronous' (same base duration)
+      bothDoneHoldTimer: 0,
+      autoStepEnabled: false,
+      autoStepIndex: 0,
+
+      // Display Options
+      showCircles: true,
+      showRadii: true,
+      showOriginal: false,
+      showVideoHud: true,
+      showZoneFrames: true,
+      spectrumLogScale: true,
+      soundEnabled: false,
+
+      // Aspect Ratio & Resolution (Default 3:4 Portrait)
+      aspectRatioKey: '3:4',
+      aspectW: 3,
+      aspectH: 4,
+      qualityTier: 1080,
+      videoWidth: 1080,
+      videoHeight: 1440,
+      videoBitrate: 30000000,
+
+      // Custom Movable & Deletable Text Annotations (标注框 1 & 标注框 2)
+      annotations: {
+        noteA: {
+          title: '标注 1',
+          text: '标注 1：可自由拖动或点 × 删除',
+          color: 'sky',
+          showBg: true
+        },
+        noteB: {
+          title: '标注 2',
+          text: '标注 2：双击画布文字可直接编辑',
+          color: 'emerald',
+          showBg: true
+        }
+      },
+      editingNoteKey: null,
+      noteDeleteHitBounds: {
+        noteA: null,
+        noteB: null
+      },
+
+      // 6-Zone Free Layout Studio (Default Horizontal Side-by-Side)
+      activeZoneTab: 'animA', // 'animA' | 'animB' | 'noteA' | 'noteB' | 'formula' | 'text'
+      allowDirectZoneDrag: true,
+      zones: JSON.parse(JSON.stringify(DEFAULT_HORIZONTAL_ZONES)),
+      zoneBounds: {
+        formula: null,
+        animA: null,
+        animB: null,
+        noteA: null,
+        noteB: null,
+        text: null
+      },
+      hoveredZone: null,
+      hoveredDeleteNote: null,
+      draggingZone: null,
+      dragOffsetNormX: 0,
+      dragOffsetNormY: 0,
+
+      // Video Recorder
+      isRecording: false,
+      recordMode: 'autostep',
+      mediaRecorder: null,
+      recordedChunks: [],
+      recordMimeType: '',
+      recordFileExt: 'webm'
+    };
+
+    // --- Web Audio API Synthesizer for Dual Completion Chime ---
+    let audioCtx = null;
+    function playCycleChime(stepRatio = 0.5, isDualComplete = true) {
+      if (!state.soundEnabled) return;
+      try {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        const now = audioCtx.currentTime;
+        const osc = new OscillatorNode(audioCtx, { type: 'sine' });
+        const gain = new GainNode(audioCtx);
+        const baseFreq = (isDualComplete ? 280 : 210) + stepRatio * 180;
+        osc.frequency.setValueAtTime(baseFreq, now);
+        if (isDualComplete) {
+          osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.25, now + 0.18);
+        }
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.exponentialRampToValueAtTime(0.075, now + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.65);
+      } catch (e) {}
+    }
+
+    // ============================================================================
+    // 1. RADIX-2 COOLEY-TUKEY FFT FOR COMPLEX SINGLE-CHAIN TRACKS
+    // ============================================================================
+    function computeFFTForTrack(track, points) {
+      const M = points.length;
+      const re = new Float64Array(M);
+      const im = new Float64Array(M);
+      for (let i = 0; i < M; i++) {
+        re[i] = points[i].x;
+        im[i] = points[i].y;
+      }
+
+      // Bit-reversal permutation
+      let j = 0;
+      for (let i = 0; i < M; i++) {
+        if (i < j) {
+          const tr = re[i]; re[i] = re[j]; re[j] = tr;
+          const ti = im[i]; im[i] = im[j]; im[j] = ti;
+        }
+        let m = M >> 1;
+        while (m >= 1 && j >= m) {
+          j -= m;
+          m >>= 1;
+        }
+        j += m;
+      }
+
+      // Butterfly updates
+      for (let len = 2; len <= M; len <<= 1) {
+        const halfLen = len >> 1;
+        const angleStep = (-2 * Math.PI) / len;
+        const wStepRe = Math.cos(angleStep);
+        const wStepIm = Math.sin(angleStep);
+
+        for (let i = 0; i < M; i += len) {
+          let wRe = 1.0;
+          let wIm = 0.0;
+          for (let k = 0; k < halfLen; k++) {
+            const evenIdx = i + k;
+            const oddIdx = i + k + halfLen;
+
+            const uRe = re[evenIdx];
+            const uIm = im[evenIdx];
+            const vRe = re[oddIdx] * wRe - im[oddIdx] * wIm;
+            const vIm = re[oddIdx] * wIm + im[oddIdx] * wRe;
+
+            re[evenIdx] = uRe + vRe;
+            im[evenIdx] = uIm + vIm;
+            re[oddIdx] = uRe - vRe;
+            im[oddIdx] = uIm - vIm;
+
+            const nextWRe = wRe * wStepRe - wIm * wStepIm;
+            wIm = wRe * wStepIm + wIm * wStepRe;
+            wRe = nextWRe;
+          }
+        }
+      }
+
+      const nonZeroHarmonics = [];
+      const byFreq = [];
+      let dcTerm = { re: re[0] / M, im: im[0] / M, freq: 0, amp: 0, phase: 0 };
+      let totalEnergy = 0;
+
+      for (let idx = 0; idx < M; idx++) {
+        const cRe = re[idx] / M;
+        const cIm = im[idx] / M;
+        const freq = idx < (M >> 1) ? idx : idx - M;
+        const amp = Math.hypot(cRe, cIm);
+        const phase = Math.atan2(cIm, cRe);
+
+        const item = { freq, re: cRe, im: cIm, amp, phase };
+        byFreq.push(item);
+
+        if (freq === 0) {
+          dcTerm = item;
+        } else {
+          nonZeroHarmonics.push(item);
+          totalEnergy += amp * amp;
+        }
+      }
+
+      byFreq.sort((a, b) => a.freq - b.freq);
+      nonZeroHarmonics.sort((a, b) => b.amp - a.amp);
+
+      track.sampledPoints = points;
+      track.dcTerm = dcTerm;
+      track.harmonics = nonZeroHarmonics;
+      track.harmonicsByFreq = byFreq;
+      track.totalVarianceEnergy = Math.max(totalEnergy, 1e-12);
+    }
+
+    function getMaxSelectableCircles() {
+      const maxA = state.trackA.harmonics.length;
+      const maxB = state.trackB.harmonics.length;
+      return Math.max(1, maxA, maxB);
+    }
+
+    function computeTrackErrorMetrics(track, N) {
+      let capturedEnergy = 0;
+      const count = Math.min(N, track.harmonics.length);
+      for (let i = 0; i < count; i++) {
+        const a = track.harmonics[i].amp;
+        capturedEnergy += a * a;
+      }
+      const ratio = Math.min(1, capturedEnergy / track.totalVarianceEnergy);
+      const residualRatio = Math.max(0, 1 - ratio);
+      return {
+        rmsErrorPercent: Math.sqrt(residualRatio) * 100,
+        fidelityPercent: ratio * 100
+      };
+    }
+
+    function updateTrackFormulaStrings(track) {
+      const activeLimit = Math.min(state.numCircles, track.harmonics.length);
+      const shownCount = Math.min(activeLimit, 2);
+      const formatSignedZero = (v) => (Math.abs(v) < 0.0005 ? '0.00' : v.toFixed(2));
+      const x0Str = formatSignedZero(track.dcTerm.re);
+      const y0Str = formatSignedZero(track.dcTerm.im);
+
+      const cTerms = [];
+      for (let i = 0; i < shownCount; i++) {
+        const h = track.harmonics[i];
+        const rStr = h.amp.toFixed(3);
+        const kStr = String(h.freq);
+        const phiAbs = Math.abs(h.phase).toFixed(2);
+        const phiSign = h.phase >= 0 ? '+' : '-';
+        cTerms.push(`${rStr}·e^(i(2π(${kStr})t${phiSign}${phiAbs}))`);
+      }
+
+      const remaining = activeLimit - shownCount;
+      const eqSymbol = remaining > 0 ? '≈' : '=';
+      const tailStr = remaining > 0 ? ` + ··· [+${remaining}项]` : '';
+
+      track.generalFormula = `z_${track.id}(t) ${eqSymbol} (${x0Str}${y0Str >= 0 ? '+' : ''}${y0Str}i)${cTerms.length ? ' + ' + cTerms.join(' + ') : ''}${tailStr}`;
+    }
+
+    function updateAllFormulaStrings() {
+      updateTrackFormulaStrings(state.trackA);
+      updateTrackFormulaStrings(state.trackB);
+    }
+
+    // ============================================================================
+    // 2. UNRESTRICTED LARGE SVG PARSER & MULTI-PATH STITCHING ENGINE
+    // ============================================================================
+    function matIdentity() {
+      return [1, 0, 0, 1, 0, 0];
+    }
+
+    function matMultiply(m1, m2) {
+      return [
+        m1[0] * m2[0] + m1[2] * m2[1],
+        m1[1] * m2[0] + m1[3] * m2[1],
+        m1[0] * m2[2] + m1[2] * m2[3],
+        m1[1] * m2[2] + m1[3] * m2[3],
+        m1[0] * m2[4] + m1[2] * m2[5] + m1[4],
+        m1[1] * m2[4] + m1[3] * m2[5] + m1[5]
+      ];
+    }
+
+    function applyMatToPoint(m, x, y) {
+      return {
+        x: m[0] * x + m[2] * y + m[4],
+        y: m[1] * x + m[3] * y + m[5]
+      };
+    }
+
+    function parseTransformAttribute(transformStr) {
+      if (!transformStr || typeof transformStr !== 'string') return matIdentity();
+      let current = matIdentity();
+      const regex = /([a-zA-Z]+)\s*\(([^)]*)\)/g;
+      let match;
+      while ((match = regex.exec(transformStr)) !== null) {
+        const type = match[1].toLowerCase();
+        const args = (match[2].match(/[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/g) || []).map(Number);
+        if (args.length === 0) continue;
+
+        let m = matIdentity();
+        if (type === 'matrix' && args.length >= 6) {
+          m = [args[0], args[1], args[2], args[3], args[4], args[5]];
+        } else if (type === 'translate') {
+          const tx = args[0] || 0;
+          const ty = args.length > 1 ? args[1] : 0;
+          m = [1, 0, 0, 1, tx, ty];
+        } else if (type === 'scale') {
+          const sx = args[0];
+          const sy = args.length > 1 ? args[1] : sx;
+          m = [sx, 0, 0, sy, 0, 0];
+        } else if (type === 'rotate') {
+          const rad = ((args[0] || 0) * Math.PI) / 180;
+          const cos = Math.cos(rad);
+          const sin = Math.sin(rad);
+          if (args.length >= 3) {
+            const cx = args[1], cy = args[2];
+            m = matMultiply([1, 0, 0, 1, cx, cy], matMultiply([cos, sin, -sin, cos, 0, 0], [1, 0, 0, 1, -cx, -cy]));
+          } else {
+            m = [cos, sin, -sin, cos, 0, 0];
+          }
+        } else if (type === 'skewx') {
+          const rad = ((args[0] || 0) * Math.PI) / 180;
+          m = [1, 0, Math.tan(rad), 1, 0, 0];
+        } else if (type === 'skewy') {
+          const rad = ((args[0] || 0) * Math.PI) / 180;
+          m = [1, Math.tan(rad), 0, 1, 0, 0];
+        }
+        current = matMultiply(current, m);
+      }
+      return current;
+    }
+
+    function getCumulativeTransform(el, rootSvg) {
+      const chain = [];
+      let cur = el;
+      while (cur && cur.nodeType === 1) {
+        chain.unshift(cur);
+        if (cur === rootSvg) break;
+        cur = cur.parentNode;
+      }
+      let mat = matIdentity();
+      for (let i = 0; i < chain.length; i++) {
+        const node = chain[i];
+        const tAttr = node.getAttribute && node.getAttribute('transform');
+        if (tAttr) {
+          mat = matMultiply(mat, parseTransformAttribute(tAttr));
+        }
+        const styleAttr = node.getAttribute && node.getAttribute('style');
+        if (styleAttr && styleAttr.includes('transform')) {
+          const m = styleAttr.match(/transform\s*:\s*([^;]+)/i);
+          if (m && m[1]) {
+            mat = matMultiply(mat, parseTransformAttribute(m[1]));
+          }
+        }
+      }
+      return mat;
+    }
+
+    function sampleCubicBezier(x0, y0, x1, y1, x2, y2, x3, y3, outPts) {
+      const chord = Math.hypot(x3 - x0, y3 - y0);
+      const net = Math.hypot(x1 - x0, y1 - y0) + Math.hypot(x2 - x1, y2 - y1) + Math.hypot(x3 - x2, y3 - y2);
+      const steps = Math.max(4, Math.min(36, Math.ceil(6 + (net - chord) * 0.25 + net * 0.04)));
+      for (let s = 1; s <= steps; s++) {
+        const t = s / steps;
+        const mt = 1 - t;
+        const a = mt * mt * mt;
+        const b = 3 * mt * mt * t;
+        const c = 3 * mt * t * t;
+        const d = t * t * t;
+        outPts.push({
+          x: a * x0 + b * x1 + c * x2 + d * x3,
+          y: a * y0 + b * y1 + c * y2 + d * y3
+        });
+      }
+    }
+
+    function sampleQuadBezier(x0, y0, x1, y1, x2, y2, outPts) {
+      const net = Math.hypot(x1 - x0, y1 - y0) + Math.hypot(x2 - x1, y2 - y1);
+      const steps = Math.max(4, Math.min(28, Math.ceil(5 + net * 0.05)));
+      for (let s = 1; s <= steps; s++) {
+        const t = s / steps;
+        const mt = 1 - t;
+        outPts.push({
+          x: mt * mt * x0 + 2 * mt * t * x1 + t * t * x2,
+          y: mt * mt * y0 + 2 * mt * t * y1 + t * t * y2
+        });
+      }
+    }
+
+    function sampleEllipticalArc(x1, y1, rx, ry, phiDeg, largeArcFlag, sweepFlag, x2, y2, outPts) {
+      if (Math.abs(x1 - x2) < 1e-7 && Math.abs(y1 - y2) < 1e-7) return;
+      rx = Math.abs(rx);
+      ry = Math.abs(ry);
+      if (rx < 1e-7 || ry < 1e-7) {
+        outPts.push({ x: x2, y: y2 });
+        return;
+      }
+
+      const phi = (phiDeg * Math.PI) / 180;
+      const cosPhi = Math.cos(phi);
+      const sinPhi = Math.sin(phi);
+
+      const dx2 = (x1 - x2) / 2;
+      const dy2 = (y1 - y2) / 2;
+      const x1p = cosPhi * dx2 + sinPhi * dy2;
+      const y1p = -sinPhi * dx2 + cosPhi * dy2;
+
+      let rxSq = rx * rx;
+      let rySq = ry * ry;
+      const x1pSq = x1p * x1p;
+      const y1pSq = y1p * y1p;
+
+      const lambda = x1pSq / rxSq + y1pSq / rySq;
+      if (lambda > 1) {
+        const sqrtL = Math.sqrt(lambda);
+        rx *= sqrtL;
+        ry *= sqrtL;
+        rxSq = rx * rx;
+        rySq = ry * ry;
+      }
+
+      const sign = largeArcFlag === sweepFlag ? -1 : 1;
+      const num = Math.max(0, rxSq * rySq - rxSq * y1pSq - rySq * x1pSq);
+      const den = rxSq * y1pSq + rySq * x1pSq;
+      const coef = sign * Math.sqrt(den > 1e-12 ? num / den : 0);
+
+      const cxp = coef * ((rx * y1p) / ry);
+      const cyp = coef * (-(ry * x1p) / rx);
+
+      const cx = cosPhi * cxp - sinPhi * cyp + (x1 + x2) / 2;
+      const cy = sinPhi * cxp + cosPhi * cyp + (y1 + y2) / 2;
+
+      const vecAngle = (ux, uy, vx, vy) => {
+        const dot = ux * vx + uy * vy;
+        const len = Math.hypot(ux, uy) * Math.hypot(vx, vy);
+        const ang = Math.acos(Math.max(-1, Math.min(1, len > 0 ? dot / len : 1)));
+        return ux * vy - uy * vx < 0 ? -ang : ang;
+      };
+
+      const theta1 = vecAngle(1, 0, (x1p - cxp) / rx, (y1p - cyp) / ry);
+      let dTheta = vecAngle(
+        (x1p - cxp) / rx,
+        (y1p - cyp) / ry,
+        (-x1p - cxp) / rx,
+        (-y1p - cyp) / ry
+      );
+
+      if (!sweepFlag && dTheta > 0) dTheta -= 2 * Math.PI;
+      else if (sweepFlag && dTheta < 0) dTheta += 2 * Math.PI;
+
+      const steps = Math.max(6, Math.min(48, Math.ceil((Math.abs(dTheta) / (Math.PI / 16)) * 2)));
+      for (let s = 1; s <= steps; s++) {
+        const theta = theta1 + (dTheta * s) / steps;
+        const cosT = Math.cos(theta);
+        const sinT = Math.sin(theta);
+        outPts.push({
+          x: cosPhi * rx * cosT - sinPhi * ry * sinT + cx,
+          y: sinPhi * rx * cosT + cosPhi * ry * sinT + cy
+        });
+      }
+    }
+
+    function parsePathDToSubpaths(dStr, matrix) {
+      if (!dStr || typeof dStr !== 'string') return [];
+      const len = dStr.length;
+      let idx = 0;
+
+      const skipSeparators = () => {
+        while (idx < len) {
+          const code = dStr.charCodeAt(idx);
+          if (code === 32 || code === 44 || code === 9 || code === 10 || code === 13) {
+            idx++;
+          } else {
+            break;
+          }
+        }
+      };
+
+      const peekIsCommand = () => {
+        skipSeparators();
+        if (idx >= len) return false;
+        return /[a-df-zA-DF-Z]/.test(dStr[idx]);
+      };
+
+      const readFlag = () => {
+        skipSeparators();
+        if (idx < len && (dStr[idx] === '0' || dStr[idx] === '1')) {
+          const val = dStr[idx] === '1' ? 1 : 0;
+          idx++;
+          return val;
+        }
+        return readNumber();
+      };
+
+      const readNumber = () => {
+        skipSeparators();
+        if (idx >= len) return NaN;
+        const start = idx;
+        if (dStr[idx] === '+' || dStr[idx] === '-') idx++;
+        let hasDigits = false;
+        while (idx < len && dStr.charCodeAt(idx) >= 48 && dStr.charCodeAt(idx) <= 57) {
+          idx++;
+          hasDigits = true;
+        }
+        if (idx < len && dStr[idx] === '.') {
+          idx++;
+          while (idx < len && dStr.charCodeAt(idx) >= 48 && dStr.charCodeAt(idx) <= 57) {
+            idx++;
+            hasDigits = true;
+          }
+        }
+        if (!hasDigits) return NaN;
+        if (idx < len && (dStr[idx] === 'e' || dStr[idx] === 'E')) {
+          const expStart = idx;
+          idx++;
+          if (idx < len && (dStr[idx] === '+' || dStr[idx] === '-')) idx++;
+          let hasExpDigits = false;
+          while (idx < len && dStr.charCodeAt(idx) >= 48 && dStr.charCodeAt(idx) <= 57) {
+            idx++;
+            hasExpDigits = true;
+          }
+          if (!hasExpDigits) idx = expStart;
+        }
+        return parseFloat(dStr.slice(start, idx));
+      };
+
+      const subpaths = [];
+      let curSubpath = null;
+      let curX = 0, curY = 0;
+      let startX = 0, startY = 0;
+      let lastCubicCtrlX = 0, lastCubicCtrlY = 0;
+      let lastQuadCtrlX = 0, lastQuadCtrlY = 0;
+      let lastCmd = '';
+      let activeCmd = '';
+
+      while (idx < len) {
+        if (peekIsCommand()) {
+          activeCmd = dStr[idx++];
+        } else if (!activeCmd) {
+          idx++;
+          continue;
+        }
+
+        if (activeCmd === 'Z' || activeCmd === 'z') {
+          if (curSubpath && curSubpath.length > 0) {
+            curSubpath.push({ x: startX, y: startY });
+          }
+          curX = startX;
+          curY = startY;
+          lastCmd = activeCmd;
+          activeCmd = '';
+          continue;
+        }
+
+        const isRel = activeCmd >= 'a' && activeCmd <= 'z';
+        const upper = activeCmd.toUpperCase();
+
+        if (upper === 'M') {
+          const nx = readNumber();
+          const ny = readNumber();
+          if (Number.isNaN(nx) || Number.isNaN(ny)) break;
+          curX = isRel ? curX + nx : nx;
+          curY = isRel ? curY + ny : ny;
+          startX = curX;
+          startY = curY;
+
+          if (curSubpath && curSubpath.length >= 2) {
+            subpaths.push(curSubpath);
+          }
+          curSubpath = [{ x: curX, y: curY }];
+          lastCmd = activeCmd;
+          activeCmd = isRel ? 'l' : 'L';
+          continue;
+        }
+
+        if (!curSubpath) {
+          curSubpath = [{ x: curX, y: curY }];
+        }
+
+        if (upper === 'L') {
+          const nx = readNumber();
+          const ny = readNumber();
+          if (Number.isNaN(nx) || Number.isNaN(ny)) break;
+          curX = isRel ? curX + nx : nx;
+          curY = isRel ? curY + ny : ny;
+          curSubpath.push({ x: curX, y: curY });
+          lastCmd = activeCmd;
+        } else if (upper === 'H') {
+          const nx = readNumber();
+          if (Number.isNaN(nx)) break;
+          curX = isRel ? curX + nx : nx;
+          curSubpath.push({ x: curX, y: curY });
+          lastCmd = activeCmd;
+        } else if (upper === 'V') {
+          const ny = readNumber();
+          if (Number.isNaN(ny)) break;
+          curY = isRel ? curY + ny : ny;
+          curSubpath.push({ x: curX, y: curY });
+          lastCmd = activeCmd;
+        } else if (upper === 'C') {
+          const x1 = readNumber(), y1 = readNumber();
+          const x2 = readNumber(), y2 = readNumber();
+          const x = readNumber(), y = readNumber();
+          if (Number.isNaN(x) || Number.isNaN(y)) break;
+          const ax1 = isRel ? curX + x1 : x1;
+          const ay1 = isRel ? curY + y1 : y1;
+          const ax2 = isRel ? curX + x2 : x2;
+          const ay2 = isRel ? curY + y2 : y2;
+          const ax = isRel ? curX + x : x;
+          const ay = isRel ? curY + y : y;
+          sampleCubicBezier(curX, curY, ax1, ay1, ax2, ay2, ax, ay, curSubpath);
+          lastCubicCtrlX = ax2;
+          lastCubicCtrlY = ay2;
+          curX = ax;
+          curY = ay;
+          lastCmd = activeCmd;
+        } else if (upper === 'S') {
+          const x2 = readNumber(), y2 = readNumber();
+          const x = readNumber(), y = readNumber();
+          if (Number.isNaN(x) || Number.isNaN(y)) break;
+          let ax1 = curX, ay1 = curY;
+          if (lastCmd === 'C' || lastCmd === 'c' || lastCmd === 'S' || lastCmd === 's') {
+            ax1 = 2 * curX - lastCubicCtrlX;
+            ay1 = 2 * curY - lastCubicCtrlY;
+          }
+          const ax2 = isRel ? curX + x2 : x2;
+          const ay2 = isRel ? curY + y2 : y2;
+          const ax = isRel ? curX + x : x;
+          const ay = isRel ? curY + y : y;
+          sampleCubicBezier(curX, curY, ax1, ay1, ax2, ay2, ax, ay, curSubpath);
+          lastCubicCtrlX = ax2;
+          lastCubicCtrlY = ay2;
+          curX = ax;
+          curY = ay;
+          lastCmd = activeCmd;
+        } else if (upper === 'Q') {
+          const x1 = readNumber(), y1 = readNumber();
+          const x = readNumber(), y = readNumber();
+          if (Number.isNaN(x) || Number.isNaN(y)) break;
+          const ax1 = isRel ? curX + x1 : x1;
+          const ay1 = isRel ? curY + y1 : y1;
+          const ax = isRel ? curX + x : x;
+          const ay = isRel ? curY + y : y;
+          sampleQuadBezier(curX, curY, ax1, ay1, ax, ay, curSubpath);
+          lastQuadCtrlX = ax1;
+          lastQuadCtrlY = ay1;
+          curX = ax;
+          curY = ay;
+          lastCmd = activeCmd;
+        } else if (upper === 'T') {
+          const x = readNumber(), y = readNumber();
+          if (Number.isNaN(x) || Number.isNaN(y)) break;
+          let ax1 = curX, ay1 = curY;
+          if (lastCmd === 'Q' || lastCmd === 'q' || lastCmd === 'T' || lastCmd === 't') {
+            ax1 = 2 * curX - lastQuadCtrlX;
+            ay1 = 2 * curY - lastQuadCtrlY;
+          }
+          const ax = isRel ? curX + x : x;
+          const ay = isRel ? curY + y : y;
+          sampleQuadBezier(curX, curY, ax1, ay1, ax, ay, curSubpath);
+          lastQuadCtrlX = ax1;
+          lastQuadCtrlY = ay1;
+          curX = ax;
+          curY = ay;
+          lastCmd = activeCmd;
+        } else if (upper === 'A') {
+          const rx = readNumber();
+          const ry = readNumber();
+          const xAxisRot = readNumber();
+          const largeArc = readFlag();
+          const sweep = readFlag();
+          const x = readNumber();
+          const y = readNumber();
+          if (Number.isNaN(x) || Number.isNaN(y)) break;
+          const ax = isRel ? curX + x : x;
+          const ay = isRel ? curY + y : y;
+          sampleEllipticalArc(curX, curY, rx, ry, xAxisRot, largeArc, sweep, ax, ay, curSubpath);
+          curX = ax;
+          curY = ay;
+          lastCmd = activeCmd;
+        } else {
+          idx++;
+        }
+      }
+
+      if (curSubpath && curSubpath.length >= 2) {
+        subpaths.push(curSubpath);
+      }
+
+      const results = [];
+      for (let s = 0; s < subpaths.length; s++) {
+        const raw = subpaths[s];
+        const transformed = [];
+        let arcLen = 0;
+        for (let i = 0; i < raw.length; i++) {
+          const pt = applyMatToPoint(matrix, raw[i].x, raw[i].y);
+          if (Number.isFinite(pt.x) && Number.isFinite(pt.y)) {
+            if (transformed.length > 0) {
+              const prev = transformed[transformed.length - 1];
+              const seg = Math.hypot(pt.x - prev.x, pt.y - prev.y);
+              if (seg > 1e-7) {
+                arcLen += seg;
+                transformed.push(pt);
+              }
+            } else {
+              transformed.push(pt);
+            }
+          }
+        }
+        if (transformed.length >= 2 && arcLen > 1e-5) {
+          results.push({ pts: transformed, length: arcLen });
+        }
+      }
+
+      return results;
+    }
+
+    function extractBasicShapeSubpath(el, matrix) {
+      const tag = el.tagName.toLowerCase();
+      const rawPts = [];
+
+      if (tag === 'polygon' || tag === 'polyline') {
+        const ptsAttr = el.getAttribute('points') || '';
+        const nums = (ptsAttr.match(/[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/g) || []).map(Number);
+        for (let i = 0; i + 1 < nums.length; i += 2) {
+          rawPts.push({ x: nums[i], y: nums[i + 1] });
+        }
+        if (tag === 'polygon' && rawPts.length > 2) {
+          rawPts.push({ x: rawPts[0].x, y: rawPts[0].y });
+        }
+      } else if (tag === 'line') {
+        const x1 = parseFloat(el.getAttribute('x1') || '0');
+        const y1 = parseFloat(el.getAttribute('y1') || '0');
+        const x2 = parseFloat(el.getAttribute('x2') || '0');
+        const y2 = parseFloat(el.getAttribute('y2') || '0');
+        rawPts.push({ x: x1, y: y1 }, { x: x2, y: y2 });
+      } else if (tag === 'rect') {
+        const x = parseFloat(el.getAttribute('x') || '0');
+        const y = parseFloat(el.getAttribute('y') || '0');
+        const w = parseFloat(el.getAttribute('width') || '0');
+        const h = parseFloat(el.getAttribute('height') || '0');
+        if (w > 0 && h > 0) {
+          rawPts.push(
+            { x, y },
+            { x: x + w, y },
+            { x: x + w, y: y + h },
+            { x, y: y + h },
+            { x, y }
+          );
+        }
+      } else if (tag === 'circle' || tag === 'ellipse') {
+        const cx = parseFloat(el.getAttribute('cx') || '0');
+        const cy = parseFloat(el.getAttribute('cy') || '0');
+        const rx = tag === 'circle'
+          ? parseFloat(el.getAttribute('r') || '0')
+          : parseFloat(el.getAttribute('rx') || '0');
+        const ry = tag === 'circle'
+          ? rx
+          : parseFloat(el.getAttribute('ry') || '0');
+        if (rx > 0 && ry > 0) {
+          const steps = 64;
+          for (let s = 0; s <= steps; s++) {
+            const ang = (s / steps) * 2 * Math.PI;
+            rawPts.push({
+              x: cx + rx * Math.cos(ang),
+              y: cy + ry * Math.sin(ang)
+            });
+          }
+        }
+      }
+
+      if (rawPts.length < 2) return null;
+
+      const transformed = [];
+      let arcLen = 0;
+      for (let i = 0; i < rawPts.length; i++) {
+        const pt = applyMatToPoint(matrix, rawPts[i].x, rawPts[i].y);
+        if (!Number.isFinite(pt.x) || !Number.isFinite(pt.y)) continue;
+        if (transformed.length > 0) {
+          const prev = transformed[transformed.length - 1];
+          const seg = Math.hypot(pt.x - prev.x, pt.y - prev.y);
+          if (seg > 1e-7) {
+            arcLen += seg;
+            transformed.push(pt);
+          }
+        } else {
+          transformed.push(pt);
+        }
+      }
+
+      if (transformed.length < 2 || arcLen <= 1e-5) return null;
+      return { pts: transformed, length: arcLen };
+    }
+
+    function isLikelyBackgroundRect(pts, overallBBox) {
+      if (pts.length < 4 || pts.length > 16) return false;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i];
+        if (p.x < minX) minX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y > maxY) maxY = p.y;
+      }
+      const w = maxX - minX;
+      const h = maxY - minY;
+      const totalW = overallBBox.maxX - overallBBox.minX;
+      const totalH = overallBBox.maxY - overallBBox.minY;
+      if (totalW <= 0 || totalH <= 0) return false;
+      if (w < totalW * 0.96 || h < totalH * 0.96) return false;
+
+      const tol = Math.max(w, h) * 0.015;
+      let onEdgeCount = 0;
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i];
+        const onEdge =
+          Math.abs(p.x - minX) <= tol ||
+          Math.abs(p.x - maxX) <= tol ||
+          Math.abs(p.y - minY) <= tol ||
+          Math.abs(p.y - maxY) <= tol;
+        if (onEdge) onEdgeCount++;
+      }
+      return onEdgeCount / pts.length >= 0.95;
+    }
+
+    function extractSubpathsFromSVGString(svgText, fileName = 'custom.svg', fileSize = 0) {
+      const t0 = performance.now();
+
+      let cleanText = (svgText || '')
+        .replace(/^\uFEFF/, '')
+        .replace(/\0/g, '')
+        .replace(/<\?xml[\s\S]*?\?>/gi, '')
+        .replace(/<!DOCTYPE[\s\S]*?(?:\[[\s\S]*?\][\s\S]*?)?>/gi, '')
+        .trim();
+
+      if (!/<svg[\s>]/i.test(cleanText)) {
+        if (/^<(path|polygon|polyline|rect|circle|ellipse|g)[\s>]/i.test(cleanText)) {
+          cleanText = `<svg xmlns="http://www.w3.org/2000/svg">${cleanText}</svg>`;
+        } else if (/^[Mm][\d\s.,+-]/.test(cleanText)) {
+          cleanText = `<svg xmlns="http://www.w3.org/2000/svg"><path d="${cleanText}"/></svg>`;
+        }
+      }
+
+      const parser = new DOMParser();
+      let doc = parser.parseFromString(cleanText, 'image/svg+xml');
+      let svgRoot = doc.querySelector('svg');
+
+      if (!svgRoot || doc.querySelector('parsererror')) {
+        const htmlDoc = parser.parseFromString(cleanText, 'text/html');
+        svgRoot = htmlDoc.querySelector('svg');
+      }
+
+      if (!svgRoot) {
+        const match = cleanText.match(/<svg[\s\S]*<\/svg>/i);
+        if (match) {
+          const htmlDoc = parser.parseFromString(match[0], 'text/html');
+          svgRoot = htmlDoc.querySelector('svg');
+        }
+      }
+
+      if (!svgRoot) {
+        throw new Error('未在文件中找到有效的 <svg> 节点，请检查文件内容。');
+      }
+
+      const useElements = Array.from(svgRoot.querySelectorAll('use'));
+      for (let u = 0; u < useElements.length; u++) {
+        const useEl = useElements[u];
+        const href = useEl.getAttribute('href') || useEl.getAttribute('xlink:href') || '';
+        if (href.startsWith('#')) {
+          const targetId = href.slice(1);
+          const target = svgRoot.querySelector(`[id="${CSS.escape ? CSS.escape(targetId) : targetId}"]`);
+          if (target && target !== useEl) {
+            const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            const x = parseFloat(useEl.getAttribute('x') || '0');
+            const y = parseFloat(useEl.getAttribute('y') || '0');
+            const existingTransform = useEl.getAttribute('transform') || '';
+            g.setAttribute('transform', `${existingTransform} translate(${x}, ${y})`.trim());
+            const clone = target.cloneNode(true);
+            if (clone.tagName && clone.tagName.toLowerCase() === 'symbol') {
+              while (clone.firstChild) g.appendChild(clone.firstChild);
+            } else {
+              g.appendChild(clone);
+            }
+            if (useEl.parentNode) {
+              useEl.parentNode.replaceChild(g, useEl);
+            }
+          }
+        }
+      }
+
+      const allShapes = Array.from(
+        svgRoot.querySelectorAll('path, polygon, polyline, rect, circle, ellipse, line')
+      );
+
+      let activeShapes = allShapes.filter(el => {
+        if (el.closest('defs, clipPath, clippath, mask, pattern, marker, symbol')) return false;
+        const disp = (el.getAttribute('display') || '').toLowerCase();
+        const vis = (el.getAttribute('visibility') || '').toLowerCase();
+        if (disp === 'none' || vis === 'hidden') return false;
+        const styleAttr = (el.getAttribute('style') || '').toLowerCase();
+        if (/display\s*:\s*none/.test(styleAttr) || /visibility\s*:\s*hidden/.test(styleAttr)) return false;
+        return true;
+      });
+
+      if (activeShapes.length === 0 && allShapes.length > 0) {
+        activeShapes = allShapes;
+      }
+
+      const rawExtracted = [];
+      let totalArcLength = 0;
+
+      for (let i = 0; i < activeShapes.length; i++) {
+        const el = activeShapes[i];
+        const matrix = getCumulativeTransform(el, svgRoot);
+        const tag = el.tagName.toLowerCase();
+
+        if (tag === 'path') {
+          const dAttr = el.getAttribute('d');
+          if (!dAttr) continue;
+          const subpaths = parsePathDToSubpaths(dAttr, matrix);
+          for (let s = 0; s < subpaths.length; s++) {
+            rawExtracted.push(subpaths[s]);
+            totalArcLength += subpaths[s].length;
+          }
+        } else {
+          const shapeSubpath = extractBasicShapeSubpath(el, matrix);
+          if (shapeSubpath) {
+            rawExtracted.push(shapeSubpath);
+            totalArcLength += shapeSubpath.length;
+          }
+        }
+      }
+
+      if (rawExtracted.length === 0 || totalArcLength <= 0) {
+        throw new Error('未能在 SVG 中提取到任何有效的矢量路径或几何轮廓。');
+      }
+
+      const overallBBox = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+      for (let i = 0; i < rawExtracted.length; i++) {
+        const pts = rawExtracted[i].pts;
+        for (let j = 0; j < pts.length; j++) {
+          const p = pts[j];
+          if (p.x < overallBBox.minX) overallBBox.minX = p.x;
+          if (p.y < overallBBox.minY) overallBBox.minY = p.y;
+          if (p.x > overallBBox.maxX) overallBBox.maxX = p.x;
+          if (p.y > overallBBox.maxY) overallBBox.maxY = p.y;
+        }
+      }
+
+      const filterRectEnabled = document.getElementById('svg-filter-rect').checked;
+      let candidateSubpaths = rawExtracted;
+      if (filterRectEnabled && candidateSubpaths.length > 1) {
+        const withoutBg = candidateSubpaths.filter(sp => !isLikelyBackgroundRect(sp.pts, overallBBox));
+        if (withoutBg.length > 0) {
+          candidateSubpaths = withoutBg;
+        }
+      }
+
+      const minFraction = parseFloat(document.getElementById('svg-min-subpath').value || '0.001');
+      const candidateTotalLen = candidateSubpaths.reduce((acc, d) => acc + d.length, 0);
+      const minAllowedLen = candidateTotalLen * minFraction;
+
+      let finalSubpaths = candidateSubpaths.filter(d => d.length >= minAllowedLen);
+      if (finalSubpaths.length === 0) {
+        finalSubpaths = candidateSubpaths;
+      }
+
+      if (finalSubpaths.length > 4000) {
+        finalSubpaths.sort((a, b) => b.length - a.length);
+        finalSubpaths = finalSubpaths.slice(0, 4000);
+      }
+
+      const finalTotalLen = finalSubpaths.reduce((acc, d) => acc + d.length, 0);
+      const elapsedMs = Math.round(performance.now() - t0);
+
+      return {
+        subpaths: finalSubpaths,
+        fileName,
+        fileSize,
+        totalLength: Math.max(1, Math.round(finalTotalLen)),
+        elapsedMs
+      };
+    }
+
+    async function extractContourFromRasterSVG(svgText, fileName, fileSize) {
+      const t0 = performance.now();
+      return new Promise((resolve, reject) => {
+        const blob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          const size = 600;
+          const c = document.createElement('canvas');
+          c.width = size;
+          c.height = size;
+          const cctx = c.getContext('2d');
+          cctx.drawImage(img, 20, 20, size - 40, size - 40);
+          const imgData = cctx.getImageData(0, 0, size, size).data;
+
+          const mask = new Uint8Array(size * size);
+          let fgCount = 0;
+          for (let i = 0; i < size * size; i++) {
+            const r = imgData[i * 4];
+            const g = imgData[i * 4 + 1];
+            const b = imgData[i * 4 + 2];
+            const a = imgData[i * 4 + 3];
+            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+            if (a > 64 && lum < 240) {
+              mask[i] = 1;
+              fgCount++;
+            }
+          }
+
+          if (fgCount < 10) {
+            reject(new Error('SVG 中既无矢量路径，也未检测到有效的位图轮廓。'));
+            return;
+          }
+
+          let startX = -1, startY = -1;
+          outer: for (let y = 1; y < size - 1; y++) {
+            for (let x = 1; x < size - 1; x++) {
+              if (mask[y * size + x]) {
+                startX = x;
+                startY = y;
+                break outer;
+              }
+            }
+          }
+
+          const dirs = [
+            [1, 0], [1, 1], [0, 1], [-1, 1],
+            [-1, 0], [-1, -1], [0, -1], [1, -1]
+          ];
+          const boundary = [];
+          let cx = startX, cy = startY;
+          let backtrackDir = 4;
+          const maxIter = size * size;
+
+          for (let step = 0; step < maxIter; step++) {
+            boundary.push({ x: cx, y: cy });
+            let foundNext = false;
+            for (let k = 0; k < 8; k++) {
+              const dIdx = (backtrackDir + 1 + k) % 8;
+              const nx = cx + dirs[dIdx][0];
+              const ny = cy + dirs[dIdx][1];
+              if (nx >= 0 && nx < size && ny >= 0 && ny < size && mask[ny * size + nx]) {
+                cx = nx;
+                cy = ny;
+                backtrackDir = (dIdx + 4) % 8;
+                foundNext = true;
+                break;
+              }
+            }
+            if (!foundNext || (cx === startX && cy === startY && boundary.length > 5)) {
+              break;
+            }
+          }
+
+          if (boundary.length < 3) {
+            reject(new Error('无法从位图 SVG 中提取闭合边界。'));
+            return;
+          }
+
+          let len = 0;
+          for (let i = 1; i < boundary.length; i++) {
+            len += Math.hypot(boundary[i].x - boundary[i - 1].x, boundary[i].y - boundary[i - 1].y);
+          }
+
+          resolve({
+            subpaths: [{ pts: boundary, length: len }],
+            fileName,
+            fileSize,
+            totalLength: Math.round(len),
+            elapsedMs: Math.round(performance.now() - t0)
+          });
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error('SVG 文件解析失败。'));
+        };
+        img.src = url;
+      });
+    }
+
+    function stitchAndResampleSubpaths(subpathsData, M, strategy = 'stitch') {
+      if (!subpathsData || subpathsData.length === 0) {
+        return { points: [], normalizedPerimeter: 1 };
+      }
+
+      let chosen = subpathsData.slice();
+      if (strategy === 'longest') {
+        chosen.sort((a, b) => b.length - a.length);
+        chosen = [chosen[0]];
+      } else {
+        chosen.sort((a, b) => b.length - a.length);
+      }
+
+      const used = new Uint8Array(chosen.length);
+      const orderedArrays = [];
+
+      let currentPts = chosen[0].pts;
+      used[0] = 1;
+      orderedArrays.push(currentPts);
+      let curEnd = currentPts[currentPts.length - 1];
+
+      for (let step = 1; step < chosen.length; step++) {
+        let bestIdx = -1;
+        let bestDistSq = Infinity;
+        let reverseBest = false;
+
+        for (let i = 0; i < chosen.length; i++) {
+          if (used[i]) continue;
+          const cand = chosen[i].pts;
+          const pStart = cand[0];
+          const pEnd = cand[cand.length - 1];
+
+          const dStart = (pStart.x - curEnd.x) ** 2 + (pStart.y - curEnd.y) ** 2;
+          if (dStart < bestDistSq) {
+            bestDistSq = dStart;
+            bestIdx = i;
+            reverseBest = false;
+          }
+
+          const dEnd = (pEnd.x - curEnd.x) ** 2 + (pEnd.y - curEnd.y) ** 2;
+          if (dEnd < bestDistSq) {
+            bestDistSq = dEnd;
+            bestIdx = i;
+            reverseBest = true;
+          }
+        }
+
+        if (bestIdx !== -1) {
+          used[bestIdx] = 1;
+          let nextPts = chosen[bestIdx].pts;
+          if (reverseBest) nextPts = nextPts.slice().reverse();
+          orderedArrays.push(nextPts);
+          curEnd = nextPts[nextPts.length - 1];
+        }
+      }
+
+      const combined = [];
+      for (let i = 0; i < orderedArrays.length; i++) {
+        const arr = orderedArrays[i];
+        for (let j = 0; j < arr.length; j++) {
+          combined.push(arr[j]);
+        }
+      }
+
+      return resampleClosedPolylineWithPerimeter(combined, M);
+    }
+
+    function resampleClosedPolylineWithPerimeter(rawPts, M) {
+      if (!rawPts || rawPts.length < 2) {
+        return {
+          points: Array.from({ length: M }, () => ({ x: 0, y: 0 })),
+          normalizedPerimeter: 1
+        };
+      }
+
+      const pts = rawPts.slice();
+      const first = pts[0];
+      const last = pts[pts.length - 1];
+      if (Math.hypot(first.x - last.x, first.y - last.y) > 1e-6) {
+        pts.push({ x: first.x, y: first.y });
+      }
+
+      const cumLen = new Float64Array(pts.length);
+      cumLen[0] = 0;
+      for (let i = 1; i < pts.length; i++) {
+        cumLen[i] = cumLen[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+      }
+
+      const totalLen = cumLen[pts.length - 1];
+      if (totalLen <= 1e-9) {
+        return {
+          points: Array.from({ length: M }, () => ({ x: 0, y: 0 })),
+          normalizedPerimeter: 1
+        };
+      }
+
+      const resampled = new Array(M);
+      let segIdx = 0;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+      for (let k = 0; k < M; k++) {
+        const targetDist = (k / M) * totalLen;
+        while (segIdx < pts.length - 2 && cumLen[segIdx + 1] < targetDist) {
+          segIdx++;
+        }
+        const segStart = cumLen[segIdx];
+        const segEnd = cumLen[segIdx + 1];
+        const segSpan = segEnd - segStart;
+        const alpha = segSpan > 1e-9 ? (targetDist - segStart) / segSpan : 0;
+
+        const x = pts[segIdx].x + alpha * (pts[segIdx + 1].x - pts[segIdx].x);
+        const y = pts[segIdx].y + alpha * (pts[segIdx + 1].y - pts[segIdx].y);
+
+        resampled[k] = { x, y };
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+
+      const cx = (minX + maxX) / 2;
+      const cy = (minY + maxY) / 2;
+      const halfSpan = Math.max(maxX - minX, maxY - minY, 1e-6) / 2;
+
+      let normPerimeter = 0;
+      for (let k = 0; k < M; k++) {
+        resampled[k].x = (resampled[k].x - cx) / halfSpan;
+        resampled[k].y = (resampled[k].y - cy) / halfSpan;
+        if (k > 0) {
+          normPerimeter += Math.hypot(
+            resampled[k].x - resampled[k - 1].x,
+            resampled[k].y - resampled[k - 1].y
+          );
+        }
+      }
+
+      return {
+        points: resampled,
+        normalizedPerimeter: Math.max(1.0, normPerimeter)
+      };
+    }
+
+    // ============================================================================
+    // 3. BUILT-IN DEMO SVG PAIRS (PURE SVG STRINGS FOR IMMEDIATE TESTING)
+    // ============================================================================
+    function generateBuiltInDemoSVGPair(pairKey) {
+      const pointsToSvgPath = (pts) => {
+        if (!pts.length) return '';
+        let d = `M ${pts[0].x.toFixed(2)} ${pts[0].y.toFixed(2)}`;
+        for (let i = 1; i < pts.length; i++) {
+          d += ` L ${pts[i].x.toFixed(2)} ${pts[i].y.toFixed(2)}`;
+        }
+        return d + ' Z';
+      };
+
+      if (pairKey === 'islands') {
+        const mainlandPts = [];
+        const stepsA = 360;
+        for (let i = 0; i < stepsA; i++) {
+          const a = (i / stepsA) * 2 * Math.PI;
+          const r = 100
+            + 24 * Math.cos(3 * a - 0.4)
+            + 16 * Math.sin(5 * a + 0.8)
+            + 11 * Math.cos(9 * a)
+            + 6.5 * Math.sin(17 * a);
+          mainlandPts.push({ x: 200 + r * Math.cos(a) * 1.25, y: 200 - r * Math.sin(a) * 0.9 });
+        }
+        const svgA = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><path d="${pointsToSvgPath(mainlandPts)}"/></svg>`;
+
+        const makeIslandPath = (cx, cy, rx, ry, lobes, freq2, amp2) => {
+          const pts = [];
+          const st = 160;
+          for (let i = 0; i < st; i++) {
+            const a = (i / st) * 2 * Math.PI;
+            const mod = 1 + 0.22 * Math.sin(lobes * a) + amp2 * Math.cos(freq2 * a);
+            pts.push({ x: cx + rx * mod * Math.cos(a), y: cy - ry * mod * Math.sin(a) });
+          }
+          return `<path d="${pointsToSvgPath(pts)}"/>`;
+        };
+
+        const svgB = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+          ${makeIslandPath(200, 200, 65, 50, 6, 15, 0.14)}
+          ${makeIslandPath(100, 110, 34, 26, 5, 11, 0.16)}
+          ${makeIslandPath(295, 105, 30, 24, 4, 13, 0.15)}
+          ${makeIslandPath(110, 290, 29, 22, 5, 9, 0.14)}
+          ${makeIslandPath(285, 295, 35, 28, 7, 17, 0.16)}
+        </svg>`;
+
+        return {
+          nameA: '苍穹大陆轮廓.svg',
+          svgA,
+          nameB: '翡翠千岛群岛.svg',
+          svgB
+        };
+      }
+
+      if (pairKey === 'continents') {
+        const hexPts = [];
+        const st = 240;
+        for (let i = 0; i < st; i++) {
+          const a = (i / st) * 2 * Math.PI;
+          const r = 90 + 16 * Math.cos(6 * a - 0.3) + 6 * Math.sin(12 * a) + 4 * Math.cos(21 * a);
+          hexPts.push({ x: 200 + r * Math.cos(a) * 1.15, y: 200 - r * Math.sin(a) * 0.9 });
+        }
+        const svgA = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><path d="${pointsToSvgPath(hexPts)}"/></svg>`;
+
+        const bootPts = [
+          [85, 42], [122, 35], [138, 44], [125, 60], [142, 75],
+          [161, 81], [185, 98], [179, 102], [168, 96], [162, 110],
+          [156, 120], [159, 121], [166, 112], [152, 99], [135, 88],
+          [118, 79], [103, 62], [88, 56], [75, 49]
+        ].map(([x, y]) => ({ x, y }));
+
+        const sicilyPts = [
+          [124, 122], [156, 118], [151, 133], [126, 124]
+        ].map(([x, y]) => ({ x, y }));
+
+        const svgB = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200">
+          <path d="${pointsToSvgPath(bootPts)}"/>
+          <path d="${pointsToSvgPath(sicilyPts)}"/>
+        </svg>`;
+
+        return {
+          nameA: '六边形疆域.svg',
+          svgA,
+          nameB: '靴形半岛与岛屿.svg',
+          svgB
+        };
+      }
+
+      // Pair 3: Classic Butterfly vs Heart SVG
+      const butterflyPts = [];
+      const heartPts = [];
+      const M = 512;
+      for (let i = 0; i < M; i++) {
+        const t = (i / M) * 2 * Math.PI;
+        const rad = Math.exp(Math.cos(t)) - 2 * Math.cos(4 * t) - Math.pow(Math.sin(t / 12), 5);
+        butterflyPts.push({ x: 200 + Math.sin(t) * rad * 40, y: 200 - Math.cos(t) * rad * 40 });
+
+        const hx = 16 * Math.pow(Math.sin(t), 3);
+        const hy = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+        heartPts.push({ x: 200 + hx * 8, y: 200 - hy * 8 });
+      }
+
+      return {
+        nameA: '蝴蝶曲线.svg',
+        svgA: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><path d="${pointsToSvgPath(butterflyPts)}"/></svg>`,
+        nameB: '爱心曲线.svg',
+        svgB: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><path d="${pointsToSvgPath(heartPts)}"/></svg>`
+      };
+    }
+
+    // ============================================================================
+    // 4. TRACK EVALUATION & DUAL-COMPLETION BARRIER ENGINE
+    // ============================================================================
+    function evaluateTrackAtTime(track, t, N) {
+      const twoPiT = 2 * Math.PI * t;
+      let x = track.dcTerm.re;
+      let y = track.dcTerm.im;
+      const limit = Math.min(N, track.harmonics.length);
+
+      for (let i = 0; i < limit; i++) {
+        const h = track.harmonics[i];
+        const angle = h.freq * twoPiT + h.phase;
+        x += h.amp * Math.cos(angle);
+        y += h.amp * Math.sin(angle);
+      }
+      return { x, y };
+    }
+
+    function applySubpathsToTrack(track, extractedMeta, resetAnimation = true) {
+      const strategy = document.getElementById('svg-path-strategy').value || 'stitch';
+      track.rawSubpaths = extractedMeta.subpaths;
+      track.name = extractedMeta.fileName.replace(/\.svg$/i, '').toUpperCase();
+
+      const { points, normalizedPerimeter } = stitchAndResampleSubpaths(
+        extractedMeta.subpaths,
+        state.sampleCount,
+        strategy
+      );
+      track.totalPerimeter = Math.max(1, normalizedPerimeter * Math.pow(Math.max(1, extractedMeta.subpaths.length), 0.18));
+
+      computeFFTForTrack(track, points);
+
+      const summaryEl = document.getElementById(track.id === 'A' ? 'meta-summary-a' : 'meta-summary-b');
+      if (summaryEl) {
+        summaryEl.textContent = `${extractedMeta.fileName} (${extractedMeta.subpaths.length} 子路径 · 周长 ${extractedMeta.totalLength})`;
+      }
+
+      syncCircleControlsRange(false);
+      if (resetAnimation) {
+        resetBothTracksCycle();
+      }
+      updateReadoutUI();
+      drawDualSpectrumChart();
+    }
+
+    function syncCircleControlsRange(resetToDefault = false) {
+      const maxPossible = getMaxSelectableCircles();
+      const sliderCircles = document.getElementById('slider-circles');
+      const inputCircles = document.getElementById('input-circles');
+      const labelMax = document.getElementById('label-max-circles');
+
+      sliderCircles.max = maxPossible;
+      inputCircles.max = maxPossible;
+      labelMax.textContent = `/ ${maxPossible}`;
+
+      if (resetToDefault) {
+        state.numCircles = Math.min(128, maxPossible);
+      }
+
+      sliderCircles.value = state.numCircles;
+      inputCircles.value = state.numCircles;
+    }
+
+    function resetBothTracksCycle() {
+      state.bothDoneHoldTimer = 0;
+
+      [state.trackA, state.trackB].forEach(track => {
+        track.t = 0;
+        track.completed = false;
+        track.trail = [];
+        if (track.harmonics.length > 0) {
+          const p0 = evaluateTrackAtTime(track, 0, state.numCircles);
+          track.trail.push(p0);
+          track.lastPenTip = p0;
+        }
+      });
+
+      updateProgressBarsUI();
+    }
+
+    function getTrackCycleDurationSeconds(track) {
+      const baseCycleSec = 3.2 / Math.max(0.05, state.masterSpeed * track.speedMultiplier);
+      if (state.timingMode === 'perimeter') {
+        const avgPerim = Math.max(
+          1,
+          0.5 * (state.trackA.totalPerimeter + state.trackB.totalPerimeter)
+        );
+        const perimFactor = Math.max(0.55, Math.min(1.85, track.totalPerimeter / avgPerim));
+        return baseCycleSec * perimFactor;
+      }
+      return baseCycleSec;
+    }
+
+    function updateProgressBarsUI() {
+      const pctA = Math.min(100, state.trackA.t * 100);
+      const pctB = Math.min(100, state.trackB.t * 100);
+
+      document.getElementById('prog-title-a').textContent = `区域 A (${state.trackA.name}): ${pctA.toFixed(1)}%`;
+      document.getElementById('prog-title-b').textContent = `区域 B (${state.trackB.name}): ${pctB.toFixed(1)}%`;
+      document.getElementById('prog-bar-a').style.width = `${pctA}%`;
+      document.getElementById('prog-bar-b').style.width = `${pctB}%`;
+
+      const statusA = document.getElementById('prog-status-a');
+      const statusB = document.getElementById('prog-status-b');
+      const lockBadge = document.getElementById('sync-lock-badge');
+
+      const bothDone = state.trackA.completed && state.trackB.completed;
+
+      if (state.trackA.completed) {
+        statusA.textContent = bothDone ? '✓ 双图均已完播' : '✓ 已完播 (等待 B...)';
+        statusA.className = 'px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 font-semibold';
+      } else {
+        statusA.textContent = '绘制中...';
+        statusA.className = 'px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-600 dark:text-sky-300';
+      }
+
+      if (state.trackB.completed) {
+        statusB.textContent = bothDone ? '✓ 双图均已完播' : '✓ 已完播 (等待 A...)';
+        statusB.className = 'px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 font-semibold';
+      } else {
+        statusB.textContent = '绘制中...';
+        statusB.className = 'px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-300';
+      }
+
+      if (bothDone) {
+        lockBadge.textContent = '✓ 双图完播达成 · 即将同步切换';
+        lockBadge.className = 'text-[11px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/40';
+      } else if (state.trackA.completed || state.trackB.completed) {
+        lockBadge.textContent = '⏳ 同步屏障锁定中 (等待未完播地图)';
+        lockBadge.className = 'text-[11px] font-mono px-2 py-0.5 rounded bg-sky-500/20 text-sky-600 dark:text-sky-300 border border-sky-500/40';
+      } else {
+        lockBadge.textContent = '双图同步绘制中';
+        lockBadge.className = 'text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30';
+      }
+
+      document.getElementById('cycle-progress-label').textContent =
+        `tA=${state.trackA.t.toFixed(2)} | tB=${state.trackB.t.toFixed(2)}`;
+    }
+
+    function updateCircleQuickButtonsUI() {
+      const activeN = state.numCircles;
+      document.querySelectorAll('.circle-quick-btn').forEach(btn => {
+        const btnVal = parseInt(btn.getAttribute('data-circle-set'), 10);
+        const isActive = btnVal === activeN;
+        btn.className = isActive
+          ? 'circle-quick-btn px-2 py-1 rounded bg-sky-500/20 text-sky-600 dark:text-sky-300 border border-sky-500/50 font-semibold text-[11px] font-mono shadow-sm shadow-sky-500/10 transition'
+          : 'circle-quick-btn px-2 py-1 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/30 hover:bg-sky-500/10 text-[11px] font-mono transition';
+      });
+    }
+
+    function updateReadoutUI() {
+      const errA = computeTrackErrorMetrics(state.trackA, state.numCircles);
+      const errB = computeTrackErrorMetrics(state.trackB, state.numCircles);
+      const activeA = Math.min(state.numCircles, state.trackA.harmonics.length);
+      const activeB = Math.min(state.numCircles, state.trackB.harmonics.length);
+      const shownA = Math.min(activeA, state.maxShownCircles);
+      const shownB = Math.min(activeB, state.maxShownCircles);
+
+      updateAllFormulaStrings();
+      updateCircleQuickButtonsUI();
+
+      document.getElementById('top-bar-circles').textContent = `复数单链: N = ${state.numCircles}`;
+      document.getElementById('top-bar-rms').textContent =
+        `A误差 ${errA.rmsErrorPercent.toFixed(4)}% | B误差 ${errB.rmsErrorPercent.toFixed(4)}%`;
+      document.getElementById('fidelity-badge').textContent =
+        `A:${errA.fidelityPercent.toFixed(2)}% · B:${errB.fidelityPercent.toFixed(2)}%`;
+      document.getElementById('terms-used-readout').textContent =
+        `A计算 ${activeA} (显示${shownA}) · B计算 ${activeB} (显示${shownB})`;
+    }
+
+    // ============================================================================
+    // 5. ASPECT RATIO & 4-ZONE FREE LAYOUT STUDIO
+    // ============================================================================
+    const epicycleCanvas = document.getElementById('epicycle-canvas');
+    const ctx = epicycleCanvas.getContext('2d', { alpha: false });
+    const spectrumCanvas = document.getElementById('spectrum-canvas');
+    const sCtx = spectrumCanvas.getContext('2d');
+    const canvasWrapper = document.getElementById('canvas-wrapper');
+
+    function computeAndApplyAspectRatioResolution() {
+      const tier = VIDEO_QUALITY_TIERS[state.qualityTier] || VIDEO_QUALITY_TIERS[1080];
+      const baseShort = tier.baseShortSide;
+      const wRatio = Math.max(0.1, state.aspectW);
+      const hRatio = Math.max(0.1, state.aspectH);
+      const ratioVal = wRatio / hRatio;
+
+      let wPx, hPx;
+      if (ratioVal <= 1.0) {
+        wPx = baseShort;
+        hPx = Math.round(baseShort / ratioVal);
+      } else {
+        hPx = baseShort;
+        wPx = Math.round(baseShort * ratioVal);
+      }
+      if (wPx % 2 !== 0) wPx += 1;
+      if (hPx % 2 !== 0) hPx += 1;
+
+      state.videoWidth = wPx;
+      state.videoHeight = hPx;
+      state.videoBitrate = tier.bitrate;
+
+      epicycleCanvas.width = state.videoWidth;
+      epicycleCanvas.height = state.videoHeight;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      canvasWrapper.style.aspectRatio = `${wRatio} / ${hRatio}`;
+      if (ratioVal <= 0.65) {
+        canvasWrapper.style.maxWidth = '468px';
+      } else if (ratioVal <= 0.85) {
+        canvasWrapper.style.maxWidth = '540px';
+      } else if (ratioVal <= 1.15) {
+        canvasWrapper.style.maxWidth = '620px';
+      } else {
+        canvasWrapper.style.maxWidth = '860px';
+      }
+
+      const ratioStr = `${wRatio}:${hRatio}`;
+      document.getElementById('res-pill-badge').textContent = `${ratioStr} · ${state.videoWidth}×${state.videoHeight}`;
+      document.getElementById('ratio-dim-readout').textContent = `${ratioStr} (${state.videoWidth}×${state.videoHeight})`;
+    }
+
+    function setAspectRatioPreset(ratioKey, customW = null, customH = null) {
+      state.aspectRatioKey = ratioKey;
+      const customBox = document.getElementById('custom-ratio-box');
+
+      if (ratioKey === 'custom') {
+        customBox.classList.remove('hidden');
+        customBox.classList.add('flex');
+        const cw = parseFloat(customW || document.getElementById('input-ratio-w').value) || 3;
+        const ch = parseFloat(customH || document.getElementById('input-ratio-h').value) || 4;
+        state.aspectW = Math.max(1, Math.min(100, cw));
+        state.aspectH = Math.max(1, Math.min(100, ch));
+      } else {
+        customBox.classList.add('hidden');
+        customBox.classList.remove('flex');
+        const parts = ratioKey.split(':').map(Number);
+        state.aspectW = parts[0] || 3;
+        state.aspectH = parts[1] || 4;
+      }
+
+      document.querySelectorAll('.ratio-preset-btn').forEach(btn => {
+        const key = btn.getAttribute('data-ratio');
+        const isAct = key === ratioKey;
+        btn.className = isAct
+          ? 'ratio-preset-btn py-1.5 px-1 rounded-lg text-[11px] font-mono font-semibold bg-sky-500 text-white shadow-sm shadow-sky-500/20 transition'
+          : 'ratio-preset-btn py-1.5 px-1 rounded-lg text-[11px] font-mono font-medium bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:border-sky-500/40 border border-transparent transition';
+      });
+
+      computeAndApplyAspectRatioResolution();
+      // Always default to horizontal side-by-side layout, scaling smoothly for the active aspect ratio
+      applyLayoutPreset('horizontal');
+      renderEpicycleFrame();
+    }
+
+    function syncZoneSlidersFromState() {
+      const zKey = state.activeZoneTab;
+      const z = state.zones[zKey];
+      if (!z) return;
+
+      document.getElementById('zone-editor-title').textContent = z.label;
+      const sliderX = document.getElementById('slider-zone-x');
+      const sliderY = document.getElementById('slider-zone-y');
+      const sliderScale = document.getElementById('slider-zone-scale');
+      const visWrapper = document.getElementById('zone-visible-wrapper');
+      const chkVis = document.getElementById('chk-zone-visible');
+
+      sliderX.value = (z.x * 100).toFixed(1);
+      sliderY.value = (z.y * 100).toFixed(1);
+      sliderScale.value = Math.round(z.scale * 100);
+
+      document.getElementById('label-zone-x').textContent = `${(z.x * 100).toFixed(1)}%`;
+      document.getElementById('label-zone-y').textContent = `${(z.y * 100).toFixed(1)}%`;
+      document.getElementById('label-zone-scale').textContent = `${Math.round(z.scale * 100)}%`;
+
+      if (zKey === 'animA' || zKey === 'animB') {
+        visWrapper.classList.add('hidden');
+        visWrapper.classList.remove('flex');
+      } else {
+        visWrapper.classList.remove('hidden');
+        visWrapper.classList.add('flex');
+        chkVis.checked = z.visible !== false;
+      }
+
+      document.querySelectorAll('.zone-tab-btn').forEach(btn => {
+        const tab = btn.getAttribute('data-zone-tab');
+        const isAct = tab === zKey;
+        btn.className = isAct
+          ? 'zone-tab-btn py-1.5 px-1 rounded-lg font-semibold bg-violet-500 text-white shadow-sm transition truncate'
+          : 'zone-tab-btn py-1.5 px-1 rounded-lg font-medium text-slate-600 dark:text-slate-300 hover:text-violet-500 transition truncate';
+      });
+    }
+
+    // Delete or Restore a Movable Text Annotation Box (noteA or noteB)
+    function setNoteBoxDeleted(zoneKey, isDeleted) {
+      const z = state.zones[zoneKey];
+      if (!z) return;
+      z.visible = !isDeleted;
+
+      if (state.editingNoteKey === zoneKey && isDeleted) {
+        closeInlineNoteEditor();
+      }
+
+      const suffix = zoneKey === 'noteA' ? 'a' : 'b';
+      const activePanel = document.getElementById(`note-${suffix}-active-panel`);
+      const deletedPanel = document.getElementById(`note-${suffix}-deleted-panel`);
+      if (activePanel && deletedPanel) {
+        if (isDeleted) {
+          activePanel.classList.add('hidden');
+          activePanel.classList.remove('flex');
+          deletedPanel.classList.remove('hidden');
+          deletedPanel.classList.add('flex');
+        } else {
+          activePanel.classList.remove('hidden');
+          activePanel.classList.add('flex');
+          deletedPanel.classList.add('hidden');
+          deletedPanel.classList.remove('flex');
+        }
+      }
+
+      if (state.activeZoneTab === zoneKey) {
+        const chkVis = document.getElementById('chk-zone-visible');
+        if (chkVis) chkVis.checked = !isDeleted;
+      }
+
+      const labelName = zoneKey === 'noteA' ? '标注框 1' : '标注框 2';
+      setStatusMessage(
+        isDeleted
+          ? `🗑️ 已删除「${labelName}」（可随时在左侧点击“＋ 恢复${labelName}”重新添加）`
+          : `📌 已恢复显示「${labelName}」`
+      );
+      renderEpicycleFrame();
+    }
+
+    function applyLayoutPreset(presetName) {
+      const ratioVal = state.aspectW / state.aspectH;
+      const keepNoteAVis = state.zones.noteA ? state.zones.noteA.visible : true;
+      const keepNoteBVis = state.zones.noteB ? state.zones.noteB.visible : true;
+
+      if (presetName === 'horizontal') {
+        // Adapt scale based on whether canvas is portrait (3:4, 9:16) or landscape (4:3, 16:9)
+        const sideScale = ratioVal > 1.05 ? 1.05 : 0.78;
+        state.zones.formula = { ...DEFAULT_HORIZONTAL_ZONES.formula, x: 0.50, y: 0.130, scale: 1.0, visible: true };
+        state.zones.animA   = { ...DEFAULT_HORIZONTAL_ZONES.animA,   x: 0.26, y: 0.540, scale: sideScale, visible: true };
+        state.zones.animB   = { ...DEFAULT_HORIZONTAL_ZONES.animB,   x: 0.74, y: 0.540, scale: sideScale, visible: true };
+        state.zones.noteA   = { ...DEFAULT_HORIZONTAL_ZONES.noteA,   x: 0.26, y: 0.275, scale: 1.0, visible: keepNoteAVis };
+        state.zones.noteB   = { ...DEFAULT_HORIZONTAL_ZONES.noteB,   x: 0.74, y: 0.275, scale: 1.0, visible: keepNoteBVis };
+        state.zones.text    = { ...DEFAULT_HORIZONTAL_ZONES.text,    x: 0.50, y: 0.890, scale: 1.0, visible: true };
+      } else if (presetName === 'vertical') {
+        state.zones.formula = { ...DEFAULT_HORIZONTAL_ZONES.formula, x: 0.50, y: 0.115, scale: 1.0, visible: true };
+        state.zones.animA   = { ...DEFAULT_HORIZONTAL_ZONES.animA,   x: 0.50, y: 0.380, scale: 0.90, visible: true };
+        state.zones.animB   = { ...DEFAULT_HORIZONTAL_ZONES.animB,   x: 0.50, y: 0.670, scale: 0.90, visible: true };
+        state.zones.noteA   = { ...DEFAULT_HORIZONTAL_ZONES.noteA,   x: 0.25, y: 0.245, scale: 1.0, visible: keepNoteAVis };
+        state.zones.noteB   = { ...DEFAULT_HORIZONTAL_ZONES.noteB,   x: 0.25, y: 0.535, scale: 1.0, visible: keepNoteBVis };
+        state.zones.text    = { ...DEFAULT_HORIZONTAL_ZONES.text,    x: 0.50, y: 0.905, scale: 1.0, visible: true };
+      } else if (presetName === 'diagonal') {
+        state.zones.formula = { ...DEFAULT_HORIZONTAL_ZONES.formula, x: 0.50, y: 0.120, scale: 0.95, visible: true };
+        state.zones.animA   = { ...DEFAULT_HORIZONTAL_ZONES.animA,   x: 0.30, y: 0.400, scale: 0.82, visible: true };
+        state.zones.animB   = { ...DEFAULT_HORIZONTAL_ZONES.animB,   x: 0.70, y: 0.640, scale: 0.82, visible: true };
+        state.zones.noteA   = { ...DEFAULT_HORIZONTAL_ZONES.noteA,   x: 0.72, y: 0.310, scale: 1.0, visible: keepNoteAVis };
+        state.zones.noteB   = { ...DEFAULT_HORIZONTAL_ZONES.noteB,   x: 0.28, y: 0.710, scale: 1.0, visible: keepNoteBVis };
+        state.zones.text    = { ...DEFAULT_HORIZONTAL_ZONES.text,    x: 0.50, y: 0.895, scale: 0.96, visible: true };
+      }
+
+      syncZoneSlidersFromState();
+      renderEpicycleFrame();
+    }
+
+    // ============================================================================
+    // 6. DUAL SPECTRUM CHART & DUAL EPICYCLE STAGE RENDERER
+    // ============================================================================
+    function drawDualSpectrumChart() {
+      const dpr = window.devicePixelRatio || 1;
+      const W = spectrumCanvas.width;
+      const H = spectrumCanvas.height;
+      sCtx.clearRect(0, 0, W, H);
+
+      const isDark = document.documentElement.classList.contains('dark');
+      const padBottom = 18 * dpr;
+      const padTop = 8 * dpr;
+      const plotH = H - padBottom - padTop;
+
+      const itemsA = state.trackA.harmonicsByFreq;
+      const itemsB = state.trackB.harmonicsByFreq;
+      if (!itemsA || itemsA.length === 0 || !itemsB || itemsB.length === 0) return;
+
+      const activeCountA = Math.min(state.numCircles, state.trackA.harmonics.length);
+      const minActiveAmpA = activeCountA > 0 ? state.trackA.harmonics[activeCountA - 1].amp : Infinity;
+
+      const activeCountB = Math.min(state.numCircles, state.trackB.harmonics.length);
+      const minActiveAmpB = activeCountB > 0 ? state.trackB.harmonics[activeCountB - 1].amp : Infinity;
+
+      const halfWindow = Math.min(80, Math.floor(itemsA.length / 2));
+      const centerIdx = itemsA.findIndex(it => it.freq === 0);
+      if (centerIdx === -1) return;
+
+      const startIdx = Math.max(0, centerIdx - halfWindow);
+      const endIdx = Math.min(itemsA.length - 1, centerIdx + halfWindow);
+      const count = endIdx - startIdx + 1;
+
+      let maxAmp = 1e-6;
+      for (let i = startIdx; i <= endIdx; i++) {
+        if (itemsA[i] && itemsA[i].freq !== 0 && itemsA[i].amp > maxAmp) maxAmp = itemsA[i].amp;
+        if (itemsB[i] && itemsB[i].freq !== 0 && itemsB[i].amp > maxAmp) maxAmp = itemsB[i].amp;
+      }
+
+      const groupStep = W / count;
+      const subBarW = Math.max(1.0 * dpr, groupStep * 0.42);
+
+      const zeroX = (centerIdx - startIdx + 0.5) * groupStep;
+      sCtx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.2)' : 'rgba(100, 116, 139, 0.25)';
+      sCtx.lineWidth = 1 * dpr;
+      sCtx.beginPath();
+      sCtx.moveTo(zeroX, 0);
+      sCtx.lineTo(zeroX, H - padBottom);
+      sCtx.stroke();
+
+      for (let i = startIdx; i <= endIdx; i++) {
+        const itA = itemsA[i];
+        const itB = itemsB[i];
+        if (!itA || itA.freq === 0) continue;
+
+        const baseX = (i - startIdx + 0.1) * groupStep;
+
+        // Bar A (Sky Blue)
+        const normHA = state.spectrumLogScale
+          ? Math.log10(1 + (itA.amp / maxAmp) * 999) / 3
+          : itA.amp / maxAmp;
+        const bhA = Math.max(1.5 * dpr, normHA * plotH);
+        const isActA = itA.amp >= minActiveAmpA && activeCountA > 0;
+        sCtx.fillStyle = isActA
+          ? (isDark ? '#38bdf8' : '#0284c7')
+          : (isDark ? 'rgba(56, 189, 248, 0.18)' : 'rgba(2, 132, 199, 0.22)');
+        sCtx.fillRect(baseX, H - padBottom - bhA, subBarW, bhA);
+
+        // Bar B (Emerald Green)
+        if (itB) {
+          const normHB = state.spectrumLogScale
+            ? Math.log10(1 + (itB.amp / maxAmp) * 999) / 3
+          : itB.amp / maxAmp;
+          const bhB = Math.max(1.5 * dpr, normHB * plotH);
+          const isActB = itB.amp >= minActiveAmpB && activeCountB > 0;
+          sCtx.fillStyle = isActB
+            ? (isDark ? '#34d399' : '#059669')
+            : (isDark ? 'rgba(52, 211, 153, 0.18)' : 'rgba(5, 150, 105, 0.22)');
+          sCtx.fillRect(baseX + subBarW, H - padBottom - bhB, subBarW, bhB);
+        }
+      }
+
+      sCtx.fillStyle = isDark ? '#94a3b8' : '#475569';
+      sCtx.font = `${10 * dpr}px "JetBrains Mono", monospace`;
+      sCtx.textAlign = 'left';
+      sCtx.fillText(`k = -${halfWindow} (顺时针)`, 8 * dpr, H - 4 * dpr);
+      sCtx.textAlign = 'center';
+      sCtx.fillText('■ 区域 A |ck| (天蓝)   ■ 区域 B |ck| (翡翠绿)', W / 2, H - 4 * dpr);
+      sCtx.textAlign = 'right';
+      sCtx.fillText(`k = +${halfWindow} (逆时针)`, W - 8 * dpr, H - 4 * dpr);
+    }
+
+    function getStageThemePalette() {
+      const isDark = document.documentElement.classList.contains('dark');
+      if (isDark) {
+        return {
+          isDark: true,
+          bgBase: '#05070b',
+          bgGlowA: 'rgba(14, 116, 144, 0.22)',
+          bgGlowB: 'rgba(6, 95, 70, 0.20)',
+          frameBg: 'rgba(13, 19, 31, 0.42)',
+          frameBorderA: 'rgba(56, 189, 248, 0.28)',
+          frameBorderB: 'rgba(52, 211, 153, 0.28)',
+          ghostPath: 'rgba(148, 163, 184, 0.22)',
+          circleA: 'rgba(56, 189, 248, 0.34)',
+          radiiA: 'rgba(186, 230, 253, 0.58)',
+          trailGlowA: 'rgba(56, 189, 248, 0.30)',
+          trailCoreA: '#38bdf8',
+          circleB: 'rgba(52, 211, 153, 0.34)',
+          radiiB: 'rgba(167, 243, 208, 0.58)',
+          trailGlowB: 'rgba(52, 211, 153, 0.30)',
+          trailCoreB: '#34d399',
+          penCore: '#ffffff',
+          hudBg: 'rgba(10, 15, 26, 0.86)',
+          hudBorder: 'rgba(56, 189, 248, 0.32)',
+          hudHeader: '#94a3b8',
+          textA: '#38bdf8',
+          textB: '#34d399',
+          textTitle: '#f1f5f9',
+          textSub: '#7dd3fc'
+        };
+      }
+      return {
+        isDark: false,
+        bgBase: '#f8fafc',
+        bgGlowA: 'rgba(186, 230, 253, 0.55)',
+        bgGlowB: 'rgba(167, 243, 208, 0.50)',
+        frameBg: 'rgba(255, 255, 255, 0.65)',
+        frameBorderA: 'rgba(2, 132, 199, 0.32)',
+        frameBorderB: 'rgba(5, 150, 105, 0.32)',
+        ghostPath: 'rgba(100, 116, 139, 0.28)',
+        circleA: 'rgba(2, 132, 199, 0.35)',
+        radiiA: 'rgba(3, 105, 161, 0.62)',
+        trailGlowA: 'rgba(2, 132, 199, 0.20)',
+        trailCoreA: '#0284c7',
+        circleB: 'rgba(5, 150, 105, 0.35)',
+        radiiB: 'rgba(4, 120, 87, 0.62)',
+        trailGlowB: 'rgba(5, 150, 105, 0.20)',
+        trailCoreB: '#059669',
+        penCore: '#0f172a',
+        hudBg: 'rgba(255, 255, 255, 0.92)',
+        hudBorder: 'rgba(2, 132, 199, 0.35)',
+        hudHeader: '#475569',
+        textA: '#0284c7',
+        textB: '#059669',
+        textTitle: '#0f172a',
+        textSub: '#0284c7'
+      };
+    }
+
+    function drawZoneHoverHighlight(zoneKey, boxX, boxY, boxW, boxH, vScale, labelText) {
+      if (!state.allowDirectZoneDrag) return;
+      const isHovered = state.hoveredZone === zoneKey;
+      const isDragging = state.draggingZone === zoneKey;
+      if (!isHovered && !isDragging) return;
+
+      ctx.save();
+      ctx.strokeStyle = isDragging ? '#8b5cf6' : 'rgba(139, 92, 246, 0.85)';
+      ctx.lineWidth = (isDragging ? 2.2 : 1.5) * vScale;
+      ctx.setLineDash([5 * vScale, 4 * vScale]);
+      const pad = 4 * vScale;
+      ctx.strokeRect(boxX - pad, boxY - pad, boxW + pad * 2, boxH + pad * 2);
+      ctx.setLineDash([]);
+
+      const tagFont = Math.round(10 * vScale);
+      ctx.font = `600 ${tagFont}px Inter, system-ui, sans-serif`;
+      const tagStr = isDragging ? `✥ 正在移动: ${labelText}` : `✥ 拖拽移动: ${labelText}`;
+      const tagW = ctx.measureText(tagStr).width + 12 * vScale;
+      const tagH = 18 * vScale;
+      const tagX = boxX + boxW - tagW;
+      const tagY = Math.max(4 * vScale, boxY - tagH - 6 * vScale);
+
+      ctx.fillStyle = '#7c3aed';
+      ctx.beginPath();
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(tagX, tagY, tagW, tagH, 5 * vScale);
+      } else {
+        ctx.rect(tagX, tagY, tagW, tagH);
+      }
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(tagStr, tagX + tagW / 2, tagY + tagH / 2);
+      ctx.restore();
+    }
+
+    /**
+     * Renders a single Complex Single-Chain Epicycle Track inside its designated zone
+     */
+    function renderSingleComplexTrackZone(track, zoneKey, W, H, minDim, vScale, palette) {
+      if (!track || track.harmonics.length === 0) return;
+
+      const z = state.zones[zoneKey];
+      const centerX = W * z.x;
+      const centerY = H * z.y;
+      const baseRadiusPx = minDim * 0.215 * z.scale;
+
+      // Record hit-test bounding box for direct canvas dragging
+      const boxHalfW = baseRadiusPx * 1.38;
+      const boxHalfH = baseRadiusPx * 1.28;
+      const boxX = centerX - boxHalfW;
+      const boxY = centerY - boxHalfH;
+      const boxW = boxHalfW * 2;
+      const boxH = boxHalfH * 2;
+      state.zoneBounds[zoneKey] = { x: boxX, y: boxY, w: boxW, h: boxH };
+
+      const isTrackA = track.id === 'A';
+      const circleColor = isTrackA ? palette.circleA : palette.circleB;
+      const radiiColor = isTrackA ? palette.radiiA : palette.radiiB;
+      const trailGlowColor = isTrackA ? palette.trailGlowA : palette.trailGlowB;
+      const trailCoreColor = isTrackA ? palette.trailCoreA : palette.trailCoreB;
+      const borderColor = isTrackA ? palette.frameBorderA : palette.frameBorderB;
+      const accentText = isTrackA ? palette.textA : palette.textB;
+
+      // Optional Subtle Region Frame & Header Badge
+      if (state.showZoneFrames) {
+        ctx.save();
+        ctx.fillStyle = palette.frameBg;
+        ctx.strokeStyle = borderColor;
+        ctx.lineWidth = 1.15 * vScale;
+        ctx.beginPath();
+        if (typeof ctx.roundRect === 'function') {
+          ctx.roundRect(boxX, boxY, boxW, boxH, 14 * vScale);
+        } else {
+          ctx.rect(boxX, boxY, boxW, boxH);
+        }
+        ctx.fill();
+        ctx.stroke();
+
+        // Top-left Map Title & Top-right Completion Status Badge
+        const labelFont = Math.max(9, Math.round(11 * vScale * Math.min(1.2, z.scale)));
+        ctx.font = `600 ${labelFont}px Inter, "JetBrains Mono", sans-serif`;
+        ctx.fillStyle = accentText;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText(`区域 ${track.id} · ${track.name}`, boxX + 12 * vScale, boxY + 9 * vScale);
+
+        const pct = Math.min(100, track.t * 100).toFixed(0);
+        const bothDone = state.trackA.completed && state.trackB.completed;
+        const statusStr = track.completed
+          ? (bothDone ? `100% ✓ 双图完播` : `100% ✓ 等待对侧`)
+          : `绘制中 ${pct}%`;
+
+        ctx.font = `500 ${Math.max(8, Math.round(10 * vScale * Math.min(1.2, z.scale)))}px "JetBrains Mono", monospace`;
+        ctx.textAlign = 'right';
+        ctx.fillStyle = track.completed ? '#10b981' : palette.hudHeader;
+        ctx.fillText(statusStr, boxX + boxW - 12 * vScale, boxY + 10 * vScale);
+        ctx.restore();
+      }
+
+      // Compute Complex Epicycle Chain at track.t
+      const twoPiT = 2 * Math.PI * track.t;
+      const activeLimit = Math.min(state.numCircles, track.harmonics.length);
+      const shownLimit = Math.min(activeLimit, state.maxShownCircles);
+
+      let curX = track.dcTerm.re;
+      let curY = track.dcTerm.im;
+      const chainCenters = new Array(shownLimit);
+
+      for (let i = 0; i < activeLimit; i++) {
+        const h = track.harmonics[i];
+        const angle = h.freq * twoPiT + h.phase;
+        const nextX = curX + h.amp * Math.cos(angle);
+        const nextY = curY + h.amp * Math.sin(angle);
+        if (i < shownLimit) {
+          chainCenters[i] = { cx: curX, cy: curY, nx: nextX, ny: nextY, r: h.amp };
+        }
+        curX = nextX;
+        curY = nextY;
+      }
+
+      const tipX = curX;
+      const tipY = curY;
+      track.lastPenTip = { x: tipX, y: tipY };
+
+      ctx.save();
+      ctx.translate(centerX, centerY);
+      ctx.scale(baseRadiusPx, baseRadiusPx);
+      const invScale = 1 / baseRadiusPx;
+
+      // 1. Optional Ghost Original Contour
+      if (state.showOriginal && track.sampledPoints.length > 1) {
+        ctx.strokeStyle = palette.ghostPath;
+        ctx.lineWidth = 1.25 * vScale * invScale;
+        ctx.beginPath();
+        for (let i = 0; i < track.sampledPoints.length; i++) {
+          const p = track.sampledPoints[i];
+          if (i === 0) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+      }
+
+      // 2. Complex Epicycle Circles
+      if (state.showCircles) {
+        ctx.strokeStyle = circleColor;
+        ctx.lineWidth = 1.1 * vScale * invScale;
+        for (let i = 0; i < shownLimit; i++) {
+          const c = chainCenters[i];
+          ctx.beginPath();
+          ctx.arc(c.cx, c.cy, c.r, 0, 2 * Math.PI);
+          ctx.stroke();
+        }
+      }
+
+      // 3. Rotating Radius Vectors
+      if (state.showRadii && shownLimit > 0) {
+        ctx.strokeStyle = radiiColor;
+        ctx.lineWidth = 1.2 * vScale * invScale;
+        ctx.beginPath();
+        ctx.moveTo(chainCenters[0].cx, chainCenters[0].cy);
+        for (let i = 0; i < shownLimit; i++) {
+          ctx.lineTo(chainCenters[i].nx, chainCenters[i].ny);
+        }
+        if (activeLimit > shownLimit) {
+          ctx.lineTo(tipX, tipY);
+        }
+        ctx.stroke();
+      }
+
+      // 4. Drawn Map Contour Trail
+      if (track.trail.length > 1) {
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        ctx.beginPath();
+        for (let i = 0; i < track.trail.length; i++) {
+          const pt = track.trail[i];
+          if (i === 0) ctx.moveTo(pt.x, pt.y);
+          else ctx.lineTo(pt.x, pt.y);
+        }
+
+        ctx.strokeStyle = trailGlowColor;
+        ctx.lineWidth = 4.8 * vScale * invScale;
+        ctx.stroke();
+
+        ctx.strokeStyle = trailCoreColor;
+        ctx.lineWidth = 2.3 * vScale * invScale;
+        ctx.stroke();
+      }
+
+      // 5. Pen Tip Dot
+      const shrink = 1 / (1 + 0.18 * Math.log2(Math.max(1, state.numCircles)));
+      const lastR = shownLimit > 0 ? chainCenters[shownLimit - 1].r : 0;
+      const tipCoreR = Math.min(
+        1.8 * vScale * invScale * shrink,
+        Math.max(0.55 * vScale * invScale, lastR * 0.45)
+      );
+      const tipHaloR = tipCoreR * 1.85;
+
+      ctx.fillStyle = trailGlowColor;
+      ctx.beginPath();
+      ctx.arc(tipX, tipY, tipHaloR, 0, 2 * Math.PI);
+      ctx.fill();
+
+      ctx.fillStyle = palette.penCore;
+      ctx.beginPath();
+      ctx.arc(tipX, tipY, tipCoreR, 0, 2 * Math.PI);
+      ctx.fill();
+
+      ctx.restore();
+
+      drawZoneHoverHighlight(zoneKey, boxX, boxY, boxW, boxH, vScale, `动画演示区 ${track.id}`);
+    }
+
+    /**
+     * Renders a Movable & Deletable Custom Text Annotation Box (noteA or noteB)
+     * Includes an on-canvas clickable red '×' delete badge when hovered or selected.
+     */
+    function renderCustomAnnotationZone(zoneKey, W, H, vScale, palette) {
+      const z = state.zones[zoneKey];
+      const ann = state.annotations[zoneKey];
+      state.noteDeleteHitBounds[zoneKey] = null;
+      if (!z || !ann || z.visible === false) return;
+
+      const rawText = (ann.text || '').trim();
+      const lines = rawText ? rawText.split(/\r?\n/) : [`[${ann.title} · 双击改字或点×删除]`];
+      const nScale = z.scale * vScale;
+      const centerX = W * z.x;
+      const centerY = H * z.y;
+
+      const colorMap = {
+        sky: {
+          text: palette.isDark ? '#38bdf8' : '#0284c7',
+          border: palette.isDark ? 'rgba(56, 189, 248, 0.55)' : 'rgba(2, 132, 199, 0.48)',
+          bg: palette.isDark ? 'rgba(10, 18, 32, 0.88)' : 'rgba(240, 249, 255, 0.94)'
+        },
+        emerald: {
+          text: palette.isDark ? '#34d399' : '#059669',
+          border: palette.isDark ? 'rgba(52, 211, 153, 0.55)' : 'rgba(5, 150, 105, 0.48)',
+          bg: palette.isDark ? 'rgba(8, 24, 21, 0.88)' : 'rgba(236, 253, 245, 0.94)'
+        },
+        amber: {
+          text: palette.isDark ? '#fbbf24' : '#d97706',
+          border: palette.isDark ? 'rgba(251, 191, 36, 0.55)' : 'rgba(217, 119, 6, 0.48)',
+          bg: palette.isDark ? 'rgba(28, 20, 8, 0.88)' : 'rgba(255, 251, 235, 0.94)'
+        },
+        rose: {
+          text: palette.isDark ? '#fb7185' : '#e11d48',
+          border: palette.isDark ? 'rgba(251, 113, 133, 0.55)' : 'rgba(225, 29, 72, 0.48)',
+          bg: palette.isDark ? 'rgba(28, 12, 18, 0.88)' : 'rgba(255, 241, 242, 0.94)'
+        },
+        violet: {
+          text: palette.isDark ? '#c084fc' : '#7c3aed',
+          border: palette.isDark ? 'rgba(192, 132, 252, 0.55)' : 'rgba(124, 58, 237, 0.48)',
+          bg: palette.isDark ? 'rgba(21, 13, 34, 0.88)' : 'rgba(245, 243, 255, 0.94)'
+        },
+        neutral: {
+          text: palette.isDark ? '#f8fafc' : '#0f172a',
+          border: palette.isDark ? 'rgba(148, 163, 184, 0.45)' : 'rgba(100, 116, 139, 0.42)',
+          bg: palette.isDark ? 'rgba(15, 23, 42, 0.88)' : 'rgba(255, 255, 255, 0.94)'
+        }
+      };
+
+      const styleTheme = colorMap[ann.color] || colorMap.sky;
+
+      ctx.save();
+      const fontPx = Math.max(9, Math.round(14.5 * nScale));
+      ctx.font = `600 ${fontPx}px Inter, "JetBrains Mono", system-ui, sans-serif`;
+
+      let maxW = 0;
+      for (let i = 0; i < lines.length; i++) {
+        const w = ctx.measureText(lines[i]).width;
+        if (w > maxW) maxW = w;
+      }
+
+      const padX = 14 * nScale;
+      const padY = 9 * nScale;
+      const lineGap = Math.round(fontPx * 1.38);
+      const boxW = maxW + padX * 2;
+      const boxH = padY * 2 + (lines.length - 1) * lineGap + fontPx;
+      const boxX = centerX - boxW / 2;
+      const boxY = centerY - boxH / 2;
+
+      state.zoneBounds[zoneKey] = { x: boxX, y: boxY, w: boxW, h: boxH };
+
+      if (ann.showBg) {
+        ctx.fillStyle = styleTheme.bg;
+        ctx.strokeStyle = styleTheme.border;
+        ctx.lineWidth = 1.35 * vScale;
+        ctx.beginPath();
+        if (typeof ctx.roundRect === 'function') {
+          ctx.roundRect(boxX, boxY, boxW, boxH, 10 * nScale);
+        } else {
+          ctx.rect(boxX, boxY, boxW, boxH);
+        }
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = styleTheme.text;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const firstLineY = boxY + padY + fontPx * 0.5;
+      for (let i = 0; i < lines.length; i++) {
+        ctx.fillText(lines[i], centerX, firstLineY + i * lineGap);
+      }
+      ctx.restore();
+
+      drawZoneHoverHighlight(zoneKey, boxX, boxY, boxW, boxH, vScale, `${ann.title} (双击改字)`);
+
+      // Draw On-Canvas Clickable '×' Delete Badge on Top-Left Corner when Hovered or Active
+      if (state.allowDirectZoneDrag && !state.isRecording) {
+        const showDeleteBadge =
+          state.hoveredZone === zoneKey ||
+          state.draggingZone === zoneKey ||
+          state.hoveredDeleteNote === zoneKey;
+
+        const delR = Math.max(9 * vScale, 10.5 * vScale);
+        const delCX = boxX - 2 * vScale;
+        const delCY = boxY - 2 * vScale;
+        state.noteDeleteHitBounds[zoneKey] = { cx: delCX, cy: delCY, r: delR * 1.35 };
+
+        if (showDeleteBadge) {
+          const isHoveringBtn = state.hoveredDeleteNote === zoneKey;
+          ctx.save();
+          ctx.fillStyle = isHoveringBtn ? '#e11d48' : '#f43f5e';
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.6 * vScale;
+          ctx.beginPath();
+          ctx.arc(delCX, delCY, isHoveringBtn ? delR * 1.12 : delR, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = '#ffffff';
+          ctx.font = `700 ${Math.round(12 * vScale)}px Inter, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('×', delCX, delCY + 0.5 * vScale);
+          ctx.restore();
+        }
+      }
+    }
+
+    function renderEpicycleFrame() {
+      const W = epicycleCanvas.width;
+      const H = epicycleCanvas.height;
+      const minDim = Math.min(W, H);
+      const vScale = minDim / 540;
+      const palette = getStageThemePalette();
+
+      ctx.fillStyle = palette.bgBase;
+      ctx.fillRect(0, 0, W, H);
+
+      // Ambient Glows under Region A and Region B (Only in Dark Mode)
+      if (palette.isDark) {
+        const gradA = ctx.createRadialGradient(
+          W * state.zones.animA.x, H * state.zones.animA.y, minDim * 0.02,
+          W * state.zones.animA.x, H * state.zones.animA.y, minDim * 0.42
+        );
+        gradA.addColorStop(0, palette.bgGlowA);
+        gradA.addColorStop(1, 'rgba(5, 7, 11, 0)');
+        ctx.fillStyle = gradA;
+        ctx.fillRect(0, 0, W, H);
+
+        const gradB = ctx.createRadialGradient(
+          W * state.zones.animB.x, H * state.zones.animB.y, minDim * 0.02,
+          W * state.zones.animB.x, H * state.zones.animB.y, minDim * 0.42
+        );
+        gradB.addColorStop(0, palette.bgGlowB);
+        gradB.addColorStop(1, 'rgba(5, 7, 11, 0)');
+        ctx.fillStyle = gradB;
+        ctx.fillRect(0, 0, W, H);
+      }
+
+      state.zoneBounds.formula = null;
+      state.zoneBounds.animA = null;
+      state.zoneBounds.animB = null;
+      state.zoneBounds.noteA = null;
+      state.zoneBounds.noteB = null;
+      state.zoneBounds.text = null;
+
+      // Render Both Complex Single-Chain Animation Regions
+      renderSingleComplexTrackZone(state.trackA, 'animA', W, H, minDim, vScale, palette);
+      renderSingleComplexTrackZone(state.trackB, 'animB', W, H, minDim, vScale, palette);
+
+      // Render Movable & Deletable Custom Text Annotation Boxes
+      renderCustomAnnotationZone('noteA', W, H, vScale, palette);
+      renderCustomAnnotationZone('noteB', W, H, vScale, palette);
+
+      // Render Top Formula Zone & Bottom Caption Zone
+      if (state.showVideoHud) {
+        const errA = computeTrackErrorMetrics(state.trackA, state.numCircles);
+        const errB = computeTrackErrorMetrics(state.trackB, state.numCircles);
+
+        // --- Formula Zone (4 Structured Lines for Dual Complex Mode) ---
+        if (state.zones.formula.visible !== false) {
+          const fZone = state.zones.formula;
+          const fScale = fZone.scale * vScale;
+
+          const tipA = state.trackA.lastPenTip;
+          const tipB = state.trackB.lastPenTip;
+          const line1 = `实时复平面笔尖  zA=(${tipA.x.toFixed(2)}, ${(-tipA.y).toFixed(2)}i)  |  zB=(${tipB.x.toFixed(2)}, ${(-tipB.y).toFixed(2)}i)`;
+          const line2 = `复数单链通项: z_N(t) = ∑ c_k · e^(2πikt)   (k ∈ [-N/2, +N/2])`;
+          const line3 = `区域A展开: ${state.trackA.generalFormula}`;
+          const line4 = `区域B展开: ${state.trackB.generalFormula}`;
+
+          const allLines = [line1, line2, line3, line4];
+
+          ctx.save();
+          let formulaFontPx = Math.round(11.2 * fScale);
+          ctx.font = `500 ${formulaFontPx}px "JetBrains Mono", monospace`;
+
+          let maxLineWidth = 0;
+          for (let i = 0; i < allLines.length; i++) {
+            const w = ctx.measureText(allLines[i]).width;
+            if (w > maxLineWidth) maxLineWidth = w;
+          }
+
+          const maxAllowedW = W * 0.92;
+          if (maxLineWidth > maxAllowedW && maxLineWidth > 0) {
+            formulaFontPx = Math.max(Math.round(7.2 * vScale), Math.floor(formulaFontPx * (maxAllowedW / maxLineWidth)));
+            ctx.font = `500 ${formulaFontPx}px "JetBrains Mono", monospace`;
+            maxLineWidth = 0;
+            for (let i = 0; i < allLines.length; i++) {
+              const w = ctx.measureText(allLines[i]).width;
+              if (w > maxLineWidth) maxLineWidth = w;
+            }
+          }
+
+          const boxPadX = 15 * fScale;
+          const boxPadY = 11 * fScale;
+          const lineGap = Math.round(formulaFontPx * 1.45);
+          const contentW = Math.min(W * 0.95, maxLineWidth + boxPadX * 2);
+          const boxH = boxPadY * 2 + lineGap * 3 + formulaFontPx;
+          const boxX = W * fZone.x - contentW / 2;
+          const boxY = H * fZone.y - boxH / 2;
+
+          state.zoneBounds.formula = { x: boxX, y: boxY, w: contentW, h: boxH };
+
+          ctx.fillStyle = palette.hudBg;
+          ctx.strokeStyle = palette.hudBorder;
+          ctx.lineWidth = 1.2 * vScale;
+          ctx.beginPath();
+          if (typeof ctx.roundRect === 'function') {
+            ctx.roundRect(boxX, boxY, contentW, boxH, 12 * fScale);
+          } else {
+            ctx.rect(boxX, boxY, contentW, boxH);
+          }
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          const firstRowY = boxY + boxPadY + formulaFontPx * 0.5;
+
+          ctx.fillStyle = palette.hudHeader;
+          ctx.font = `600 ${formulaFontPx}px Inter, "JetBrains Mono", sans-serif`;
+          ctx.fillText(line1, W * fZone.x, firstRowY);
+
+          ctx.fillStyle = palette.textTitle;
+          ctx.font = `600 ${formulaFontPx}px "JetBrains Mono", monospace`;
+          ctx.fillText(line2, W * fZone.x, firstRowY + lineGap);
+
+          ctx.fillStyle = palette.textA;
+          ctx.font = `500 ${formulaFontPx}px "JetBrains Mono", monospace`;
+          ctx.fillText(line3, W * fZone.x, firstRowY + lineGap * 2);
+
+          ctx.fillStyle = palette.textB;
+          ctx.font = `500 ${formulaFontPx}px "JetBrains Mono", monospace`;
+          ctx.fillText(line4, W * fZone.x, firstRowY + lineGap * 3);
+
+          ctx.restore();
+          drawZoneHoverHighlight('formula', boxX, boxY, contentW, boxH, vScale, '公式区');
+        }
+
+        // --- Bottom Caption & RMS Readout Zone ---
+        if (state.zones.text.visible !== false) {
+          const tZone = state.zones.text;
+          const tScale = tZone.scale * vScale;
+          const centerX = W * tZone.x;
+          const centerY = H * tZone.y;
+
+          ctx.save();
+          ctx.textAlign = 'center';
+
+          const mainText = `复数单链本轮数量 : N = ${state.numCircles}`;
+          const rmsText = `A (${state.trackA.name}) 误差: ${errA.rmsErrorPercent.toFixed(4)}%   |   B (${state.trackB.name}) 误差: ${errB.rmsErrorPercent.toFixed(4)}%`;
+
+          const fontTitle = Math.round(22 * tScale);
+          const fontSub = Math.round(13.5 * tScale);
+
+          const y1 = centerY - 9 * tScale;
+          const y2 = centerY + 18 * tScale;
+
+          ctx.fillStyle = palette.textTitle;
+          ctx.font = `700 ${fontTitle}px Inter, system-ui, sans-serif`;
+          const w1 = ctx.measureText(mainText).width;
+          ctx.fillText(mainText, centerX, y1);
+
+          ctx.fillStyle = palette.textSub;
+          ctx.font = `500 ${fontSub}px "JetBrains Mono", Inter, sans-serif`;
+          const w2 = ctx.measureText(rmsText).width;
+          ctx.fillText(rmsText, centerX, y2);
+
+          const textW = Math.max(w1, w2) + 28 * tScale;
+          const textH = 58 * tScale;
+          const textBoxX = centerX - textW / 2;
+          const textBoxY = centerY - 34 * tScale;
+
+          state.zoneBounds.text = { x: textBoxX, y: textBoxY, w: textW, h: textH };
+          ctx.restore();
+
+          drawZoneHoverHighlight('text', textBoxX, textBoxY, textW, textH, vScale, '底部标题区');
+        }
+      }
+    }
+
+    // ============================================================================
+    // 7. MAIN ANIMATION LOOP WITH DUAL-COMPLETION BARRIER LOGIC
+    // ============================================================================
+    function getValidAutoSteps() {
+      const maxTerms = getMaxSelectableCircles();
+      const valid = VIDEO_AUTO_STEPS.filter(n => n <= maxTerms);
+      return valid.length > 0 ? valid : [maxTerms];
+    }
+
+    function setAutoStepUI(enabled) {
+      state.autoStepEnabled = enabled;
+      const dot = document.getElementById('autostep-dot');
+      const status = document.getElementById('autostep-status');
+      if (enabled) {
+        const steps = getValidAutoSteps();
+        dot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-ping';
+        status.textContent = `第 ${state.autoStepIndex + 1}/${steps.length} 阶 · N=${steps[state.autoStepIndex] || state.numCircles}`;
+        status.className = 'font-mono text-[11px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-300';
+      } else {
+        dot.className = 'w-2 h-2 rounded-full bg-slate-400';
+        status.textContent = 'OFF';
+        status.className = 'font-mono text-[11px] px-1.5 py-0.5 rounded bg-slate-200/70 dark:bg-slate-900/40 text-slate-600 dark:text-slate-300';
+      }
+    }
+
+    function advanceSingleTrack(track, dt) {
+      if (track.completed || track.harmonics.length === 0) return;
+
+      const durationSec = getTrackCycleDurationSeconds(track);
+      const prevT = track.t;
+      const nextT = Math.min(1.0, prevT + dt / durationSec);
+
+      const subSteps = Math.max(4, Math.ceil((nextT - prevT) * state.sampleCount * 0.6));
+      for (let s = 1; s <= subSteps; s++) {
+        const interpT = prevT + ((nextT - prevT) * s) / subSteps;
+        track.trail.push(evaluateTrackAtTime(track, interpT, state.numCircles));
+      }
+
+      track.t = nextT;
+      if (track.t >= 1.0) {
+        track.trail.push(evaluateTrackAtTime(track, 0, state.numCircles));
+        track.completed = true;
+      }
+    }
+
+    function advanceAutoStepAfterBothCompleted() {
+      const validSteps = getValidAutoSteps();
+      state.autoStepIndex = (state.autoStepIndex + 1) % validSteps.length;
+      const nextN = validSteps[state.autoStepIndex];
+      setCircleCount(nextN);
+      if (state.autoStepEnabled) {
+        setAutoStepUI(true);
+      }
+    }
+
+    function setCircleCount(newN) {
+      const maxTerms = getMaxSelectableCircles();
+      const clamped = Math.max(1, Math.min(maxTerms, Math.round(newN)));
+      state.numCircles = clamped;
+      document.getElementById('slider-circles').value = clamped;
+      document.getElementById('input-circles').value = clamped;
+      updateCircleQuickButtonsUI();
+      resetBothTracksCycle();
+      updateReadoutUI();
+      drawDualSpectrumChart();
+    }
+
+    let lastFrameTime = performance.now();
+    function animationLoop(now) {
+      const dt = Math.min(0.05, (now - lastFrameTime) / 1000);
+      lastFrameTime = now;
+
+      if (state.isPlaying) {
+        if (state.trackA.completed && state.trackB.completed) {
+          if (state.bothDoneHoldTimer <= 0) {
+            state.bothDoneHoldTimer = 0.65;
+            playCycleChime(Math.min(1, Math.log2(state.numCircles + 1) / 11), true);
+          } else {
+            state.bothDoneHoldTimer -= dt;
+            if (state.bothDoneHoldTimer <= 0) {
+              if (state.isRecording && state.recordMode === 'cycle') {
+                stopAnimationRecording();
+                resetBothTracksCycle();
+              } else if (state.isRecording && state.recordMode === 'autostep') {
+                const validSteps = getValidAutoSteps();
+                if (state.autoStepIndex >= validSteps.length - 1) {
+                  stopAnimationRecording();
+                  setAutoStepUI(false);
+                  resetBothTracksCycle();
+                } else {
+                  advanceAutoStepAfterBothCompleted();
+                }
+              } else if (state.autoStepEnabled) {
+                advanceAutoStepAfterBothCompleted();
+              } else {
+                resetBothTracksCycle();
+              }
+            }
+          }
+        } else {
+          const wasADone = state.trackA.completed;
+          const wasBDone = state.trackB.completed;
+
+          advanceSingleTrack(state.trackA, dt);
+          advanceSingleTrack(state.trackB, dt);
+
+          if ((!wasADone && state.trackA.completed && !state.trackB.completed) ||
+              (!wasBDone && state.trackB.completed && !state.trackA.completed)) {
+            playCycleChime(0.3, false);
+          }
+
+          updateProgressBarsUI();
+
+          if (state.isRecording) {
+            const avgTrackProgress = 0.5 * (state.trackA.t + state.trackB.t);
+            if (state.recordMode === 'autostep') {
+              const validSteps = getValidAutoSteps();
+              const stageNum = state.autoStepIndex + 1;
+              const totalStages = validSteps.length;
+              const overallPct = Math.min(
+                100,
+                Math.round(((state.autoStepIndex + avgTrackProgress) / totalStages) * 100)
+              );
+              document.getElementById('record-btn-text').textContent =
+                `正在录制第 ${stageNum}/${totalStages} 阶 (N=${state.numCircles}) · 双图总进度 ${overallPct}% (点击可提前保存)`;
+              document.getElementById('header-record-label').textContent =
+                `录制中 ${stageNum}/${totalStages} (${overallPct}%)`;
+            } else if (state.recordMode === 'cycle') {
+              const pct = Math.round(avgTrackProgress * 100);
+              document.getElementById('record-btn-text').textContent =
+                `正在录制当前阶双图 (${pct}%)... 双图均完播后自动保存`;
+              document.getElementById('header-record-label').textContent = `录制中 ${pct}%`;
+            }
+          }
+        }
+      }
+
+      renderEpicycleFrame();
+      requestAnimationFrame(animationLoop);
+    }
+
+    // ============================================================================
+    // 8. SVG FILE IMPORT & UI EVENT HANDLERS
+    // ============================================================================
+    function setStatusMessage(msg) {
+      document.getElementById('status-text').textContent = msg;
+    }
+
+    async function readSvgFileAsText(file) {
+      if (typeof file.arrayBuffer === 'function') {
+        const buffer = await file.arrayBuffer();
+        const utf8Decoder = new TextDecoder('utf-8', { fatal: false });
+        let text = utf8Decoder.decode(buffer);
+        if (text.includes('\uFFFD')) {
+          try {
+            const gbkDecoder = new TextDecoder('gbk', { fatal: false });
+            text = gbkDecoder.decode(buffer);
+          } catch (e) {}
+        }
+        return text;
+      }
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('无法读取本地文件。'));
+        reader.readAsText(file, 'utf-8');
+      });
+    }
+
+    async function handleSVGFileLoad(track, file) {
+      if (!file) return;
+      const overlay = document.getElementById('svg-loading-overlay');
+      const loadTitle = document.getElementById('loading-title');
+      const loadSub = document.getElementById('loading-subtitle');
+
+      const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+      const sizeStr = file.size >= 1024 * 1024
+        ? `${sizeMB} MB`
+        : `${(file.size / 1024).toFixed(1)} KB`;
+
+      overlay.classList.remove('hidden');
+      overlay.classList.add('flex');
+      loadTitle.textContent = `正在读取区域 ${track.id}: ${file.name} (${sizeStr})...`;
+      loadSub.textContent = '无文件大小限制 · 正在解析 SVG 几何路径与变换矩阵';
+
+      await new Promise(r => setTimeout(r, 25));
+
+      try {
+        const text = await readSvgFileAsText(file);
+        await parseAndApplySVGText(track, text, file.name, sizeStr);
+      } catch (err) {
+        console.error('SVG Import Error:', err);
+        setStatusMessage(`❌ 解析错误: ${err.message}`);
+      } finally {
+        overlay.classList.add('hidden');
+        overlay.classList.remove('flex');
+      }
+    }
+
+    async function parseAndApplySVGText(track, svgText, fileName = 'pasted.svg', sizeStr = '文本输入') {
+      let result;
+      try {
+        result = extractSubpathsFromSVGString(svgText, fileName, sizeStr);
+      } catch (vectorErr) {
+        if (/<image[\s>]/i.test(svgText)) {
+          result = await extractContourFromRasterSVG(svgText, fileName, sizeStr);
+        } else {
+          throw vectorErr;
+        }
+      }
+
+      const suffix = track.id === 'A' ? 'a' : 'b';
+      const infoCard = document.getElementById(`svg-info-card-${suffix}`);
+      if (infoCard) {
+        infoCard.classList.remove('hidden');
+        infoCard.classList.add('flex');
+        document.getElementById(`info-filename-${suffix}`).textContent = fileName;
+        document.getElementById(`info-filesize-${suffix}`).textContent = `${sizeStr} · ${result.elapsedMs} ms`;
+        document.getElementById(`info-subpaths-${suffix}`).textContent = `${result.subpaths.length} 段 · 周长 ${result.totalLength}`;
+      }
+
+      applySubpathsToTrack(track, result, true);
+      setStatusMessage(`✅ 区域 ${track.id} 成功导入 SVG: ${fileName} (${result.subpaths.length} 子路径, ${state.sampleCount} 采样点)`);
+    }
+
+    function bindTrackUploader(track, inputId, dropzoneId, togglePasteId, pasteBoxId, textareaId, parseBtnId, speedSliderId, speedLabelId) {
+      const svgFileInput = document.getElementById(inputId);
+      const svgDropzone = document.getElementById(dropzoneId);
+      const togglePaste = document.getElementById(togglePasteId);
+      const pasteBox = document.getElementById(pasteBoxId);
+      const textarea = document.getElementById(textareaId);
+      const parseBtn = document.getElementById(parseBtnId);
+      const speedSlider = document.getElementById(speedSliderId);
+      const speedLabel = document.getElementById(speedLabelId);
+
+      svgDropzone.addEventListener('click', (e) => {
+        e.preventDefault();
+        svgFileInput.value = '';
+        svgFileInput.click();
+      });
+
+      svgDropzone.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          svgFileInput.value = '';
+          svgFileInput.click();
+        }
+      });
+
+      svgFileInput.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (file) {
+          handleSVGFileLoad(track, file);
+        }
+        e.target.value = '';
+      });
+
+      ['dragenter', 'dragover'].forEach(evtName => {
+        svgDropzone.addEventListener(evtName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+          svgDropzone.classList.add('border-sky-400', 'bg-sky-500/10');
+        });
+      });
+
+      ['dragleave', 'drop'].forEach(evtName => {
+        svgDropzone.addEventListener(evtName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          svgDropzone.classList.remove('border-sky-400', 'bg-sky-500/10');
+        });
+      });
+
+      svgDropzone.addEventListener('drop', (e) => {
+        const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (file) {
+          handleSVGFileLoad(track, file);
+        }
+      });
+
+      togglePaste.addEventListener('click', () => {
+        pasteBox.classList.toggle('hidden');
+        pasteBox.classList.toggle('flex');
+      });
+
+      parseBtn.addEventListener('click', async () => {
+        const raw = textarea.value.trim();
+        if (!raw) return;
+        try {
+          await parseAndApplySVGText(track, raw, `pasted_${track.id}.svg`, `${(raw.length / 1024).toFixed(1)} KB`);
+        } catch (err) {
+          setStatusMessage(`❌ 解析失败: ${err.message}`);
+        }
+      });
+
+      speedSlider.addEventListener('input', (e) => {
+        track.speedMultiplier = parseFloat(e.target.value) || 1.0;
+        speedLabel.textContent = `${track.speedMultiplier.toFixed(1)}x`;
+      });
+    }
+
+    bindTrackUploader(
+      state.trackA,
+      'file-input-a', 'dropzone-a', 'btn-paste-toggle-a', 'paste-box-a', 'raw-textarea-a', 'btn-parse-raw-a',
+      'slider-speed-a', 'label-speed-a'
+    );
+
+    bindTrackUploader(
+      state.trackB,
+      'file-input-b', 'dropzone-b', 'btn-paste-toggle-b', 'paste-box-b', 'raw-textarea-b', 'btn-parse-raw-b',
+      'slider-speed-b', 'label-speed-b'
+    );
+
+    function loadBuiltInDemoPair(pairKey) {
+      const pair = generateBuiltInDemoSVGPair(pairKey);
+      const metaA = extractSubpathsFromSVGString(pair.svgA, pair.nameA, '内置预设');
+      const metaB = extractSubpathsFromSVGString(pair.svgB, pair.nameB, '内置预设');
+      document.getElementById('svg-info-card-a').classList.add('hidden');
+      document.getElementById('svg-info-card-b').classList.add('hidden');
+      applySubpathsToTrack(state.trackA, metaA, false);
+      applySubpathsToTrack(state.trackB, metaB, false);
+      resetBothTracksCycle();
+      setStatusMessage(`🗺️ 已加载预设 SVG 双图: ${metaA.fileName} vs ${metaB.fileName}`);
+    }
+
+    document.querySelectorAll('.pair-preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.getAttribute('data-pair');
+        document.querySelectorAll('.pair-preset-btn').forEach(b => {
+          b.className = b === btn
+            ? 'pair-preset-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-sky-500/15 text-sky-600 dark:text-sky-300 border border-sky-500/40 hover:bg-sky-500/25 transition'
+            : 'pair-preset-btn px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800/70 text-slate-700 dark:text-slate-300 border border-transparent hover:border-sky-500/40 transition';
+        });
+        loadBuiltInDemoPair(key);
+      });
+    });
+
+    ['svg-path-strategy', 'svg-min-subpath', 'svg-filter-rect'].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('change', () => {
+        const strategy = document.getElementById('svg-path-strategy').value;
+        [state.trackA, state.trackB].forEach(track => {
+          if (track.rawSubpaths && track.rawSubpaths.length > 0) {
+            const { points, normalizedPerimeter } = stitchAndResampleSubpaths(
+              track.rawSubpaths,
+              state.sampleCount,
+              strategy
+            );
+            track.totalPerimeter = normalizedPerimeter;
+            computeFFTForTrack(track, points);
+          }
+        });
+        resetBothTracksCycle();
+        updateReadoutUI();
+        drawDualSpectrumChart();
+      });
+    });
+
+    document.getElementById('select-timing-mode').addEventListener('change', (e) => {
+      state.timingMode = e.target.value;
+      resetBothTracksCycle();
+      setStatusMessage(
+        state.timingMode === 'perimeter'
+          ? '⏱️ 已切换至「按地图周长自适应时长」：周长较短的地图先完播并等待另一幅完播后再共同递进'
+          : '⏱️ 已切换至「恒定周期时长」：若独立倍率相同，两幅地图将同时完成周期'
+      );
+    });
+
+    document.getElementById('btn-swap-maps').addEventListener('click', () => {
+      const tempSub = state.trackA.rawSubpaths;
+      const tempName = state.trackA.name;
+      state.trackA.rawSubpaths = state.trackB.rawSubpaths;
+      state.trackA.name = state.trackB.name;
+      state.trackB.rawSubpaths = tempSub;
+      state.trackB.name = tempName;
+
+      const strategy = document.getElementById('svg-path-strategy').value;
+      [state.trackA, state.trackB].forEach(tr => {
+        const { points, normalizedPerimeter } = stitchAndResampleSubpaths(tr.rawSubpaths, state.sampleCount, strategy);
+        tr.totalPerimeter = normalizedPerimeter;
+        computeFFTForTrack(tr, points);
+      });
+      resetBothTracksCycle();
+      updateReadoutUI();
+      drawDualSpectrumChart();
+      setStatusMessage('⇄ 已互换区域 A 与区域 B 的 SVG 地图数据');
+    });
+
+    document.querySelectorAll('.ratio-preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        setAspectRatioPreset(btn.getAttribute('data-ratio'));
+      });
+    });
+
+    document.getElementById('btn-apply-custom-ratio').addEventListener('click', () => {
+      const cw = parseFloat(document.getElementById('input-ratio-w').value) || 3;
+      const ch = parseFloat(document.getElementById('input-ratio-h').value) || 4;
+      setAspectRatioPreset('custom', cw, ch);
+    });
+
+    document.querySelectorAll('.zone-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.activeZoneTab = btn.getAttribute('data-zone-tab');
+        syncZoneSlidersFromState();
+      });
+    });
+
+    document.getElementById('chk-canvas-drag-zones').addEventListener('change', (e) => {
+      state.allowDirectZoneDrag = e.target.checked;
+    });
+
+    document.getElementById('slider-zone-x').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value) / 100;
+      const z = state.zones[state.activeZoneTab];
+      if (z) {
+        z.x = val;
+        document.getElementById('label-zone-x').textContent = `${(val * 100).toFixed(1)}%`;
+      }
+    });
+
+    document.getElementById('slider-zone-y').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value) / 100;
+      const z = state.zones[state.activeZoneTab];
+      if (z) {
+        z.y = val;
+        document.getElementById('label-zone-y').textContent = `${(val * 100).toFixed(1)}%`;
+      }
+    });
+
+    document.getElementById('slider-zone-scale').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value) / 100;
+      const z = state.zones[state.activeZoneTab];
+      if (z) {
+        z.scale = val;
+        document.getElementById('label-zone-scale').textContent = `${Math.round(val * 100)}%`;
+      }
+    });
+
+    document.getElementById('chk-zone-visible').addEventListener('change', (e) => {
+      const z = state.zones[state.activeZoneTab];
+      if (z && (state.activeZoneTab === 'formula' || state.activeZoneTab === 'text' || state.activeZoneTab === 'noteA' || state.activeZoneTab === 'noteB')) {
+        if (state.activeZoneTab === 'noteA' || state.activeZoneTab === 'noteB') {
+          setNoteBoxDeleted(state.activeZoneTab, !e.target.checked);
+        } else {
+          z.visible = e.target.checked;
+        }
+      }
+    });
+
+    // Bind Custom Annotation Box 1 & Box 2 Controls (including Delete & Restore buttons)
+    function bindCustomAnnotationControls(zoneKey, textInputId, bgChkId, colorSelectId, deleteBtnId, restoreBtnId) {
+      const textInput = document.getElementById(textInputId);
+      const bgChk = document.getElementById(bgChkId);
+      const colorSelect = document.getElementById(colorSelectId);
+      const deleteBtn = document.getElementById(deleteBtnId);
+      const restoreBtn = document.getElementById(restoreBtnId);
+
+      textInput.addEventListener('input', (e) => {
+        state.annotations[zoneKey].text = e.target.value;
+      });
+
+      bgChk.addEventListener('change', (e) => {
+        state.annotations[zoneKey].showBg = e.target.checked;
+      });
+
+      colorSelect.addEventListener('change', (e) => {
+        state.annotations[zoneKey].color = e.target.value;
+      });
+
+      deleteBtn.addEventListener('click', () => {
+        setNoteBoxDeleted(zoneKey, true);
+      });
+
+      restoreBtn.addEventListener('click', () => {
+        setNoteBoxDeleted(zoneKey, false);
+      });
+    }
+
+    bindCustomAnnotationControls('noteA', 'input-note-a-text', 'chk-note-a-bg', 'select-note-a-color', 'btn-delete-note-a', 'btn-restore-note-a');
+    bindCustomAnnotationControls('noteB', 'input-note-b-text', 'chk-note-b-bg', 'select-note-b-color', 'btn-delete-note-b', 'btn-restore-note-b');
+
+    document.querySelectorAll('.layout-preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        applyLayoutPreset(btn.getAttribute('data-layout-preset'));
+      });
+    });
+
+    document.getElementById('btn-reset-zone-layout').addEventListener('click', () => {
+      applyLayoutPreset('horizontal');
+    });
+
+    // Direct Canvas 6-Zone Dragging, On-Canvas '×' Delete Hit-Testing, Double-Click Editing & Wheel Zooming
+    function getPointerCanvasPixels(e) {
+      const rect = epicycleCanvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const pxX = ((clientX - rect.left) / Math.max(1, rect.width)) * epicycleCanvas.width;
+      const pxY = ((clientY - rect.top) / Math.max(1, rect.height)) * epicycleCanvas.height;
+      return {
+        pxX,
+        pxY,
+        normX: pxX / Math.max(1, epicycleCanvas.width),
+        normY: pxY / Math.max(1, epicycleCanvas.height)
+      };
+    }
+
+    function hitTestNoteDeleteButtonAtCanvasPx(pxX, pxY) {
+      if (!state.allowDirectZoneDrag) return null;
+      const keys = ['noteA', 'noteB'];
+      for (let i = 0; i < keys.length; i++) {
+        const k = keys[i];
+        const z = state.zones[k];
+        const hit = state.noteDeleteHitBounds[k];
+        if (z && z.visible !== false && hit) {
+          if (Math.hypot(pxX - hit.cx, pxY - hit.cy) <= hit.r) {
+            return k;
+          }
+        }
+      }
+      return null;
+    }
+
+    function hitTestZoneAtCanvasPx(pxX, pxY) {
+      if (!state.allowDirectZoneDrag) return state.activeZoneTab;
+      // Prioritize movable annotation boxes (noteA, noteB) so they can always be dragged or deleted
+      const order = ['noteA', 'noteB', 'formula', 'text', 'animA', 'animB'];
+      for (let i = 0; i < order.length; i++) {
+        const key = order[i];
+        const b = state.zoneBounds[key];
+        if (b && pxX >= b.x && pxX <= b.x + b.w && pxY >= b.y && pxY <= b.y + b.h) {
+          return key;
+        }
+      }
+      const distA = Math.hypot(pxX - epicycleCanvas.width * state.zones.animA.x, pxY - epicycleCanvas.height * state.zones.animA.y);
+      const distB = Math.hypot(pxX - epicycleCanvas.width * state.zones.animB.x, pxY - epicycleCanvas.height * state.zones.animB.y);
+      return distA <= distB ? 'animA' : 'animB';
+    }
+
+    // Inline On-Canvas Double-Click Editor for Note A & Note B
+    const inlineEditorWrap = document.getElementById('inline-note-editor-wrap');
+    const inlineTextarea = document.getElementById('inline-note-textarea');
+    const inlineEditorLabel = document.getElementById('inline-note-editor-label');
+    const inlineDeleteBtn = document.getElementById('btn-inline-delete-note');
+
+    function openInlineNoteEditor(zoneKey) {
+      const z = state.zones[zoneKey];
+      const ann = state.annotations[zoneKey];
+      if (!z || !ann || z.visible === false) return;
+
+      state.editingNoteKey = zoneKey;
+      inlineEditorLabel.textContent = `✏️ 编辑${ann.title}`;
+      inlineTextarea.value = ann.text;
+
+      const leftPct = Math.max(5, Math.min(58, z.x * 100 - 18));
+      const topPct = Math.max(5, Math.min(80, z.y * 100 - 6));
+      inlineEditorWrap.style.left = `${leftPct}%`;
+      inlineEditorWrap.style.top = `${topPct}%`;
+      inlineEditorWrap.classList.remove('hidden');
+      inlineEditorWrap.classList.add('flex');
+      setTimeout(() => {
+        inlineTextarea.focus();
+        inlineTextarea.select();
+      }, 10);
+    }
+
+    function closeInlineNoteEditor() {
+      if (!state.editingNoteKey) return;
+      state.editingNoteKey = null;
+      inlineEditorWrap.classList.add('hidden');
+      inlineEditorWrap.classList.remove('flex');
+    }
+
+    inlineTextarea.addEventListener('input', (e) => {
+      if (!state.editingNoteKey) return;
+      const key = state.editingNoteKey;
+      state.annotations[key].text = e.target.value;
+      const sidebarInput = document.getElementById(key === 'noteA' ? 'input-note-a-text' : 'input-note-b-text');
+      if (sidebarInput) sidebarInput.value = e.target.value;
+    });
+
+    inlineTextarea.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' || (e.key === 'Enter' && (e.ctrlKey || e.metaKey))) {
+        e.preventDefault();
+        closeInlineNoteEditor();
+      }
+    });
+
+    inlineDeleteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (state.editingNoteKey) {
+        setNoteBoxDeleted(state.editingNoteKey, true);
+      }
+    });
+
+    inlineEditorWrap.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+    });
+
+    canvasWrapper.addEventListener('dblclick', (e) => {
+      const pos = getPointerCanvasPixels(e);
+      if (hitTestNoteDeleteButtonAtCanvasPx(pos.pxX, pos.pxY)) return;
+      const hitZone = hitTestZoneAtCanvasPx(pos.pxX, pos.pxY);
+      if (hitZone === 'noteA' || hitZone === 'noteB') {
+        openInlineNoteEditor(hitZone);
+      }
+    });
+
+    canvasWrapper.addEventListener('mousedown', (e) => {
+      if (state.editingNoteKey && !inlineEditorWrap.contains(e.target)) {
+        closeInlineNoteEditor();
+      }
+      const pos = getPointerCanvasPixels(e);
+
+      // 1. Check if user clicked the red '×' delete badge on noteA or noteB
+      const deleteNoteKey = hitTestNoteDeleteButtonAtCanvasPx(pos.pxX, pos.pxY);
+      if (deleteNoteKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        state.hoveredDeleteNote = null;
+        state.hoveredZone = null;
+        setNoteBoxDeleted(deleteNoteKey, true);
+        return;
+      }
+
+      // 2. Otherwise start dragging the hit zone
+      const hitZone = hitTestZoneAtCanvasPx(pos.pxX, pos.pxY);
+      state.draggingZone = hitZone;
+      state.activeZoneTab = hitZone;
+      const targetZone = state.zones[hitZone];
+      state.dragOffsetNormX = pos.normX - targetZone.x;
+      state.dragOffsetNormY = pos.normY - targetZone.y;
+      syncZoneSlidersFromState();
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (state.draggingZone) {
+        const pos = getPointerCanvasPixels(e);
+        const targetZone = state.zones[state.draggingZone];
+        if (targetZone) {
+          targetZone.x = Math.max(0.05, Math.min(0.95, pos.normX - state.dragOffsetNormX));
+          targetZone.y = Math.max(0.05, Math.min(0.95, pos.normY - state.dragOffsetNormY));
+          syncZoneSlidersFromState();
+        }
+        return;
+      }
+
+      const rect = epicycleCanvas.getBoundingClientRect();
+      if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
+        const pos = getPointerCanvasPixels(e);
+        const delHit = hitTestNoteDeleteButtonAtCanvasPx(pos.pxX, pos.pxY);
+        if (delHit) {
+          state.hoveredDeleteNote = delHit;
+          state.hoveredZone = delHit;
+          canvasWrapper.style.cursor = 'pointer';
+        } else {
+          state.hoveredDeleteNote = null;
+          state.hoveredZone = hitTestZoneAtCanvasPx(pos.pxX, pos.pxY);
+          canvasWrapper.style.cursor = 'move';
+        }
+      } else {
+        state.hoveredZone = null;
+        state.hoveredDeleteNote = null;
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      state.draggingZone = null;
+    });
+
+    // Keyboard Delete / Backspace shortcut to delete selected movable text box (noteA or noteB)
+    window.addEventListener('keydown', (e) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      const activeEl = document.activeElement;
+      const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT');
+      if (isTyping) return;
+
+      if (state.activeZoneTab === 'noteA' || state.activeZoneTab === 'noteB') {
+        const z = state.zones[state.activeZoneTab];
+        if (z && z.visible !== false) {
+          e.preventDefault();
+          setNoteBoxDeleted(state.activeZoneTab, true);
+        }
+      }
+    });
+
+    document.querySelectorAll('.layout-preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        applyLayoutPreset(btn.getAttribute('data-layout-preset'));
+      });
+    });
+
+    document.getElementById('btn-reset-zone-layout').addEventListener('click', () => {
+      applyLayoutPreset('horizontal');
+    });
+
+    // Direct Canvas 4-Zone Dragging & Wheel Zooming
+    function getPointerCanvasPixels(e) {
+      const rect = epicycleCanvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const pxX = ((clientX - rect.left) / Math.max(1, rect.width)) * epicycleCanvas.width;
+      const pxY = ((clientY - rect.top) / Math.max(1, rect.height)) * epicycleCanvas.height;
+      return {
+        pxX,
+        pxY,
+        normX: pxX / Math.max(1, epicycleCanvas.width),
+        normY: pxY / Math.max(1, epicycleCanvas.height)
+      };
+    }
+
+    function hitTestZoneAtCanvasPx(pxX, pxY) {
+      if (!state.allowDirectZoneDrag) return state.activeZoneTab;
+      const order = ['formula', 'text', 'animA', 'animB'];
+      for (let i = 0; i < order.length; i++) {
+        const key = order[i];
+        const b = state.zoneBounds[key];
+        if (b && pxX >= b.x && pxX <= b.x + b.w && pxY >= b.y && pxY <= b.y + b.h) {
+          return key;
+        }
+      }
+      const distA = Math.hypot(pxX - epicycleCanvas.width * state.zones.animA.x, pxY - epicycleCanvas.height * state.zones.animA.y);
+      const distB = Math.hypot(pxX - epicycleCanvas.width * state.zones.animB.x, pxY - epicycleCanvas.height * state.zones.animB.y);
+      return distA <= distB ? 'animA' : 'animB';
+    }
+
+    canvasWrapper.addEventListener('mousedown', (e) => {
+      const pos = getPointerCanvasPixels(e);
+      const hitZone = hitTestZoneAtCanvasPx(pos.pxX, pos.pxY);
+      state.draggingZone = hitZone;
+      state.activeZoneTab = hitZone;
+      const targetZone = state.zones[hitZone];
+      state.dragOffsetNormX = pos.normX - targetZone.x;
+      state.dragOffsetNormY = pos.normY - targetZone.y;
+      syncZoneSlidersFromState();
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (state.draggingZone) {
+        const pos = getPointerCanvasPixels(e);
+        const targetZone = state.zones[state.draggingZone];
+        if (targetZone) {
+          targetZone.x = Math.max(0.05, Math.min(0.95, pos.normX - state.dragOffsetNormX));
+          targetZone.y = Math.max(0.05, Math.min(0.95, pos.normY - state.dragOffsetNormY));
+          syncZoneSlidersFromState();
+        }
+        return;
+      }
+
+      const rect = epicycleCanvas.getBoundingClientRect();
+      if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
+        const pos = getPointerCanvasPixels(e);
+        state.hoveredZone = hitTestZoneAtCanvasPx(pos.pxX, pos.pxY);
+        canvasWrapper.style.cursor = 'move';
+      } else {
+        state.hoveredZone = null;
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      state.draggingZone = null;
+    });
+
+    canvasWrapper.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.08 : 0.92;
+      const targetKey = state.hoveredZone || state.activeZoneTab || 'animA';
+      state.activeZoneTab = targetKey;
+      const targetZone = state.zones[targetKey];
+      if (targetZone) {
+        targetZone.scale = Math.max(0.3, Math.min(3.5, targetZone.scale * factor));
+        syncZoneSlidersFromState();
+      }
+    }, { passive: false });
+
+    document.getElementById('btn-zoom-in').addEventListener('click', () => {
+      const z = state.zones[state.activeZoneTab];
+      if (z) {
+        z.scale = Math.min(3.5, z.scale * 1.15);
+        syncZoneSlidersFromState();
+      }
+    });
+
+    document.getElementById('btn-zoom-out').addEventListener('click', () => {
+      const z = state.zones[state.activeZoneTab];
+      if (z) {
+        z.scale = Math.max(0.3, z.scale / 1.15);
+        syncZoneSlidersFromState();
+      }
+    });
+
+    document.getElementById('btn-reset-view').addEventListener('click', () => {
+      applyLayoutPreset('horizontal');
+    });
+
+    // Harmonics & Sample Controls
+    document.getElementById('slider-circles').addEventListener('input', (e) => {
+      setCircleCount(parseInt(e.target.value, 10));
+    });
+
+    document.getElementById('input-circles').addEventListener('change', (e) => {
+      setCircleCount(parseInt(e.target.value, 10) || 1);
+    });
+
+    document.querySelectorAll('.circle-quick-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetN = parseInt(btn.getAttribute('data-circle-set'), 10);
+        setCircleCount(targetN);
+      });
+    });
+
+    document.getElementById('select-samples').addEventListener('change', (e) => {
+      state.sampleCount = parseInt(e.target.value, 10);
+      const strategy = document.getElementById('svg-path-strategy').value;
+      [state.trackA, state.trackB].forEach(tr => {
+        if (tr.rawSubpaths && tr.rawSubpaths.length > 0) {
+          const { points, normalizedPerimeter } = stitchAndResampleSubpaths(tr.rawSubpaths, state.sampleCount, strategy);
+          tr.totalPerimeter = normalizedPerimeter;
+          computeFFTForTrack(tr, points);
+        }
+      });
+      syncCircleControlsRange(false);
+      resetBothTracksCycle();
+      updateReadoutUI();
+      drawDualSpectrumChart();
+    });
+
+    document.getElementById('select-shown-circles').addEventListener('change', (e) => {
+      state.maxShownCircles = parseInt(e.target.value, 10);
+      updateReadoutUI();
+    });
+
+    // Playback & Synchronized Auto-Step Controls
+    document.getElementById('btn-play-pause').addEventListener('click', () => {
+      state.isPlaying = !state.isPlaying;
+      document.getElementById('play-icon').textContent = state.isPlaying ? '⏸' : '▶';
+      document.getElementById('play-label').textContent = state.isPlaying ? '暂停双图 (Pause)' : '继续播放 (Play)';
+    });
+
+    document.getElementById('btn-reset-cycle').addEventListener('click', () => {
+      resetBothTracksCycle();
+    });
+
+    document.getElementById('btn-autostep').addEventListener('click', () => {
+      if (!state.autoStepEnabled) {
+        state.autoStepIndex = 0;
+        const validSteps = getValidAutoSteps();
+        setCircleCount(validSteps[0]);
+        setAutoStepUI(true);
+        state.isPlaying = true;
+        document.getElementById('play-icon').textContent = '⏸';
+        document.getElementById('play-label').textContent = '暂停双图 (Pause)';
+        setStatusMessage(`🎬 已开启双图完播同步递增演示: 每当 A 和 B 均完播后自动递进 (${validSteps.join(' → ')})`);
+      } else {
+        setAutoStepUI(false);
+        setStatusMessage('已关闭自动递增模式');
+      }
+    });
+
+    document.getElementById('slider-speed').addEventListener('input', (e) => {
+      state.masterSpeed = parseFloat(e.target.value);
+      document.getElementById('label-speed').textContent = `${state.masterSpeed.toFixed(2)}x`;
+    });
+
+    document.getElementById('chk-show-circles').addEventListener('change', (e) => {
+      state.showCircles = e.target.checked;
+    });
+    document.getElementById('chk-show-radii').addEventListener('change', (e) => {
+      state.showRadii = e.target.checked;
+    });
+    document.getElementById('chk-show-original').addEventListener('change', (e) => {
+      state.showOriginal = e.target.checked;
+    });
+    document.getElementById('chk-video-hud').addEventListener('change', (e) => {
+      state.showVideoHud = e.target.checked;
+    });
+    document.getElementById('chk-show-zone-frames').addEventListener('change', (e) => {
+      state.showZoneFrames = e.target.checked;
+    });
+
+    document.getElementById('btn-spectrum-scale').addEventListener('click', (e) => {
+      state.spectrumLogScale = !state.spectrumLogScale;
+      e.currentTarget.textContent = state.spectrumLogScale ? '纵轴: 对数刻度 (Log)' : '纵轴: 线性刻度 (Linear)';
+      drawDualSpectrumChart();
+    });
+
+    document.getElementById('btn-sound-toggle').addEventListener('click', () => {
+      state.soundEnabled = !state.soundEnabled;
+      document.getElementById('sound-icon').textContent = state.soundEnabled ? '🔊' : '🔇';
+      document.getElementById('sound-label').textContent = state.soundEnabled ? '完播音效: 开' : '完播音效: 关';
+      if (state.soundEnabled) playCycleChime(0.5, true);
+    });
+
+    document.getElementById('btn-export-png').addEventListener('click', () => {
+      const prevHover = state.hoveredZone;
+      state.hoveredZone = null;
+      renderEpicycleFrame();
+      state.hoveredZone = prevHover;
+
+      const link = document.createElement('a');
+      link.download = `fourier-dual-svg-${state.numCircles}circles-${state.videoWidth}x${state.videoHeight}.png`;
+      link.href = epicycleCanvas.toDataURL('image/png');
+      link.click();
+      setStatusMessage(`📷 已导出双图超清 PNG (${state.videoWidth}×${state.videoHeight})`);
+    });
+
+    // Video Recording
+    function detectSupportedVideoMime() {
+      const candidates = [
+        { mime: 'video/mp4;codecs="avc1.640033"', ext: 'mp4' },
+        { mime: 'video/mp4', ext: 'mp4' },
+        { mime: 'video/webm;codecs=vp9', ext: 'webm' },
+        { mime: 'video/webm', ext: 'webm' }
+      ];
+      if (typeof MediaRecorder === 'undefined') return null;
+      for (const item of candidates) {
+        if (!MediaRecorder.isTypeSupported || MediaRecorder.isTypeSupported(item.mime)) {
+          return item;
+        }
+      }
+      return { mime: '', ext: 'webm' };
+    }
+
+    function updateRecordingUI(recording) {
+      const btnMain = document.getElementById('btn-download-anim');
+      const txtMain = document.getElementById('record-btn-text');
+      const lblHeader = document.getElementById('header-record-label');
+
+      if (recording) {
+        btnMain.className = 'w-full py-2.5 px-3 rounded-lg bg-rose-500 hover:bg-rose-600 text-white font-semibold text-xs transition flex items-center justify-center gap-2 shadow-sm';
+        txtMain.textContent = '正在录制双图同步动画... 点击可提前完成并保存';
+        lblHeader.textContent = '停止并保存';
+      } else {
+        btnMain.className = 'w-full py-2.5 px-3 rounded-lg bg-gradient-to-r from-emerald-500 to-sky-500 hover:from-emerald-600 hover:to-sky-600 text-white font-semibold text-xs transition flex items-center justify-center gap-2 shadow-sm';
+        txtMain.textContent = '一键录制 1→1024 双图完播同步视频';
+        lblHeader.textContent = '录制双图视频';
+      }
+    }
+
+    function startAnimationRecording() {
+      if (state.isRecording) return;
+      const formatInfo = detectSupportedVideoMime();
+      if (!formatInfo || typeof epicycleCanvas.captureStream !== 'function') {
+        setStatusMessage('❌ 当前浏览器不支持 Canvas 视频流录制');
+        return;
+      }
+
+      state.qualityTier = parseInt(document.getElementById('select-video-res').value, 10) || 1080;
+      computeAndApplyAspectRatioResolution();
+
+      state.recordMode = document.getElementById('select-record-mode').value || 'autostep';
+      state.recordedChunks = [];
+      state.recordMimeType = formatInfo.mime;
+      state.recordFileExt = formatInfo.ext;
+
+      if (state.recordMode === 'autostep') {
+        state.autoStepIndex = 0;
+        const validSteps = getValidAutoSteps();
+        setCircleCount(validSteps[0]);
+        setAutoStepUI(true);
+      } else {
+        resetBothTracksCycle();
+      }
+
+      state.isPlaying = true;
+      state.hoveredZone = null;
+      renderEpicycleFrame();
+
+      const stream = epicycleCanvas.captureStream(60);
+      try {
+        state.mediaRecorder = new MediaRecorder(stream, {
+          videoBitsPerSecond: state.videoBitrate,
+          ...(state.recordMimeType ? { mimeType: state.recordMimeType } : {})
+        });
+      } catch (e) {
+        state.mediaRecorder = new MediaRecorder(stream);
+      }
+
+      state.mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) state.recordedChunks.push(e.data);
+      };
+
+      state.mediaRecorder.onstop = () => {
+        const blob = new Blob(state.recordedChunks, { type: state.recordMimeType || 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = `fourier-dual-svg-${state.videoWidth}x${state.videoHeight}.${state.recordFileExt}`;
+        link.href = url;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        state.isRecording = false;
+        updateRecordingUI(false);
+        setStatusMessage(`✅ 双图超清视频已导出: ${link.download}`);
+      };
+
+      state.mediaRecorder.start(100);
+      state.isRecording = true;
+      updateRecordingUI(true);
+    }
+
+    function stopAnimationRecording() {
+      if (!state.isRecording || !state.mediaRecorder) return;
+      if (state.mediaRecorder.state !== 'inactive') {
+        state.mediaRecorder.stop();
+      }
+    }
+
+    document.getElementById('btn-download-anim').addEventListener('click', () => {
+      if (state.isRecording) stopAnimationRecording();
+      else startAnimationRecording();
+    });
+    document.getElementById('btn-header-record').addEventListener('click', () => {
+      if (state.isRecording) stopAnimationRecording();
+      else startAnimationRecording();
+    });
+
+    document.getElementById('btn-theme-toggle').addEventListener('click', () => {
+      const isDarkNow = document.documentElement.classList.toggle('dark');
+      document.getElementById('theme-mode-label').textContent = isDarkNow ? '暗色舞台' : '亮色舞台';
+      drawDualSpectrumChart();
+      renderEpicycleFrame();
+    });
+
+    function resizeCanvases() {
+      computeAndApplyAspectRatioResolution();
+      const dpr = window.devicePixelRatio || 1;
+      const sRect = spectrumCanvas.parentElement.getBoundingClientRect();
+      spectrumCanvas.width = Math.max(1, Math.floor(sRect.width * dpr));
+      spectrumCanvas.height = Math.max(1, Math.floor(sRect.height * dpr));
+      drawDualSpectrumChart();
+    }
+
+    window.addEventListener('resize', resizeCanvases);
+
+    window.onload = function () {
+      resizeCanvases();
+      syncZoneSlidersFromState();
+      loadBuiltInDemoPair('islands');
+      requestAnimationFrame(animationLoop);
+    };
+  </script>
+</body>
+</html>
