@@ -1,0 +1,1452 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ridge Map 动态地形生成器 (GeoTIFF to Video)</title>
+  <!-- 引入 Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class'
+    };
+  </script>
+  <!-- 引入 Google Fonts Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- 引入 geotiff.js 用于浏览器端直接解析 GeoTIFF 文件 -->
+  <script src="https://cdn.jsdelivr.net/npm/geotiff@2.1.3/dist-browser/geotiff.js"></script>
+  <!-- 引入 proj4.js 用于将其他坐标系自动重投影转换至 EPSG:4326 (WGS84) -->
+  <script src="https://cdn.jsdelivr.net/npm/proj4@2.11.0/dist/proj4.js"></script>
+  <style>
+    :root {
+      --bg-app: #f1f5f9;
+      --bg-sidebar: #ffffff;
+      --bg-card: #f8fafc;
+      --bg-input: #ffffff;
+      --bg-btn-secondary: #f1f5f9;
+      --bg-btn-secondary-hover: #e2e8f0;
+      --border-color: #e2e8f0;
+      --text-primary: #0f172a;
+      --text-secondary: #334155;
+      --text-muted: #64748b;
+      --workspace-gradient: radial-gradient(circle at center, #e2e8f0 0%, #cbd5e1 100%);
+      --scrollbar-thumb: #cbd5e1;
+      --scrollbar-thumb-hover: #94a3b8;
+    }
+
+    html.dark {
+      --bg-app: #0b0d10;
+      --bg-sidebar: #14171d;
+      --bg-card: rgba(255, 255, 255, 0.02);
+      --bg-input: #0d0f14;
+      --bg-btn-secondary: #1f242d;
+      --bg-btn-secondary-hover: #2b323f;
+      --border-color: #262b36;
+      --text-primary: #e8ecf2;
+      --text-secondary: #cfd6e0;
+      --text-muted: #8b95a5;
+      --workspace-gradient: radial-gradient(circle at center, #161922 0%, #090a0d 100%);
+      --scrollbar-thumb: #2e3440;
+      --scrollbar-thumb-hover: #434c5e;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-app);
+      color: var(--text-primary);
+      transition: background-color 0.25s ease, color 0.25s ease;
+    }
+
+    .theme-sidebar {
+      background-color: var(--bg-sidebar);
+      border-color: var(--border-color);
+      transition: background-color 0.25s ease, border-color 0.25s ease;
+    }
+
+    .theme-card {
+      background-color: var(--bg-card);
+      border-color: var(--border-color);
+      transition: background-color 0.25s ease, border-color 0.25s ease;
+    }
+
+    .theme-input {
+      background-color: var(--bg-input);
+      border-color: var(--border-color);
+      color: var(--text-primary);
+      transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    }
+
+    .theme-btn-secondary {
+      background-color: var(--bg-btn-secondary);
+      border-color: var(--border-color);
+      color: var(--text-primary);
+      transition: all 0.2s ease;
+    }
+    .theme-btn-secondary:hover {
+      background-color: var(--bg-btn-secondary-hover);
+    }
+
+    .theme-text-primary { color: var(--text-primary); }
+    .theme-text-secondary { color: var(--text-secondary); }
+    .theme-text-muted { color: var(--text-muted); }
+    .theme-border { border-color: var(--border-color); }
+    .theme-workspace { background: var(--workspace-gradient); }
+
+    /* 自定义滚动条 */
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb);
+      border-radius: 9999px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: var(--scrollbar-thumb-hover);
+    }
+
+    /* 滑块样式优化 */
+    input[type="range"] {
+      accent-color: #3b82f6;
+    }
+
+    /* 录制呼吸灯动画 */
+    @keyframes recordPulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.78; transform: scale(0.995); }
+    }
+    .recording-active {
+      animation: recordPulse 1.2s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col lg:flex-row select-none">
+
+  <!-- 左侧控制面板 -->
+  <aside class="theme-sidebar w-full lg:w-[430px] lg:min-w-[430px] h-[48vh] lg:h-screen border-b lg:border-b-0 lg:border-r flex flex-col overflow-y-auto custom-scrollbar p-4 sm:p-5 gap-4 z-10">
+    
+    <!-- 顶部品牌、分辨率徽章与亮/暗色切换按钮 -->
+    <div class="flex flex-col gap-2 pb-3 border-b theme-border">
+      <div class="flex items-center justify-between gap-2">
+        <h1 class="text-base sm:text-[17px] font-semibold tracking-wide theme-text-primary flex items-center gap-2">
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_10px_#3b82f6]"></span>
+          Ridge Map 动态地形生成器
+        </h1>
+
+        <!-- 亮色 / 暗色模式切换按钮 -->
+        <button id="themeToggleBtn" type="button" title="切换亮色/暗色主题 (同时切换画布与界面配色)" class="theme-btn-secondary border px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 cursor-pointer shadow-sm shrink-0">
+          <!-- 太阳图标 (暗色模式下显示，点击切到亮色) -->
+          <svg id="sunIcon" class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+          </svg>
+          <!-- 月亮图标 (亮色模式下显示，点击切到暗色) -->
+          <svg id="moonIcon" class="w-4 h-4 text-slate-700 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+          </svg>
+          <span id="themeToggleText">亮色模式</span>
+        </button>
+      </div>
+
+      <div class="flex items-center justify-between">
+        <p class="text-xs theme-text-muted">
+          EPSG:4326 经纬度投影 · 经典由北向南逐行生长
+        </p>
+        <span id="resBadge" class="text-[11px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 dark:text-blue-400 border border-blue-500/20 font-medium tabular-nums">
+          3:4 · 1440×1920
+        </span>
+      </div>
+    </div>
+
+    <!-- 1. 画幅比例、投影坐标与动画模式 -->
+    <div class="theme-card flex flex-col gap-3 border rounded-xl p-3.5">
+      <div class="text-xs font-semibold uppercase tracking-wider theme-text-muted">1. 画幅比例 · 投影坐标 · 动画模式</div>
+
+      <!-- 画面长宽比选择 (默认 3:4 竖图) -->
+      <div class="flex flex-col gap-1">
+        <label for="aspectRatioSelect" class="text-xs theme-text-secondary flex justify-between">
+          <span>画面长宽比 (Aspect Ratio)</span>
+          <span class="text-blue-500 dark:text-blue-400 font-medium">默认 3:4 竖图</span>
+        </label>
+        <select id="aspectRatioSelect" class="theme-input w-full border focus:border-blue-500 text-xs px-2.5 py-2 rounded-lg outline-none cursor-pointer">
+          <option value="3:4" selected>3:4 竖图海报 — 推荐</option>
+          <option value="9:16">9:16 竖屏短视频</option>
+          <option value="1:1">1:1 方形画幅</option>
+          <option value="4:3">4:3 经典横图</option>
+          <option value="16:9">16:9 宽屏横图</option>
+        </select>
+      </div>
+
+      <!-- 动画效果模式选择：仅保留“经典由北向南逐行生长” -->
+      <div class="flex flex-col gap-1">
+        <label for="animModeSelect" class="text-xs theme-text-secondary flex justify-between">
+          <span>动画效果模式 (Animation Mode)</span>
+          <span class="text-emerald-500 dark:text-emerald-400 font-medium">经典扫描模式</span>
+        </label>
+        <select id="animModeSelect" class="theme-input w-full border focus:border-blue-500 text-xs px-2.5 py-2 rounded-lg outline-none cursor-pointer">
+          <option value="classic_scan" selected>● 经典由北向南逐行生长 (纯垂直扫描隆起，无海面延伸线)</option>
+        </select>
+      </div>
+
+      <!-- EPSG:4326 投影比例策略 -->
+      <div class="flex flex-col gap-1">
+        <label for="projModeSelect" class="text-xs theme-text-secondary flex justify-between">
+          <span>地图坐标系与投影比例 (Target: EPSG:4326)</span>
+          <span class="text-blue-500 dark:text-blue-400 font-mono text-[11px]">WGS 84</span>
+        </label>
+        <select id="projModeSelect" class="theme-input w-full border focus:border-blue-500 text-xs px-2.5 py-2 rounded-lg outline-none cursor-pointer">
+          <option value="epsg4326_plate_carree" selected>EPSG:4326 等经纬度直投 (1°Lon = 1°Lat, 原版 ridge_map 标准)</option>
+          <option value="epsg4326_cos_lat">EPSG:4326 纬度余弦几何修正 (按 cos(φ) 还原真实地面宽高比)</option>
+          <option value="fill_viewport">自适应拉伸铺满版心 (忽略经纬度宽高比约束)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 2. 数据源上传 -->
+    <div class="theme-card flex flex-col gap-3 border rounded-xl p-3.5">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-semibold uppercase tracking-wider theme-text-muted">2. 高程数据源 (GeoTIFF)</span>
+        <button id="resetDemoBtn" class="text-[11px] text-blue-500 dark:text-blue-400 hover:underline cursor-pointer transition">
+          恢复内置南美洲数据
+        </button>
+      </div>
+
+      <label id="dropZone" class="border border-dashed border-slate-400/60 dark:border-[#3b4454] hover:border-blue-500 rounded-lg p-3.5 text-center cursor-pointer transition-all bg-blue-500/[0.04] hover:bg-blue-500/[0.09] flex flex-col items-center gap-1">
+        <input type="file" id="tiffInput" accept=".tif,.tiff" class="hidden" />
+        <svg class="w-6 h-6 text-blue-500 dark:text-blue-400 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+        </svg>
+        <div class="text-xs font-medium theme-text-primary">点击或拖拽上传 .tif / .tiff 文件</div>
+        <div class="text-[11px] theme-text-muted">自动识别 GeoKeys 并重采样至 EPSG:4326 等纬度剖面</div>
+      </label>
+
+      <div id="dataStatus" class="text-xs px-2.5 py-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 break-all leading-relaxed">
+        当前数据：内置南美洲 (South America) SRTM 级演示高程
+      </div>
+      <div id="crsInfoBox" class="theme-input text-[11px] font-mono px-2.5 py-1.5 rounded-lg theme-text-muted border leading-relaxed">
+        CRS: EPSG:4326 (WGS 84) | Lon: [-82.00°, -34.00°] | Lat: [-56.50°, 13.00°]
+      </div>
+    </div>
+
+    <!-- 3. 动画控制、输出分辨率选择与视频/截图导出 -->
+    <div class="theme-card flex flex-col gap-3 border rounded-xl p-3.5">
+      <div class="text-xs font-semibold uppercase tracking-wider theme-text-muted">3. 动画控制与视频/截图导出</div>
+
+      <!-- 新增：录制视频与导出截图分辨率档位选择 -->
+      <div class="flex flex-col gap-1">
+        <label for="resolutionSelect" class="text-xs theme-text-secondary flex justify-between">
+          <span>录制视频与截图输出分辨率</span>
+          <span id="resQualityHint" class="text-blue-500 dark:text-blue-400 font-medium tabular-nums">2K 超清 · 1440×1920</span>
+        </label>
+        <select id="resolutionSelect" class="theme-input w-full border focus:border-blue-500 text-xs px-2.5 py-2 rounded-lg outline-none cursor-pointer">
+          <option value="720p">720p HD 标准 (短边 720px · 快速轻量导出)</option>
+          <option value="1080p">1080p FHD 高清 (短边 1080px · 社媒短视频推荐)</option>
+          <option value="2k" selected>2K QHD 超清 (短边 1440px · 默认精细画质)</option>
+          <option value="4k">4K UHD 极清 (短边 2160px · 印刷海报级超采样)</option>
+        </select>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <button id="playPauseBtn" class="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-[13px] font-medium transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer">
+          暂停播放
+        </button>
+        <button id="restartBtn" class="theme-btn-secondary px-3 py-2 rounded-lg border text-xs sm:text-[13px] font-medium flex items-center justify-center gap-1.5 cursor-pointer">
+          重头播放
+        </button>
+        <button id="recordBtn" class="col-span-2 px-3 py-2.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs sm:text-[13px] font-semibold transition flex items-center justify-center gap-2 shadow-md cursor-pointer">
+          <span id="recordBtnText">● 录制并导出完整视频 (1440×1920)</span>
+        </button>
+        <button id="exportPngBtn" class="theme-btn-secondary col-span-2 px-3 py-2 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 cursor-pointer">
+          <span id="exportPngBtnText">导出当前帧高清静态图 PNG (1440×1920)</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 4. 山脊线与掩膜参数 -->
+    <div class="theme-card flex flex-col gap-3 border rounded-xl p-3.5">
+      <div class="text-xs font-semibold uppercase tracking-wider theme-text-muted">4. 山脊线与掩膜参数</div>
+
+      <div class="flex flex-col gap-1">
+        <div class="flex justify-between text-xs">
+          <label for="numLinesInput" class="theme-text-secondary">水平山脊线数量 (Lines)</label>
+          <span id="numLinesVal" class="text-blue-500 dark:text-blue-400 font-medium tabular-nums">185</span>
+        </div>
+        <input type="range" id="numLinesInput" min="60" max="280" step="5" value="185" class="w-full cursor-pointer" />
+      </div>
+
+      <div class="flex flex-col gap-1">
+        <div class="flex justify-between text-xs">
+          <label for="vertScaleInput" class="theme-text-secondary">垂直高程夸张系数 (Vertical Ratio)</label>
+          <span id="vertScaleVal" class="text-blue-500 dark:text-blue-400 font-medium tabular-nums">125</span>
+        </div>
+        <input type="range" id="vertScaleInput" min="25" max="280" step="5" value="125" class="w-full cursor-pointer" />
+      </div>
+
+      <div class="flex flex-col gap-1">
+        <div class="flex justify-between text-xs">
+          <label for="waterThreshInput" class="theme-text-secondary">水体/海洋掩膜阈值 (海拔 ≤ 阈值剔除)</label>
+          <span id="waterThreshVal" class="text-blue-500 dark:text-blue-400 font-medium tabular-nums">0</span>
+        </div>
+        <input type="range" id="waterThreshInput" min="-50" max="200" step="1" value="0" class="w-full cursor-pointer" />
+      </div>
+
+      <div class="flex flex-col gap-1">
+        <div class="flex justify-between text-xs">
+          <label for="smoothInput" class="theme-text-secondary">剖面平滑度 (Smoothing)</label>
+          <span id="smoothVal" class="text-blue-500 dark:text-blue-400 font-medium tabular-nums">1.0</span>
+        </div>
+        <input type="range" id="smoothInput" min="0" max="5" step="0.5" value="1.0" class="w-full cursor-pointer" />
+      </div>
+
+      <div class="flex flex-col gap-1">
+        <div class="flex justify-between text-xs">
+          <label for="lineWidthInput" class="theme-text-secondary">线条粗细 (px)</label>
+          <span id="lineWidthVal" class="text-blue-500 dark:text-blue-400 font-medium tabular-nums">2.2</span>
+        </div>
+        <input type="range" id="lineWidthInput" min="1.0" max="4.5" step="0.2" value="2.2" class="w-full cursor-pointer" />
+      </div>
+    </div>
+
+    <!-- 5. 逐行生长动画时序控制 -->
+    <div class="theme-card flex flex-col gap-3 border rounded-xl p-3.5">
+      <div class="text-xs font-semibold uppercase tracking-wider theme-text-muted">5. 逐行生长动画时序控制</div>
+
+      <div class="flex flex-col gap-1">
+        <div class="flex justify-between text-xs">
+          <label for="growDurInput" class="theme-text-secondary">由北向南生长时长 (秒)</label>
+          <span id="growDurVal" class="text-blue-500 dark:text-blue-400 font-medium tabular-nums">4.2s</span>
+        </div>
+        <input type="range" id="growDurInput" min="2.0" max="10.0" step="0.2" value="4.2" class="w-full cursor-pointer" />
+      </div>
+
+      <div class="flex flex-col gap-1">
+        <div class="flex justify-between text-xs">
+          <label for="totalDurInput" class="theme-text-secondary">视频总时长 (含末尾定格)</label>
+          <span id="totalDurVal" class="text-blue-500 dark:text-blue-400 font-medium tabular-nums">8.0s</span>
+        </div>
+        <input type="range" id="totalDurInput" min="4.0" max="15.0" step="0.5" value="8.0" class="w-full cursor-pointer" />
+      </div>
+
+      <div class="flex flex-col gap-1">
+        <div class="flex justify-between text-xs">
+          <label for="waveBandInput" class="theme-text-secondary">单行隆起过渡带宽度 (Transition Span)</label>
+          <span id="waveBandVal" class="text-blue-500 dark:text-blue-400 font-medium tabular-nums">0.18</span>
+        </div>
+        <input type="range" id="waveBandInput" min="0.04" max="0.40" step="0.02" value="0.18" class="w-full cursor-pointer" />
+      </div>
+    </div>
+
+    <!-- 6. 版面文案设置 -->
+    <div class="theme-card flex flex-col gap-2.5 border rounded-xl p-3.5">
+      <div class="text-xs font-semibold uppercase tracking-wider theme-text-muted">6. 版面文案设置</div>
+
+      <div class="flex flex-col gap-1">
+        <label for="titleText" class="text-xs theme-text-secondary">主标题 (Title)</label>
+        <input type="text" id="titleText" value="SOUTH AMERICA" class="theme-input w-full border focus:border-blue-500 text-xs px-2.5 py-1.5 rounded-lg outline-none" />
+      </div>
+
+      <div class="flex flex-col gap-1">
+        <label for="subTitleText" class="text-xs theme-text-secondary">副标题 (Subtitle)</label>
+        <input type="text" id="subTitleText" value="Every ridge, Caribbean to Cape Horn" class="theme-input w-full border focus:border-blue-500 text-xs px-2.5 py-1.5 rounded-lg outline-none" />
+      </div>
+
+      <div class="flex flex-col gap-1">
+        <label for="footerText" class="text-xs theme-text-secondary">底部署名 (Footer)</label>
+        <input type="text" id="footerText" value="ridge_map by Colin Carroll  ·  elevation: NASA SRTM  ·  New Science of Maps" class="theme-input w-full border focus:border-blue-500 text-xs px-2.5 py-1.5 rounded-lg outline-none" />
+      </div>
+    </div>
+  </aside>
+
+  <!-- 右侧预览工作区 -->
+  <main class="theme-workspace flex-1 h-[52vh] lg:h-screen flex flex-col items-center justify-center p-3 sm:p-5 relative overflow-hidden">
+    
+    <!-- 自适应画幅容器（默认 3:4 竖图 1440×1920） -->
+    <div id="canvasWrapper" class="max-h-[calc(100%-56px)] max-w-full rounded-lg overflow-hidden bg-black shadow-[0_20px_60px_rgba(0,0,0,0.45),0_0_0_1px_rgba(128,128,128,0.18)] flex items-center justify-center relative transition-shadow duration-300" style="aspect-ratio: 3 / 4; height: calc(100% - 56px);">
+      <canvas id="ridgeCanvas" width="1440" height="1920" class="w-full h-full block"></canvas>
+    </div>
+
+    <!-- 底部时间轴控制条 -->
+    <div class="theme-sidebar mt-3 w-full max-w-[560px] flex items-center gap-3 border px-3.5 py-2 rounded-xl shadow-lg">
+      <span class="text-[11px] font-medium theme-text-muted uppercase tracking-wider">Timeline</span>
+      <input type="range" id="timelineScrubber" min="0" max="8.0" step="0.01" value="0" class="flex-1 cursor-pointer" />
+      <div id="timeDisplay" class="text-xs tabular-nums theme-text-secondary min-w-[86px] text-right font-medium">
+        0.00 / 8.00s
+      </div>
+    </div>
+  </main>
+
+  <script>
+    /*************************************************************************
+     * 1. 全局状态、主题配色、长宽比与多档分辨率配置
+     *************************************************************************/
+    const canvas = document.getElementById('ridgeCanvas');
+    const canvasWrapper = document.getElementById('canvasWrapper');
+    const ctx = canvas.getContext('2d', { alpha: false });
+
+    // 亮色 / 暗色模式状态与画布配色方案
+    let isDarkMode = true;
+    const CANVAS_THEMES = {
+      dark: {
+        bg: '#000000',
+        fillMask: '#000000',
+        stroke: '#ffffff',
+        title: '#ffffff',
+        subtitle: '#e5e7eb',
+        footer: '#737373'
+      },
+      light: {
+        bg: '#f8fafc',
+        fillMask: '#f8fafc',
+        stroke: '#0f172a',
+        title: '#0f172a',
+        subtitle: '#334155',
+        footer: '#64748b'
+      }
+    };
+
+    // 支持的画幅长宽比预设
+    const ASPECT_PRESETS = {
+      '3:4':  { rw: 3,  rh: 4,  cssRatio: '3 / 4' },
+      '9:16': { rw: 9,  rh: 16, cssRatio: '9 / 16' },
+      '1:1':  { rw: 1,  rh: 1,  cssRatio: '1 / 1' },
+      '4:3':  { rw: 4,  rh: 3,  cssRatio: '4 / 3' },
+      '16:9': { rw: 16, rh: 9,  cssRatio: '16 / 9' }
+    };
+
+    // 支持的输出分辨率档位（以画幅短边基准像素计算精确宽高，并匹配相应视频录制码率）
+    const RESOLUTION_TIERS = {
+      '720p':  { shortEdge: 720,  label: '720p 标准',  bitrate: 8_000_000 },
+      '1080p': { shortEdge: 1080, label: '1080p 高清', bitrate: 12_000_000 },
+      '2k':    { shortEdge: 1440, label: '2K 超清',    bitrate: 18_000_000 },
+      '4k':    { shortEdge: 2160, label: '4K 极清',    bitrate: 36_000_000 }
+    };
+
+    let W = canvas.width;   // 默认 1440
+    let H = canvas.height;  // 默认 1920
+
+    // 原始栅格与地理空间元数据缓存（支持 EPSG:4326 逆向重采样）
+    let rawRaster = {
+      data: null,
+      width: 0,
+      height: 0,
+      noData: null,
+      isProcedural: true,
+      sourceCRS: 'EPSG:4326',
+      nativeBBox: [-82.0, -56.5, -34.0, 13.0],
+      lonLatBBox: [-82.0, -56.5, -34.0, 13.0],
+      forwardToNative: null
+    };
+
+    // 预处理后的扫描线数据结构
+    let ridgeData = {
+      lines: [],
+      numLines: 185,
+      numSamples: 480,
+      minElev: 0,
+      maxElev: 6000
+    };
+
+    // 动画播放与录制状态
+    let animState = {
+      isPlaying: true,
+      currentTime: 0,
+      lastFrameTime: performance.now(),
+      isRecording: false,
+      mediaRecorder: null,
+      recordedChunks: []
+    };
+
+    // 切换亮色/暗色主题
+    function applyTheme(dark) {
+      isDarkMode = dark;
+      const htmlEl = document.documentElement;
+      const sunIcon = document.getElementById('sunIcon');
+      const moonIcon = document.getElementById('moonIcon');
+      const themeText = document.getElementById('themeToggleText');
+
+      if (isDarkMode) {
+        htmlEl.classList.add('dark');
+        sunIcon.classList.remove('hidden');
+        moonIcon.classList.add('hidden');
+        themeText.textContent = '亮色模式';
+      } else {
+        htmlEl.classList.remove('dark');
+        sunIcon.classList.add('hidden');
+        moonIcon.classList.remove('hidden');
+        themeText.textContent = '暗色模式';
+      }
+
+      renderFrame(animState.currentTime);
+    }
+
+    // 根据长宽比 + 分辨率档位计算并应用画布尺寸
+    function updateCanvasDimensions() {
+      const ratioKey = document.getElementById('aspectRatioSelect').value;
+      const resKey = document.getElementById('resolutionSelect').value;
+
+      const aspect = ASPECT_PRESETS[ratioKey] || ASPECT_PRESETS['3:4'];
+      const tier = RESOLUTION_TIERS[resKey] || RESOLUTION_TIERS['2k'];
+
+      // 以短边为基准计算精确偶数的像素宽高
+      if (aspect.rw <= aspect.rh) {
+        W = tier.shortEdge;
+        H = Math.round((tier.shortEdge * aspect.rh) / aspect.rw);
+      } else {
+        H = tier.shortEdge;
+        W = Math.round((tier.shortEdge * aspect.rw) / aspect.rh);
+      }
+      // 确保像素为偶数以兼容编码器
+      W = W % 2 === 0 ? W : W + 1;
+      H = H % 2 === 0 ? H : H + 1;
+
+      canvas.width = W;
+      canvas.height = H;
+      canvasWrapper.style.aspectRatio = aspect.cssRatio;
+
+      // 根据横竖屏自适应外框尺寸约束，防止溢出右侧工作区
+      if (W > H) {
+        canvasWrapper.style.width = 'min(94%, calc((100vh - 96px) * ' + (W / H).toFixed(3) + '))';
+        canvasWrapper.style.height = 'auto';
+      } else {
+        canvasWrapper.style.height = 'calc(100% - 56px)';
+        canvasWrapper.style.width = 'auto';
+      }
+
+      // 同步更新界面上的分辨率显示与按钮文案
+      document.getElementById('resBadge').textContent = `${ratioKey} · ${W}×${H}`;
+      document.getElementById('resQualityHint').textContent = `${tier.label} · ${W}×${H}`;
+
+      if (!animState.isRecording) {
+        document.getElementById('recordBtnText').textContent = `● 录制并导出完整视频 (${W}×${H})`;
+      }
+      document.getElementById('exportPngBtnText').textContent = `导出当前帧高清静态图 PNG (${W}×${H})`;
+
+      renderFrame(animState.currentTime);
+    }
+
+    // 读取当前所有 UI 控件参数
+    function getParams() {
+      const growDur = parseFloat(document.getElementById('growDurInput').value);
+      const totalDur = Math.max(growDur + 0.5, parseFloat(document.getElementById('totalDurInput').value));
+      return {
+        aspectRatio: document.getElementById('aspectRatioSelect').value,
+        resolutionTier: document.getElementById('resolutionSelect').value,
+        animMode: 'classic_scan',
+        projMode: document.getElementById('projModeSelect').value,
+        numLines: parseInt(document.getElementById('numLinesInput').value, 10),
+        vertScale: parseFloat(document.getElementById('vertScaleInput').value),
+        waterThresh: parseFloat(document.getElementById('waterThreshInput').value),
+        smoothing: parseFloat(document.getElementById('smoothInput').value),
+        lineWidth: parseFloat(document.getElementById('lineWidthInput').value),
+        growDur,
+        totalDur,
+        waveBand: parseFloat(document.getElementById('waveBandInput').value),
+        title: document.getElementById('titleText').value,
+        subtitle: document.getElementById('subTitleText').value,
+        footer: document.getElementById('footerText').value
+      };
+    }
+
+    /*************************************************************************
+     * 2. 内置南美洲 (South America) EPSG:4326 高精度程序化 DEM 生成器
+     *************************************************************************/
+    function generateSouthAmericaProceduralDEM(gridW = 480, gridH = 420) {
+      const data = new Float32Array(gridW * gridH);
+      const noData = -9999;
+      data.fill(noData);
+
+      function hash(n) {
+        const x = Math.sin(n) * 43758.5453123;
+        return x - Math.floor(x);
+      }
+      function noise2D(x, y) {
+        const xi = Math.floor(x), yi = Math.floor(y);
+        const xf = x - xi, yf = y - yi;
+        const u = xf * xf * (3 - 2 * xf);
+        const v = yf * yf * (3 - 2 * yf);
+        const n00 = hash(xi + yi * 57);
+        const n10 = hash(xi + 1 + yi * 57);
+        const n01 = hash(xi + (yi + 1) * 57);
+        const n11 = hash(xi + 1 + (yi + 1) * 57);
+        return (n00 * (1 - u) + n10 * u) * (1 - v) + (n01 * (1 - u) + n11 * u) * v;
+      }
+      function fbm(x, y) {
+        let val = 0, amp = 0.5, freq = 1;
+        for (let k = 0; k < 5; k++) {
+          val += amp * noise2D(x * freq, y * freq);
+          freq *= 2.07;
+          amp *= 0.5;
+        }
+        return val;
+      }
+      function ridgedMF(x, y) {
+        let val = 0, amp = 0.5, freq = 1, weight = 1;
+        for (let k = 0; k < 4; k++) {
+          let n = 1.0 - Math.abs(noise2D(x * freq, y * freq) * 2.0 - 1.0);
+          n = n * n * weight;
+          weight = Math.max(0.2, Math.min(1.0, n * 1.8));
+          val += n * amp;
+          freq *= 2.15;
+          amp *= 0.5;
+        }
+        return val;
+      }
+
+      // 南美洲真实 EPSG:4326 经纬度范围: Lon [-82°, -34°], Lat [-56.5°, 13.0°]
+      for (let r = 0; r < gridH; r++) {
+        const v = r / (gridH - 1);
+        let westCoast = 0.5, eastCoast = 0.4;
+
+        if (v < 0.025) {
+          continue;
+        } else if (v < 0.14) {
+          const t = (v - 0.025) / 0.115;
+          westCoast = 0.19 - 0.06 * Math.sin(t * Math.PI * 0.85);
+          eastCoast = 0.22 + 0.36 * Math.pow(t, 0.72);
+        } else if (v < 0.36) {
+          const t = (v - 0.14) / 0.22;
+          westCoast = 0.13 - 0.045 * Math.sin(t * Math.PI);
+          eastCoast = 0.58 + 0.37 * Math.sin(t * Math.PI * 0.78);
+        } else if (v < 0.56) {
+          const t = (v - 0.36) / 0.20;
+          westCoast = 0.13 + 0.11 * Math.sin(t * Math.PI * 0.55);
+          eastCoast = 0.92 - 0.30 * t;
+        } else if (v < 0.94) {
+          const t = (v - 0.56) / 0.38;
+          westCoast = 0.24 - 0.06 * Math.sin(t * Math.PI * 0.7);
+          eastCoast = 0.62 - 0.35 * Math.pow(t, 0.82);
+        } else if (v <= 0.978) {
+          const t = (v - 0.94) / 0.038;
+          westCoast = 0.19 + 0.04 * t;
+          eastCoast = 0.27 + 0.03 * (1 - t);
+        } else {
+          continue;
+        }
+
+        const coastJitterW = (fbm(v * 20, 1.3) - 0.5) * 0.022;
+        const coastJitterE = (fbm(v * 20, 7.7) - 0.5) * 0.028;
+        westCoast += coastJitterW;
+        eastCoast += coastJitterE;
+
+        for (let c = 0; c < gridW; c++) {
+          const u = c / (gridW - 1);
+
+          // 太平洋与南大西洋岛屿
+          const isGalapagos = Math.abs(v - 0.205) < 0.016 && Math.abs(u - 0.038) < 0.024;
+          const isMalpelo = Math.abs(v - 0.135) < 0.008 && Math.abs(u - 0.085) < 0.014;
+          const isSanFelix = Math.abs(v - 0.565) < 0.010 && Math.abs(u - 0.055) < 0.018;
+          const isJuanFernandez = Math.abs(v - 0.675) < 0.012 && Math.abs(u - 0.068) < 0.022;
+          const isFalklands = Math.abs(v - 0.905) < 0.013 && Math.abs(u - 0.46) < 0.035;
+          const isSouthGeorgia = Math.abs(v - 0.945) < 0.015 && Math.abs(u - 0.88) < 0.042;
+
+          if (isGalapagos || isMalpelo || isSanFelix || isJuanFernandez || isFalklands || isSouthGeorgia) {
+            const islandNoise = ridgedMF(u * 42, v * 42);
+            if (islandNoise > 0.30) {
+              data[r * gridW + c] = isSouthGeorgia ? 2100 * islandNoise : 820 * islandNoise;
+            }
+            continue;
+          }
+
+          // 南美大陆主体高程合成
+          if (u >= westCoast && u <= eastCoast) {
+            const dWest = u - westCoast;
+            const andesWidth = v < 0.15 ? 0.065 : (v < 0.55 ? 0.088 : 0.055);
+            const andesCenter = 0.030 + 0.014 * Math.sin(v * 9.5);
+            let andes = Math.exp(-Math.pow((dWest - andesCenter) / andesWidth, 2));
+
+            if (v > 0.35 && v < 0.58) {
+              const altiplano = Math.exp(-Math.pow((v - 0.46) / 0.085, 2));
+              andes += 0.72 * altiplano * Math.exp(-Math.pow((dWest - 0.088) / 0.058, 2));
+            }
+
+            if (v < 0.085 && Math.abs(u - 0.195) < 0.025) {
+              andes += 1.25 * Math.exp(-Math.pow((u - 0.195) / 0.012, 2));
+            }
+
+            const ridgePeak = ridgedMF(u * 36, v * 36);
+            const midFreq = fbm(u * 15, v * 15);
+            let elev = 110 + andes * (3800 * Math.pow(ridgePeak, 1.25) + 1500 * midFreq);
+
+            const guiana = Math.exp(-Math.pow((u - 0.39) / 0.095, 2) - Math.pow((v - 0.135) / 0.055, 2));
+            elev += guiana * 2450 * Math.pow(ridgePeak, 1.2);
+
+            const brazilEast = Math.exp(-Math.pow((u - 0.72) / 0.15, 2) - Math.pow((v - 0.47) / 0.19, 2));
+            const serraDoMar = Math.exp(-Math.pow((eastCoast - u - 0.035) / 0.045, 2) - Math.pow((v - 0.50) / 0.14, 2));
+            elev += (brazilEast * 1250 + serraDoMar * 1150) * Math.pow(ridgePeak, 1.3);
+
+            elev += 240 * Math.pow(fbm(u * 25, v * 25), 2.1);
+
+            data[r * gridW + c] = elev;
+          }
+        }
+      }
+
+      rawRaster = {
+        data,
+        width: gridW,
+        height: gridH,
+        noData,
+        isProcedural: true,
+        sourceCRS: 'EPSG:4326',
+        nativeBBox: [-82.0, -56.5, -34.0, 13.0],
+        lonLatBBox: [-82.0, -56.5, -34.0, 13.0],
+        forwardToNative: null
+      };
+      updateCRSInfoDisplay();
+    }
+
+    function updateCRSInfoDisplay() {
+      const [minLon, minLat, maxLon, maxLat] = rawRaster.lonLatBBox;
+      const dLon = Math.max(0.01, maxLon - minLon);
+      const dLat = Math.max(0.01, maxLat - minLat);
+      const crsBox = document.getElementById('crsInfoBox');
+      const srcNote = rawRaster.sourceCRS !== 'EPSG:4326'
+        ? `${rawRaster.sourceCRS} → EPSG:4326`
+        : `EPSG:4326 (WGS 84)`;
+      crsBox.textContent = `CRS: ${srcNote} | Lon: [${minLon.toFixed(2)}°, ${maxLon.toFixed(2)}°] (Δ${dLon.toFixed(1)}°) | Lat: [${minLat.toFixed(2)}°, ${maxLat.toFixed(2)}°] (Δ${dLat.toFixed(1)}°)`;
+    }
+
+    /*************************************************************************
+     * 3. EPSG:4326 等经纬度网格重采样、水体掩膜与一维高斯平滑
+     *************************************************************************/
+    function buildRidgeLines() {
+      if (!rawRaster.data) return;
+
+      const params = getParams();
+      const numLines = params.numLines;
+      const numSamples = ridgeData.numSamples;
+      const waterThresh = params.waterThresh;
+      const sigma = params.smoothing;
+
+      const { data, width, height, noData, nativeBBox, lonLatBBox, forwardToNative } = rawRaster;
+      const [minLon, minLat, maxLon, maxLat] = lonLatBBox;
+      const [natMinX, natMinY, natMaxX, natMaxY] = nativeBBox;
+      const natSpanX = Math.max(1e-9, natMaxX - natMinX);
+      const natSpanY = Math.max(1e-9, natMaxY - natMinY);
+
+      let kernel = [1];
+      if (sigma > 0.1) {
+        const radius = Math.ceil(sigma * 2.5);
+        kernel = [];
+        let sum = 0;
+        for (let k = -radius; k <= radius; k++) {
+          const w = Math.exp(-(k * k) / (2 * sigma * sigma));
+          kernel.push(w);
+          sum += w;
+        }
+        kernel = kernel.map(w => w / sum);
+      }
+      const kHalf = Math.floor(kernel.length / 2);
+
+      const lines = [];
+      let globalMin = Infinity;
+      let globalMax = -Infinity;
+
+      for (let i = 0; i < numLines; i++) {
+        const v = i / (numLines - 1);
+        const lat = maxLat - v * (maxLat - minLat);
+
+        const rawRow = new Float32Array(numSamples);
+        const isLand = new Uint8Array(numSamples);
+
+        for (let j = 0; j < numSamples; j++) {
+          const u = j / (numSamples - 1);
+          const lon = minLon + u * (maxLon - minLon);
+
+          let srcX, srcY;
+          if (forwardToNative) {
+            try {
+              const [nx, ny] = forwardToNative([lon, lat]);
+              srcX = ((nx - natMinX) / natSpanX) * (width - 1);
+              srcY = ((natMaxY - ny) / natSpanY) * (height - 1);
+            } catch (_) {
+              srcX = u * (width - 1);
+              srcY = v * (height - 1);
+            }
+          } else {
+            srcX = u * (width - 1);
+            srcY = v * (height - 1);
+          }
+
+          if (srcX < 0 || srcX > width - 1 || srcY < 0 || srcY > height - 1) {
+            rawRow[j] = NaN;
+            isLand[j] = 0;
+            continue;
+          }
+
+          const x0 = Math.floor(srcX);
+          const x1 = Math.min(width - 1, x0 + 1);
+          const fx = srcX - x0;
+          const y0 = Math.floor(srcY);
+          const y1 = Math.min(height - 1, y0 + 1);
+          const fy = srcY - y0;
+
+          const v00 = data[y0 * width + x0];
+          const v10 = data[y0 * width + x1];
+          const v01 = data[y1 * width + x0];
+          const v11 = data[y1 * width + x1];
+
+          const invalid = (val) =>
+            val === undefined ||
+            Number.isNaN(val) ||
+            (noData !== null && Math.abs(val - noData) < 1e-3) ||
+            val < -5000 ||
+            val <= waterThresh;
+
+          if (invalid(v00) || invalid(v10) || invalid(v01) || invalid(v11)) {
+            rawRow[j] = NaN;
+            isLand[j] = 0;
+          } else {
+            const val =
+              (v00 * (1 - fx) + v10 * fx) * (1 - fy) +
+              (v01 * (1 - fx) + v11 * fx) * fy;
+            rawRow[j] = val;
+            isLand[j] = 1;
+            if (val < globalMin) globalMin = val;
+            if (val > globalMax) globalMax = val;
+          }
+        }
+
+        const smoothedRow = new Float32Array(numSamples);
+        let firstLand = -1;
+
+        for (let j = 0; j < numSamples; j++) {
+          if (!isLand[j]) {
+            smoothedRow[j] = NaN;
+            continue;
+          }
+          if (firstLand === -1) firstLand = j;
+
+          if (kernel.length === 1) {
+            smoothedRow[j] = rawRow[j];
+          } else {
+            let acc = 0, wSum = 0;
+            for (let k = -kHalf; k <= kHalf; k++) {
+              const idx = j + k;
+              if (idx >= 0 && idx < numSamples && isLand[idx]) {
+                const w = kernel[k + kHalf];
+                acc += rawRow[idx] * w;
+                wSum += w;
+              }
+            }
+            smoothedRow[j] = wSum > 0 ? acc / wSum : rawRow[j];
+          }
+        }
+
+        lines.push({
+          elev: smoothedRow,
+          normElev: new Float32Array(numSamples),
+          isLand,
+          hasLand: firstLand !== -1
+        });
+      }
+
+      if (!Number.isFinite(globalMin) || globalMax <= globalMin) {
+        globalMin = 0;
+        globalMax = 1000;
+      }
+
+      const elevSpan = globalMax - globalMin;
+      for (let i = 0; i < numLines; i++) {
+        const line = lines[i];
+        for (let j = 0; j < numSamples; j++) {
+          if (line.isLand[j]) {
+            line.normElev[j] = Math.max(0, (line.elev[j] - globalMin) / elevSpan);
+          } else {
+            line.normElev[j] = NaN;
+          }
+        }
+      }
+
+      ridgeData.lines = lines;
+      ridgeData.numLines = numLines;
+      ridgeData.minElev = globalMin;
+      ridgeData.maxElev = globalMax;
+    }
+
+    /*************************************************************************
+     * 4. 核心渲染引擎：经典由北向南逐行生长 (支持亮色/暗色主题配色)
+     *************************************************************************/
+    function easeOutQuart(x) {
+      const t = Math.max(0, Math.min(1, x));
+      return 1 - Math.pow(1 - t, 4);
+    }
+
+    function computeMapViewport(projMode) {
+      const availTop = H * 0.205;
+      const availBottom = H * 0.915;
+      const availLeft = W * 0.055;
+      const availRight = W * 0.945;
+      const availW = availRight - availLeft;
+      const availH = availBottom - availTop;
+
+      if (projMode === 'fill_viewport') {
+        return { mapLeft: availLeft, mapTop: availTop, mapWidth: availW, mapHeight: availH };
+      }
+
+      const [minLon, minLat, maxLon, maxLat] = rawRaster.lonLatBBox;
+      const dLon = Math.max(0.01, maxLon - minLon);
+      const dLat = Math.max(0.01, maxLat - minLat);
+
+      let geoAspect = dLon / dLat;
+      if (projMode === 'epsg4326_cos_lat') {
+        const centerLatRad = ((minLat + maxLat) * 0.5 * Math.PI) / 180;
+        geoAspect = (dLon * Math.max(0.15, Math.cos(centerLatRad))) / dLat;
+      }
+
+      const boxAspect = availW / availH;
+      let mapWidth, mapHeight;
+      if (geoAspect > boxAspect) {
+        mapWidth = availW;
+        mapHeight = availW / geoAspect;
+      } else {
+        mapHeight = availH;
+        mapWidth = availH * geoAspect;
+      }
+
+      const mapLeft = availLeft + (availW - mapWidth) * 0.5;
+      const mapTop = availTop + (availH - mapHeight) * 0.5;
+      return { mapLeft, mapTop, mapWidth, mapHeight };
+    }
+
+    // 收集一行的连续陆地折线段并按画家算法填充遮挡层与绘制山脊线
+    function fillAndStrokeLandSegments(line, numSamples, mapXFn, yBase, elevScale, palette) {
+      const segments = [];
+      let curSeg = null;
+
+      for (let j = 0; j < numSamples; j++) {
+        if (line.isLand[j]) {
+          const u = j / (numSamples - 1);
+          const x = mapXFn(u);
+          const y = yBase - line.normElev[j] * elevScale;
+
+          if (!curSeg) {
+            curSeg = [];
+            segments.push(curSeg);
+          }
+          curSeg.push({ x, y });
+        } else if (curSeg) {
+          curSeg = null;
+        }
+      }
+
+      // 1. 画家算法：填充与背景一致的遮挡多边形，遮挡后方北侧山脊线
+      ctx.fillStyle = palette.fillMask;
+      for (const seg of segments) {
+        if (seg.length < 2) continue;
+        ctx.beginPath();
+        ctx.moveTo(seg[0].x, yBase + 2.0);
+        for (let p = 0; p < seg.length; p++) {
+          ctx.lineTo(seg[p].x, seg[p].y);
+        }
+        ctx.lineTo(seg[seg.length - 1].x, yBase + 2.0);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // 2. 绘制山脊折线
+      ctx.strokeStyle = palette.stroke;
+      for (const seg of segments) {
+        if (seg.length === 1) {
+          ctx.beginPath();
+          ctx.moveTo(seg[0].x - 2.5, seg[0].y);
+          ctx.lineTo(seg[0].x + 2.5, seg[0].y);
+          ctx.stroke();
+          continue;
+        }
+        ctx.beginPath();
+        ctx.moveTo(seg[0].x, seg[0].y);
+        for (let p = 1; p < seg.length; p++) {
+          ctx.lineTo(seg[p].x, seg[p].y);
+        }
+        ctx.stroke();
+      }
+    }
+
+    function renderFrame(timeSec) {
+      const params = getParams();
+      const {
+        projMode,
+        vertScale,
+        lineWidth,
+        growDur,
+        waveBand,
+        title,
+        subtitle,
+        footer
+      } = params;
+
+      const palette = isDarkMode ? CANVAS_THEMES.dark : CANVAS_THEMES.light;
+
+      // 1. 绘制画布背景
+      ctx.fillStyle = palette.bg;
+      ctx.fillRect(0, 0, W, H);
+
+      // 2. 计算符合 EPSG:4326 比例的版心窗口
+      const { mapLeft, mapTop, mapWidth, mapHeight } = computeMapViewport(projMode);
+
+      // 按当前画布分辨率自适应缩放垂直夸张与线宽
+      const scaleFactorH = H / 1920;
+      const scaleFactorW = Math.min(W, H) / 1200;
+      const effectiveVertScale = vertScale * scaleFactorH;
+
+      const lines = ridgeData.lines;
+      const numLines = lines.length;
+      const numSamples = ridgeData.numSamples;
+
+      // 波前位置 w(t)：t=0 时从北部启动，t=growDur 时全图 100% 生长完成
+      const normTime = Math.max(0, Math.min(1, timeSec / growDur));
+      const waveStart = 0.04;
+      const waveEnd = 1.0 + waveBand + 0.02;
+      const wavefront = waveStart + normTime * (waveEnd - waveStart);
+
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.lineWidth = lineWidth * Math.max(0.65, scaleFactorW);
+
+      // 3. 经典由北向南逐行生长模式 (classic_scan)
+      for (let i = 0; i < numLines; i++) {
+        const line = lines[i];
+        if (!line.hasLand) continue;
+
+        const v = i / (numLines - 1);
+        const yTrueBase = mapTop + v * mapHeight;
+        const tau = wavefront - v;
+
+        if (tau < 0) continue;
+
+        const s = easeOutQuart(Math.min(1.0, tau / waveBand));
+        const elevScale = effectiveVertScale * s;
+        const mapX = (u) => mapLeft + u * mapWidth;
+
+        fillAndStrokeLandSegments(line, numSamples, mapX, yTrueBase, elevScale, palette);
+      }
+
+      // 4. 自适应比例绘制顶部主副标题与底部署名
+      const fontRef = Math.min(W * 1.15, H * 0.72);
+      const titleSize = Math.round(fontRef * 0.056);
+      const subTitleSize = Math.round(fontRef * 0.0285);
+      const footerSize = Math.round(fontRef * 0.0165);
+
+      ctx.fillStyle = palette.title;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+
+      // 主标题
+      ctx.font = `300 ${titleSize}px "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif`;
+      ctx.fillText(title, mapLeft, H * 0.112);
+
+      // 副标题
+      ctx.fillStyle = palette.subtitle;
+      ctx.font = `400 ${subTitleSize}px "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif`;
+      ctx.fillText(subtitle, mapLeft, H * 0.150);
+
+      // 底部居中署名
+      ctx.fillStyle = palette.footer;
+      ctx.textAlign = 'center';
+      ctx.font = `400 ${footerSize}px "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif`;
+      ctx.fillText(footer, W * 0.5, H * 0.965);
+    }
+
+    /*************************************************************************
+     * 5. GeoTIFF 文件读取、CRS 识别与 EPSG:4326 自动坐标转换
+     *************************************************************************/
+    function detectGeoTiffCRS(geoKeys, bbox) {
+      if (!geoKeys) return 'EPSG:4326';
+      const projCode = geoKeys.ProjectedCSTypeGeoKey;
+      const geogCode = geoKeys.GeographicTypeGeoKey;
+
+      if (projCode && projCode !== 32767) {
+        return `EPSG:${projCode}`;
+      }
+      if (geogCode && geogCode !== 32767) {
+        return `EPSG:${geogCode}`;
+      }
+      if (bbox && (Math.abs(bbox[0]) > 360 || Math.abs(bbox[2]) > 360)) {
+        return 'EPSG:3857';
+      }
+      return 'EPSG:4326';
+    }
+
+    function ensureProj4Def(epsgCode) {
+      if (typeof proj4 === 'undefined') return false;
+      if (epsgCode === 'EPSG:4326' || epsgCode === 'EPSG:3857') return true;
+      try {
+        if (proj4.defs(epsgCode)) return true;
+      } catch (_) {}
+
+      const m = /^EPSG:32(6|7)(\d{2})$/.exec(epsgCode);
+      if (m) {
+        const isSouth = m[1] === '7';
+        const zone = parseInt(m[2], 10);
+        proj4.defs(
+          epsgCode,
+          `+proj=utm +zone=${zone} ${isSouth ? '+south ' : ''}+datum=WGS84 +units=m +no_defs`
+        );
+        return true;
+      }
+      return false;
+    }
+
+    async function handleGeoTiffFile(file) {
+      const statusEl = document.getElementById('dataStatus');
+      statusEl.textContent = `正在解析 GeoTIFF 与投影信息: ${file.name} ...`;
+      statusEl.className = 'text-xs px-2.5 py-2 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/25 break-all leading-relaxed';
+
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
+        const image = await tiff.getImage();
+        const width = image.getWidth();
+        const height = image.getHeight();
+        const noData = image.getGDALNoData();
+
+        let nativeBBox = [-82.0, -56.5, -34.0, 13.0];
+        try {
+          const b = image.getBoundingBox();
+          if (b && b.length === 4 && b.every(Number.isFinite)) {
+            nativeBBox = b;
+          }
+        } catch (_) {}
+
+        let geoKeys = {};
+        try {
+          geoKeys = image.getGeoKeys() || {};
+        } catch (_) {}
+
+        const sourceCRS = detectGeoTiffCRS(geoKeys, nativeBBox);
+        let lonLatBBox = [...nativeBBox];
+        let forwardToNative = null;
+
+        if (sourceCRS !== 'EPSG:4326' && ensureProj4Def(sourceCRS)) {
+          try {
+            const pSW = proj4(sourceCRS, 'EPSG:4326', [nativeBBox[0], nativeBBox[1]]);
+            const pNE = proj4(sourceCRS, 'EPSG:4326', [nativeBBox[2], nativeBBox[3]]);
+            const pNW = proj4(sourceCRS, 'EPSG:4326', [nativeBBox[0], nativeBBox[3]]);
+            const pSE = proj4(sourceCRS, 'EPSG:4326', [nativeBBox[2], nativeBBox[1]]);
+            const lons = [pSW[0], pNE[0], pNW[0], pSE[0]];
+            const lats = [pSW[1], pNE[1], pNW[1], pSE[1]];
+            lonLatBBox = [
+              Math.min(...lons),
+              Math.min(...lats),
+              Math.max(...lons),
+              Math.max(...lats)
+            ];
+            forwardToNative = (lonLat) => proj4('EPSG:4326', sourceCRS, lonLat);
+          } catch (projErr) {
+            console.warn('Proj4 转换回退至原生坐标网格:', projErr);
+          }
+        }
+
+        const rasters = await image.readRasters();
+        const band0 = rasters[0];
+
+        rawRaster = {
+          data: band0,
+          width,
+          height,
+          noData: noData !== null && noData !== undefined ? noData : -9999,
+          isProcedural: false,
+          sourceCRS,
+          nativeBBox,
+          lonLatBBox,
+          forwardToNative
+        };
+
+        const baseName = file.name.replace(/\.(geotiff|tiff|tif)$/i, '').replace(/[_-]+/g, ' ').toUpperCase();
+        if (baseName) {
+          document.getElementById('titleText').value = baseName;
+        }
+
+        updateCRSInfoDisplay();
+        buildRidgeLines();
+        animState.currentTime = 0;
+        animState.isPlaying = true;
+        document.getElementById('playPauseBtn').textContent = '暂停播放';
+
+        statusEl.textContent = `已加载并重采样至 EPSG:4326: ${file.name} (${width}×${height} px, 高程: ${Math.round(ridgeData.minElev)}m ~ ${Math.round(ridgeData.maxElev)}m)`;
+        statusEl.className = 'text-xs px-2.5 py-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 break-all leading-relaxed';
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = `解析失败: ${err.message || '请确认文件为标准未加密单波段 GeoTIFF'}`;
+        statusEl.className = 'text-xs px-2.5 py-2 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/25 break-all leading-relaxed';
+      }
+    }
+
+    /*************************************************************************
+     * 6. 视频录制与静态截图导出 (自适应所选分辨率档位与亮暗主题)
+     *************************************************************************/
+    function startVideoRecording() {
+      if (animState.isRecording) return;
+
+      // 确保录制前画布分辨率与所选档位一致
+      updateCanvasDimensions();
+
+      const resKey = document.getElementById('resolutionSelect').value;
+      const tier = RESOLUTION_TIERS[resKey] || RESOLUTION_TIERS['2k'];
+
+      const recordBtn = document.getElementById('recordBtn');
+      const recordBtnText = document.getElementById('recordBtnText');
+      const stream = canvas.captureStream(60);
+
+      const mimeCandidates = [
+        'video/mp4;codecs=avc1.42E01E',
+        'video/mp4',
+        'video/webm;codecs=vp9',
+        'video/webm;codecs=vp8',
+        'video/webm'
+      ];
+      let selectedMime = '';
+      for (const mime of mimeCandidates) {
+        if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(mime)) {
+          selectedMime = mime;
+          break;
+        }
+      }
+
+      animState.recordedChunks = [];
+      const recorder = new MediaRecorder(stream, {
+        mimeType: selectedMime || undefined,
+        videoBitsPerSecond: tier.bitrate
+      });
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          animState.recordedChunks.push(e.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        const ext = selectedMime.includes('mp4') ? 'mp4' : 'webm';
+        const blob = new Blob(animState.recordedChunks, { type: selectedMime || 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const cleanTitle = (document.getElementById('titleText').value || 'ridge_map')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '_');
+        const ratioTag = document.getElementById('aspectRatioSelect').value.replace(':', 'x');
+        const themeTag = isDarkMode ? 'dark' : 'light';
+        a.href = url;
+        a.download = `${cleanTitle}_${ratioTag}_${resKey}_${W}x${H}_${themeTag}.${ext}`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+
+        animState.isRecording = false;
+        recordBtn.classList.remove('recording-active', 'bg-red-800');
+        recordBtn.classList.add('bg-red-600');
+        recordBtnText.textContent = `● 录制并导出完整视频 (${W}×${H})`;
+      };
+
+      animState.currentTime = 0;
+      animState.isPlaying = true;
+      animState.isRecording = true;
+      animState.mediaRecorder = recorder;
+      document.getElementById('playPauseBtn').textContent = '暂停播放';
+
+      recordBtn.classList.remove('bg-red-600');
+      recordBtn.classList.add('recording-active', 'bg-red-800');
+      recordBtnText.textContent = `■ 正在录制 ${W}×${H} (${tier.label}) 视频中... (点击可提前完成)`;
+      recorder.start(100);
+    }
+
+    function stopVideoRecording() {
+      if (animState.isRecording && animState.mediaRecorder && animState.mediaRecorder.state !== 'inactive') {
+        animState.mediaRecorder.stop();
+      }
+    }
+
+    /*************************************************************************
+     * 7. 主循环与交互事件绑定
+     *************************************************************************/
+    function tick(now) {
+      const dt = Math.min(0.1, (now - animState.lastFrameTime) / 1000);
+      animState.lastFrameTime = now;
+
+      const params = getParams();
+      const scrubber = document.getElementById('timelineScrubber');
+      scrubber.max = params.totalDur.toFixed(1);
+
+      if (animState.isPlaying) {
+        animState.currentTime += dt;
+
+        if (animState.currentTime >= params.totalDur) {
+          if (animState.isRecording) {
+            animState.currentTime = params.totalDur;
+            renderFrame(animState.currentTime);
+            stopVideoRecording();
+            animState.isPlaying = false;
+            document.getElementById('playPauseBtn').textContent = '继续播放';
+          } else {
+            animState.currentTime = 0;
+          }
+        }
+      }
+
+      scrubber.value = animState.currentTime;
+      document.getElementById('timeDisplay').textContent =
+        `${animState.currentTime.toFixed(2)} / ${params.totalDur.toFixed(2)}s`;
+
+      renderFrame(animState.currentTime);
+      requestAnimationFrame(tick);
+    }
+
+    function bindEvents() {
+      // 0. 亮色 / 暗色模式切换按钮
+      document.getElementById('themeToggleBtn').addEventListener('click', () => {
+        applyTheme(!isDarkMode);
+      });
+
+      // 1. 画面长宽比与输出分辨率档位切换
+      document.getElementById('aspectRatioSelect').addEventListener('change', () => {
+        updateCanvasDimensions();
+      });
+
+      document.getElementById('resolutionSelect').addEventListener('change', () => {
+        updateCanvasDimensions();
+      });
+
+      // 2. 动画模式选择
+      document.getElementById('animModeSelect').addEventListener('change', () => {
+        animState.currentTime = 0;
+        animState.isPlaying = true;
+        document.getElementById('playPauseBtn').textContent = '暂停播放';
+      });
+
+      // 3. EPSG:4326 投影比例策略切换
+      document.getElementById('projModeSelect').addEventListener('change', () => {
+        renderFrame(animState.currentTime);
+      });
+
+      // 4. 文件上传与拖拽
+      const tiffInput = document.getElementById('tiffInput');
+      const dropZone = document.getElementById('dropZone');
+
+      tiffInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) {
+          handleGeoTiffFile(e.target.files[0]);
+        }
+      });
+
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('border-blue-500', 'bg-blue-500/15');
+      });
+      dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('border-blue-500', 'bg-blue-500/15');
+      });
+      dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('border-blue-500', 'bg-blue-500/15');
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+          handleGeoTiffFile(e.dataTransfer.files[0]);
+        }
+      });
+
+      // 恢复内置南美洲演示数据按钮
+      document.getElementById('resetDemoBtn').addEventListener('click', () => {
+        generateSouthAmericaProceduralDEM();
+        document.getElementById('titleText').value = 'SOUTH AMERICA';
+        document.getElementById('subTitleText').value = 'Every ridge, Caribbean to Cape Horn';
+        buildRidgeLines();
+        animState.currentTime = 0;
+        animState.isPlaying = true;
+        document.getElementById('playPauseBtn').textContent = '暂停播放';
+        const statusEl = document.getElementById('dataStatus');
+        statusEl.textContent = '当前数据：内置南美洲 (South America) SRTM 级演示高程';
+        statusEl.className = 'text-xs px-2.5 py-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 break-all leading-relaxed';
+      });
+
+      // 需重新构建剖面数据的滑块
+      const rebuildControls = [
+        ['numLinesInput', 'numLinesVal', ''],
+        ['waterThreshInput', 'waterThreshVal', ''],
+        ['smoothInput', 'smoothVal', '']
+      ];
+      for (const [inputId, valId, suffix] of rebuildControls) {
+        const el = document.getElementById(inputId);
+        el.addEventListener('input', () => {
+          document.getElementById(valId).textContent = el.value + suffix;
+          buildRidgeLines();
+        });
+      }
+
+      // 实时渲染滑块
+      const liveControls = [
+        ['vertScaleInput', 'vertScaleVal', ''],
+        ['lineWidthInput', 'lineWidthVal', ''],
+        ['growDurInput', 'growDurVal', 's'],
+        ['totalDurInput', 'totalDurVal', 's'],
+        ['waveBandInput', 'waveBandVal', '']
+      ];
+      for (const [inputId, valId, suffix] of liveControls) {
+        const el = document.getElementById(inputId);
+        el.addEventListener('input', () => {
+          document.getElementById(valId).textContent = el.value + suffix;
+        });
+      }
+
+      // 播放/暂停/重播
+      const playPauseBtn = document.getElementById('playPauseBtn');
+      playPauseBtn.addEventListener('click', () => {
+        animState.isPlaying = !animState.isPlaying;
+        playPauseBtn.textContent = animState.isPlaying ? '暂停播放' : '继续播放';
+      });
+
+      document.getElementById('restartBtn').addEventListener('click', () => {
+        animState.currentTime = 0;
+        animState.isPlaying = true;
+        playPauseBtn.textContent = '暂停播放';
+      });
+
+      // 时间轴拖拽
+      const scrubber = document.getElementById('timelineScrubber');
+      scrubber.addEventListener('input', () => {
+        animState.currentTime = parseFloat(scrubber.value);
+        animState.isPlaying = false;
+        playPauseBtn.textContent = '继续播放';
+      });
+
+      // 视频录制按钮
+      document.getElementById('recordBtn').addEventListener('click', () => {
+        if (animState.isRecording) {
+          stopVideoRecording();
+        } else {
+          startVideoRecording();
+        }
+      });
+
+      // 导出当前帧高清静态图 PNG（按所选分辨率档位与当前亮/暗主题导出）
+      document.getElementById('exportPngBtn').addEventListener('click', () => {
+        updateCanvasDimensions();
+        renderFrame(animState.currentTime);
+        const resKey = document.getElementById('resolutionSelect').value;
+        const cleanTitle = (document.getElementById('titleText').value || 'ridge_map')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '_');
+        const themeTag = isDarkMode ? 'dark' : 'light';
+        const url = canvas.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${cleanTitle}_${resKey}_${W}x${H}_${themeTag}.png`;
+        a.click();
+      });
+    }
+
+    // 页面加载后立即初始化启动
+    window.onload = function () {
+      applyTheme(true);
+      updateCanvasDimensions();
+      generateSouthAmericaProceduralDEM();
+      buildRidgeLines();
+      bindEvents();
+      requestAnimationFrame(tick);
+    };
+  </script>
+</body>
+</html>
