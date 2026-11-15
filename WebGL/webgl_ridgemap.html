@@ -115,6 +115,15 @@
       accent-color: #3b82f6;
     }
 
+    /* 画布拖拽手势光标 */
+    .canvas-interactive {
+      cursor: grab;
+      touch-action: none;
+    }
+    .canvas-interactive.is-dragging {
+      cursor: grabbing;
+    }
+
     /* 录制呼吸灯动画 */
     @keyframes recordPulse {
       0%, 100% { opacity: 1; transform: scale(1); }
@@ -140,11 +149,9 @@
 
         <!-- 亮色 / 暗色模式切换按钮 -->
         <button id="themeToggleBtn" type="button" title="切换亮色/暗色主题 (同时切换画布与界面配色)" class="theme-btn-secondary border px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 cursor-pointer shadow-sm shrink-0">
-          <!-- 太阳图标 (暗色模式下显示，点击切到亮色) -->
           <svg id="sunIcon" class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
           </svg>
-          <!-- 月亮图标 (亮色模式下显示，点击切到暗色) -->
           <svg id="moonIcon" class="w-4 h-4 text-slate-700 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
           </svg>
@@ -154,7 +161,7 @@
 
       <div class="flex items-center justify-between">
         <p class="text-xs theme-text-muted">
-          EPSG:4326 经纬度投影 · 经典由北向南逐行生长
+          EPSG:4326 经纬度投影 · 支持绘图区自由缩放与拖动
         </p>
         <span id="resBadge" class="text-[11px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 dark:text-blue-400 border border-blue-500/20 font-medium tabular-nums">
           3:4 · 1440×1920
@@ -162,9 +169,9 @@
       </div>
     </div>
 
-    <!-- 1. 画幅比例、投影坐标与动画模式 -->
+    <!-- 1. 画幅比例、投影坐标与绘图区缩放/拖动控制 -->
     <div class="theme-card flex flex-col gap-3 border rounded-xl p-3.5">
-      <div class="text-xs font-semibold uppercase tracking-wider theme-text-muted">1. 画幅比例 · 投影坐标 · 动画模式</div>
+      <div class="text-xs font-semibold uppercase tracking-wider theme-text-muted">1. 画幅比例 · 投影坐标 · 绘图区视图</div>
 
       <!-- 画面长宽比选择 (默认 3:4 竖图) -->
       <div class="flex flex-col gap-1">
@@ -181,7 +188,7 @@
         </select>
       </div>
 
-      <!-- 动画效果模式选择：仅保留“经典由北向南逐行生长” -->
+      <!-- 动画效果模式选择 -->
       <div class="flex flex-col gap-1">
         <label for="animModeSelect" class="text-xs theme-text-secondary flex justify-between">
           <span>动画效果模式 (Animation Mode)</span>
@@ -203,6 +210,41 @@
           <option value="epsg4326_cos_lat">EPSG:4326 纬度余弦几何修正 (按 cos(φ) 还原真实地面宽高比)</option>
           <option value="fill_viewport">自适应拉伸铺满版心 (忽略经纬度宽高比约束)</option>
         </select>
+      </div>
+
+      <!-- 新增：中间地图绘图区缩放与拖动微调面板 -->
+      <div class="pt-2 mt-0.5 border-t theme-border flex flex-col gap-2.5">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium theme-text-secondary flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
+            </svg>
+            中间地图绘图区缩放与拖动
+          </span>
+          <button id="resetViewSidebarBtn" type="button" class="text-[11px] text-blue-500 dark:text-blue-400 hover:underline cursor-pointer">
+            居中复位 (100%)
+          </button>
+        </div>
+
+        <!-- 缩放比例滑块 -->
+        <div class="flex flex-col gap-1">
+          <div class="flex justify-between text-xs">
+            <label for="mapZoomInput" class="theme-text-muted">地图缩放倍率 (滚轮可直接缩放)</label>
+            <span id="mapZoomVal" class="text-blue-500 dark:text-blue-400 font-medium tabular-nums">100%</span>
+          </div>
+          <input type="range" id="mapZoomInput" min="0.25" max="8.0" step="0.01" value="1.0" class="w-full cursor-pointer" />
+        </div>
+
+        <!-- 水平与垂直偏移显示与裁剪开关 -->
+        <div class="flex items-center justify-between gap-2 text-[11px]">
+          <span id="panOffsetDisplay" class="font-mono theme-text-muted tabular-nums">
+            偏移: X 0% · Y 0%
+          </span>
+          <label class="flex items-center gap-1.5 cursor-pointer theme-text-secondary select-none" title="开启后，放大或拖动的山脊线将被严格限制在中间地图区，不会遮挡顶部标题和底部署名">
+            <input type="checkbox" id="clipViewportCheckbox" checked class="rounded accent-blue-500 cursor-pointer" />
+            <span>裁剪至绘图区安全框</span>
+          </label>
+        </div>
       </div>
     </div>
 
@@ -236,7 +278,7 @@
     <div class="theme-card flex flex-col gap-3 border rounded-xl p-3.5">
       <div class="text-xs font-semibold uppercase tracking-wider theme-text-muted">3. 动画控制与视频/截图导出</div>
 
-      <!-- 新增：录制视频与导出截图分辨率档位选择 -->
+      <!-- 录制视频与导出截图分辨率档位选择 -->
       <div class="flex flex-col gap-1">
         <label for="resolutionSelect" class="text-xs theme-text-secondary flex justify-between">
           <span>录制视频与截图输出分辨率</span>
@@ -364,9 +406,26 @@
   <!-- 右侧预览工作区 -->
   <main class="theme-workspace flex-1 h-[52vh] lg:h-screen flex flex-col items-center justify-center p-3 sm:p-5 relative overflow-hidden">
     
+    <!-- 顶部悬浮缩放/拖动快捷工具栏 (处于 Canvas 外部，不会污染录屏或截图导出) -->
+    <div class="absolute top-3.5 right-3.5 z-20 flex items-center gap-1.5 theme-sidebar border px-2.5 py-1.5 rounded-xl shadow-lg backdrop-blur-md bg-opacity-90">
+      <span class="hidden sm:inline-block text-[11px] theme-text-muted mr-1">滚轮缩放 · 按住拖动 · 双击复位</span>
+      <button id="zoomOutBtn" type="button" title="缩小地图" class="theme-btn-secondary border w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold cursor-pointer">
+        −
+      </button>
+      <span id="zoomBadgeBtn" title="点击恢复 100% 原始大小" class="text-[11px] font-mono font-semibold text-blue-500 dark:text-blue-400 min-w-[46px] text-center cursor-pointer hover:underline tabular-nums">
+        100%
+      </span>
+      <button id="zoomInBtn" type="button" title="放大地图" class="theme-btn-secondary border w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold cursor-pointer">
+        +
+      </button>
+      <button id="resetViewHudBtn" type="button" title="居中复位地图绘图区 (双击画布亦可复位)" class="theme-btn-secondary border px-2 py-1 rounded-md text-[11px] font-medium cursor-pointer ml-0.5">
+        复位
+      </button>
+    </div>
+
     <!-- 自适应画幅容器（默认 3:4 竖图 1440×1920） -->
     <div id="canvasWrapper" class="max-h-[calc(100%-56px)] max-w-full rounded-lg overflow-hidden bg-black shadow-[0_20px_60px_rgba(0,0,0,0.45),0_0_0_1px_rgba(128,128,128,0.18)] flex items-center justify-center relative transition-shadow duration-300" style="aspect-ratio: 3 / 4; height: calc(100% - 56px);">
-      <canvas id="ridgeCanvas" width="1440" height="1920" class="w-full h-full block"></canvas>
+      <canvas id="ridgeCanvas" width="1440" height="1920" class="w-full h-full block canvas-interactive" title="滚轮缩放山脊线地图，按住左键拖动平移，双击复位"></canvas>
     </div>
 
     <!-- 底部时间轴控制条 -->
@@ -381,7 +440,7 @@
 
   <script>
     /*************************************************************************
-     * 1. 全局状态、主题配色、长宽比与多档分辨率配置
+     * 1. 全局状态、主题配色、长宽比、分辨率与地图绘图区缩放/拖动状态
      *************************************************************************/
     const canvas = document.getElementById('ridgeCanvas');
     const canvasWrapper = document.getElementById('canvasWrapper');
@@ -396,7 +455,8 @@
         stroke: '#ffffff',
         title: '#ffffff',
         subtitle: '#e5e7eb',
-        footer: '#737373'
+        footer: '#737373',
+        guideStroke: 'rgba(59, 130, 246, 0.55)'
       },
       light: {
         bg: '#f8fafc',
@@ -404,7 +464,8 @@
         stroke: '#0f172a',
         title: '#0f172a',
         subtitle: '#334155',
-        footer: '#64748b'
+        footer: '#64748b',
+        guideStroke: 'rgba(37, 99, 235, 0.45)'
       }
     };
 
@@ -417,7 +478,7 @@
       '16:9': { rw: 16, rh: 9,  cssRatio: '16 / 9' }
     };
 
-    // 支持的输出分辨率档位（以画幅短边基准像素计算精确宽高，并匹配相应视频录制码率）
+    // 支持的输出分辨率档位
     const RESOLUTION_TIERS = {
       '720p':  { shortEdge: 720,  label: '720p 标准',  bitrate: 8_000_000 },
       '1080p': { shortEdge: 1080, label: '1080p 高清', bitrate: 12_000_000 },
@@ -428,7 +489,31 @@
     let W = canvas.width;   // 默认 1440
     let H = canvas.height;  // 默认 1920
 
-    // 原始栅格与地理空间元数据缓存（支持 EPSG:4326 逆向重采样）
+    /**
+     * 中间山脊线地图绘图区的视图变换状态 (Zoom & Pan)
+     * - zoom: 缩放倍率 (0.25x ~ 8.0x)
+     * - normPanX / normPanY: 相对于画布宽 W、高 H 的归一化平移量，切换分辨率时构图保持完全一致
+     * - clipToViewport: 是否将山脊线裁剪在中间地图安全框内（避免放大时遮挡顶部主副标题和底部署名）
+     * - isInteracting / guideTimer: 交互时短暂显示绘图区边界辅助虚线框（录制与导出时自动隐藏）
+     */
+    const viewTransform = {
+      zoom: 1.0,
+       minZoom: 0.25,
+      maxZoom: 8.0,
+      normPanX: 0.0,
+      normPanY: 0.0,
+      clipToViewport: true,
+      isDragging: false,
+      dragStartX: 0,
+      dragStartY: 0,
+      startNormPanX: 0,
+      startNormPanY: 0,
+      showGuide: false,
+      guideTimer: null,
+      suppressGuideForExport: false
+    };
+
+    // 原始栅格与地理空间元数据缓存
     let rawRaster = {
       data: null,
       width: 0,
@@ -459,6 +544,71 @@
       mediaRecorder: null,
       recordedChunks: []
     };
+
+    // 触发短暂显示绘图区边界辅助框
+    function flashViewportGuide() {
+      viewTransform.showGuide = true;
+      if (viewTransform.guideTimer) {
+        clearTimeout(viewTransform.guideTimer);
+      }
+      viewTransform.guideTimer = setTimeout(() => {
+        if (!viewTransform.isDragging) {
+          viewTransform.showGuide = false;
+        }
+      }, 950);
+    }
+
+    // 同步更新 UI 上的缩放与偏移数值
+    function syncViewTransformUI() {
+      const pct = `${Math.round(viewTransform.zoom * 100)}%`;
+      document.getElementById('mapZoomInput').value = viewTransform.zoom.toFixed(2);
+      document.getElementById('mapZoomVal').textContent = pct;
+      document.getElementById('zoomBadgeBtn').textContent = pct;
+
+      const pxPct = Math.round(viewTransform.normPanX * 100);
+      const pyPct = Math.round(viewTransform.normPanY * 100);
+      const signX = pxPct > 0 ? `+${pxPct}%` : `${pxPct}%`;
+      const signY = pyPct > 0 ? `+${pyPct}%` : `${pyPct}%`;
+      document.getElementById('panOffsetDisplay').textContent = `偏移: X ${signX} · Y ${signY}`;
+    }
+
+    // 复位中间地图绘图区缩放与位置
+    function resetViewTransform() {
+      viewTransform.zoom = 1.0;
+      viewTransform.normPanX = 0.0;
+      viewTransform.normPanY = 0.0;
+      flashViewportGuide();
+      syncViewTransformUI();
+      renderFrame(animState.currentTime);
+    }
+
+    // 以画布上指定像素坐标 (anchorX, anchorY) 为锚点进行平滑缩放
+    function zoomMapAtCanvasPoint(newZoom, anchorX, anchorY) {
+      const clampedZoom = Math.max(viewTransform.minZoom, Math.min(viewTransform.maxZoom, newZoom));
+      const oldZoom = viewTransform.zoom;
+      if (Math.abs(clampedZoom - oldZoom) < 1e-5) return;
+
+      const { projMode } = getParams();
+      const baseVP = computeMapViewport(projMode);
+      const cx = baseVP.mapLeft + baseVP.mapWidth * 0.5;
+      const cy = baseVP.mapTop + baseVP.mapHeight * 0.5;
+
+      const oldPanPxX = viewTransform.normPanX * W;
+      const oldPanPxY = viewTransform.normPanY * H;
+
+      // 保持鼠标指针下的地图点在缩放前后位置不变
+      const ratio = clampedZoom / oldZoom;
+      const newPanPxX = (anchorX - cx) - (anchorX - cx - oldPanPxX) * ratio;
+      const newPanPxY = (anchorY - cy) - (anchorY - cy - oldPanPxY) * ratio;
+
+      viewTransform.zoom = clampedZoom;
+      viewTransform.normPanX = newPanPxX / W;
+      viewTransform.normPanY = newPanPxY / H;
+
+      flashViewportGuide();
+      syncViewTransformUI();
+      renderFrame(animState.currentTime);
+    }
 
     // 切换亮色/暗色主题
     function applyTheme(dark) {
@@ -491,7 +641,6 @@
       const aspect = ASPECT_PRESETS[ratioKey] || ASPECT_PRESETS['3:4'];
       const tier = RESOLUTION_TIERS[resKey] || RESOLUTION_TIERS['2k'];
 
-      // 以短边为基准计算精确偶数的像素宽高
       if (aspect.rw <= aspect.rh) {
         W = tier.shortEdge;
         H = Math.round((tier.shortEdge * aspect.rh) / aspect.rw);
@@ -499,7 +648,6 @@
         H = tier.shortEdge;
         W = Math.round((tier.shortEdge * aspect.rw) / aspect.rh);
       }
-      // 确保像素为偶数以兼容编码器
       W = W % 2 === 0 ? W : W + 1;
       H = H % 2 === 0 ? H : H + 1;
 
@@ -507,7 +655,6 @@
       canvas.height = H;
       canvasWrapper.style.aspectRatio = aspect.cssRatio;
 
-      // 根据横竖屏自适应外框尺寸约束，防止溢出右侧工作区
       if (W > H) {
         canvasWrapper.style.width = 'min(94%, calc((100vh - 96px) * ' + (W / H).toFixed(3) + '))';
         canvasWrapper.style.height = 'auto';
@@ -516,7 +663,6 @@
         canvasWrapper.style.width = 'auto';
       }
 
-      // 同步更新界面上的分辨率显示与按钮文案
       document.getElementById('resBadge').textContent = `${ratioKey} · ${W}×${H}`;
       document.getElementById('resQualityHint').textContent = `${tier.label} · ${W}×${H}`;
 
@@ -596,7 +742,6 @@
         return val;
       }
 
-      // 南美洲真实 EPSG:4326 经纬度范围: Lon [-82°, -34°], Lat [-56.5°, 13.0°]
       for (let r = 0; r < gridH; r++) {
         const v = r / (gridH - 1);
         let westCoast = 0.5, eastCoast = 0.4;
@@ -635,7 +780,6 @@
         for (let c = 0; c < gridW; c++) {
           const u = c / (gridW - 1);
 
-          // 太平洋与南大西洋岛屿
           const isGalapagos = Math.abs(v - 0.205) < 0.016 && Math.abs(u - 0.038) < 0.024;
           const isMalpelo = Math.abs(v - 0.135) < 0.008 && Math.abs(u - 0.085) < 0.014;
           const isSanFelix = Math.abs(v - 0.565) < 0.010 && Math.abs(u - 0.055) < 0.018;
@@ -651,7 +795,6 @@
             continue;
           }
 
-          // 南美大陆主体高程合成
           if (u >= westCoast && u <= eastCoast) {
             const dWest = u - westCoast;
             const andesWidth = v < 0.15 ? 0.065 : (v < 0.55 ? 0.088 : 0.055);
@@ -869,13 +1012,14 @@
     }
 
     /*************************************************************************
-     * 4. 核心渲染引擎：经典由北向南逐行生长 (支持亮色/暗色主题配色)
+     * 4. 核心渲染引擎：支持中间地图绘图区自由缩放/拖动 + 经典由北向南生长
      *************************************************************************/
     function easeOutQuart(x) {
       const t = Math.max(0, Math.min(1, x));
       return 1 - Math.pow(1 - t, 4);
     }
 
+    // 计算中间地图绘图区的基准版心与安全裁剪框
     function computeMapViewport(projMode) {
       const availTop = H * 0.205;
       const availBottom = H * 0.915;
@@ -884,8 +1028,26 @@
       const availW = availRight - availLeft;
       const availH = availBottom - availTop;
 
+      // 安全裁剪区域（给顶部山峰隆起留出余量，同时保护顶部标题与底部署名）
+      const clipBox = {
+        left: W * 0.03,
+        top: H * 0.168,
+        width: W * 0.94,
+        height: H * (0.935 - 0.168)
+      };
+
       if (projMode === 'fill_viewport') {
-        return { mapLeft: availLeft, mapTop: availTop, mapWidth: availW, mapHeight: availH };
+        return {
+          mapLeft: availLeft,
+          mapTop: availTop,
+          mapWidth: availW,
+          mapHeight: availH,
+          availLeft,
+          availTop,
+          availW,
+          availH,
+          clipBox
+        };
       }
 
       const [minLon, minLat, maxLon, maxLat] = rawRaster.lonLatBBox;
@@ -910,7 +1072,17 @@
 
       const mapLeft = availLeft + (availW - mapWidth) * 0.5;
       const mapTop = availTop + (availH - mapHeight) * 0.5;
-      return { mapLeft, mapTop, mapWidth, mapHeight };
+      return {
+        mapLeft,
+        mapTop,
+        mapWidth,
+        mapHeight,
+        availLeft,
+        availTop,
+        availW,
+        availH,
+        clipBox
+      };
     }
 
     // 收集一行的连续陆地折线段并按画家算法填充遮挡层与绘制山脊线
@@ -935,15 +1107,16 @@
       }
 
       // 1. 画家算法：填充与背景一致的遮挡多边形，遮挡后方北侧山脊线
+      const maskBottomPad = 2.0 * Math.max(1, viewTransform.zoom * 0.8);
       ctx.fillStyle = palette.fillMask;
       for (const seg of segments) {
         if (seg.length < 2) continue;
         ctx.beginPath();
-        ctx.moveTo(seg[0].x, yBase + 2.0);
+        ctx.moveTo(seg[0].x, yBase + maskBottomPad);
         for (let p = 0; p < seg.length; p++) {
           ctx.lineTo(seg[p].x, seg[p].y);
         }
-        ctx.lineTo(seg[seg.length - 1].x, yBase + 2.0);
+        ctx.lineTo(seg[seg.length - 1].x, yBase + maskBottomPad);
         ctx.closePath();
         ctx.fill();
       }
@@ -986,47 +1159,83 @@
       ctx.fillStyle = palette.bg;
       ctx.fillRect(0, 0, W, H);
 
-      // 2. 计算符合 EPSG:4326 比例的版心窗口
-      const { mapLeft, mapTop, mapWidth, mapHeight } = computeMapViewport(projMode);
+      // 2. 计算基准版心窗口与应用缩放/平移后的地图绘图区矩形
+      const vp = computeMapViewport(projMode);
+      const { mapLeft, mapTop, mapWidth, mapHeight, clipBox } = vp;
 
-      // 按当前画布分辨率自适应缩放垂直夸张与线宽
+      const zoom = viewTransform.zoom;
+      const panPxX = viewTransform.normPanX * W;
+      const panPxY = viewTransform.normPanY * H;
+
+      const centerX = mapLeft + mapWidth * 0.5;
+      const centerY = mapTop + mapHeight * 0.5;
+
+      const transMapWidth = mapWidth * zoom;
+      const transMapHeight = mapHeight * zoom;
+      const transMapLeft = centerX - transMapWidth * 0.5 + panPxX;
+      const transMapTop = centerY - transMapHeight * 0.5 + panPxY;
+
+      // 按当前画布分辨率与缩放倍率自适应垂直高程夸张与线宽
       const scaleFactorH = H / 1920;
       const scaleFactorW = Math.min(W, H) / 1200;
-      const effectiveVertScale = vertScale * scaleFactorH;
+      const effectiveVertScale = vertScale * scaleFactorH * zoom;
 
       const lines = ridgeData.lines;
       const numLines = lines.length;
       const numSamples = ridgeData.numSamples;
 
-      // 波前位置 w(t)：t=0 时从北部启动，t=growDur 时全图 100% 生长完成
+      // 波前位置 w(t)
       const normTime = Math.max(0, Math.min(1, timeSec / growDur));
       const waveStart = 0.04;
       const waveEnd = 1.0 + waveBand + 0.02;
       const wavefront = waveStart + normTime * (waveEnd - waveStart);
 
+      // 3. 绘制中间山脊线地图绘图区（支持可选的安全框裁剪）
+      ctx.save();
+      if (viewTransform.clipToViewport) {
+        ctx.beginPath();
+        ctx.rect(clipBox.left, clipBox.top, clipBox.width, clipBox.height);
+        ctx.clip();
+      }
+
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
-      ctx.lineWidth = lineWidth * Math.max(0.65, scaleFactorW);
+      ctx.lineWidth = lineWidth * Math.max(0.65, scaleFactorW) * Math.pow(zoom, 0.25);
 
-      // 3. 经典由北向南逐行生长模式 (classic_scan)
       for (let i = 0; i < numLines; i++) {
         const line = lines[i];
         if (!line.hasLand) continue;
 
         const v = i / (numLines - 1);
-        const yTrueBase = mapTop + v * mapHeight;
+        const yTrueBase = transMapTop + v * transMapHeight;
         const tau = wavefront - v;
 
         if (tau < 0) continue;
 
         const s = easeOutQuart(Math.min(1.0, tau / waveBand));
         const elevScale = effectiveVertScale * s;
-        const mapX = (u) => mapLeft + u * mapWidth;
+        const mapX = (u) => transMapLeft + u * transMapWidth;
 
         fillAndStrokeLandSegments(line, numSamples, mapX, yTrueBase, elevScale, palette);
       }
 
-      // 4. 自适应比例绘制顶部主副标题与底部署名
+      ctx.restore();
+
+      // 3.5 当用户正在拖拽或缩放时，显示柔和的绘图区边界辅助虚线框（录制视频与导出截图时自动隐藏）
+      if (
+        (viewTransform.showGuide || viewTransform.isDragging) &&
+        !animState.isRecording &&
+        !viewTransform.suppressGuideForExport
+      ) {
+        ctx.save();
+        ctx.strokeStyle = palette.guideStroke;
+        ctx.lineWidth = Math.max(1.5, scaleFactorW * 1.6);
+        ctx.setLineDash([8 * scaleFactorW, 6 * scaleFactorW]);
+        ctx.strokeRect(clipBox.left, clipBox.top, clipBox.width, clipBox.height);
+        ctx.restore();
+      }
+
+      // 4. 自适应比例绘制顶部主副标题与底部署名（保持在海报固定版位，不随地图偏移）
       const fontRef = Math.min(W * 1.15, H * 0.72);
       const titleSize = Math.round(fontRef * 0.056);
       const subTitleSize = Math.round(fontRef * 0.0285);
@@ -1164,6 +1373,7 @@
 
         updateCRSInfoDisplay();
         buildRidgeLines();
+        resetViewTransform();
         animState.currentTime = 0;
         animState.isPlaying = true;
         document.getElementById('playPauseBtn').textContent = '暂停播放';
@@ -1178,12 +1388,11 @@
     }
 
     /*************************************************************************
-     * 6. 视频录制与静态截图导出 (自适应所选分辨率档位与亮暗主题)
+     * 6. 视频录制与静态截图导出 (自适应所选分辨率档位与当前缩放/拖动构图)
      *************************************************************************/
     function startVideoRecording() {
       if (animState.isRecording) return;
 
-      // 确保录制前画布分辨率与所选档位一致
       updateCanvasDimensions();
 
       const resKey = document.getElementById('resolutionSelect').value;
@@ -1262,7 +1471,152 @@
     }
 
     /*************************************************************************
-     * 7. 主循环与交互事件绑定
+     * 7. 画布指针交互（鼠标滚轮缩放、左键拖拽平移、触摸双指捏合缩放、双击复位）
+     *************************************************************************/
+    function clientToCanvasCoords(clientX, clientY) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = W / Math.max(1, rect.width);
+      const scaleY = H / Math.max(1, rect.height);
+      return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY,
+        rectWidth: Math.max(1, rect.width),
+        rectHeight: Math.max(1, rect.height)
+      };
+    }
+
+    function bindCanvasZoomPanEvents() {
+      // 1. 鼠标滚轮以指针位置为中心平滑缩放
+      canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const pt = clientToCanvasCoords(e.clientX, e.clientY);
+        const zoomFactor = Math.exp(-e.deltaY * 0.0014);
+        zoomMapAtCanvasPoint(viewTransform.zoom * zoomFactor, pt.x, pt.y);
+      }, { passive: false });
+
+      // 2. 鼠标左键按住拖拽平移
+      canvas.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        viewTransform.isDragging = true;
+        viewTransform.dragStartX = e.clientX;
+        viewTransform.dragStartY = e.clientY;
+        viewTransform.startNormPanX = viewTransform.normPanX;
+        viewTransform.startNormPanY = viewTransform.normPanY;
+        canvas.classList.add('is-dragging');
+        flashViewportGuide();
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!viewTransform.isDragging) return;
+        const rect = canvas.getBoundingClientRect();
+        const dx = e.clientX - viewTransform.dragStartX;
+        const dy = e.clientY - viewTransform.dragStartY;
+
+        viewTransform.normPanX = viewTransform.startNormPanX + dx / Math.max(1, rect.width);
+        viewTransform.normPanY = viewTransform.startNormPanY + dy / Math.max(1, rect.height);
+
+        syncViewTransformUI();
+        renderFrame(animState.currentTime);
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (!viewTransform.isDragging) return;
+        viewTransform.isDragging = false;
+        canvas.classList.remove('is-dragging');
+        flashViewportGuide();
+      });
+
+      // 3. 双击画布快速居中复位
+      canvas.addEventListener('dblclick', () => {
+        resetViewTransform();
+      });
+
+      // 4. 移动端触摸支持：单指拖动平移 + 双指捏合缩放
+      let lastTouchDist = 0;
+      canvas.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+          viewTransform.isDragging = true;
+          viewTransform.dragStartX = e.touches[0].clientX;
+          viewTransform.dragStartY = e.touches[0].clientY;
+          viewTransform.startNormPanX = viewTransform.normPanX;
+          viewTransform.startNormPanY = viewTransform.normPanY;
+          flashViewportGuide();
+        } else if (e.touches.length === 2) {
+          viewTransform.isDragging = false;
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          lastTouchDist = Math.hypot(dx, dy);
+          flashViewportGuide();
+        }
+      }, { passive: true });
+
+      canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if (e.touches.length === 1 && viewTransform.isDragging) {
+          const rect = canvas.getBoundingClientRect();
+          const dx = e.touches[0].clientX - viewTransform.dragStartX;
+          const dy = e.touches[0].clientY - viewTransform.dragStartY;
+          viewTransform.normPanX = viewTransform.startNormPanX + dx / Math.max(1, rect.width);
+          viewTransform.normPanY = viewTransform.startNormPanY + dy / Math.max(1, rect.height);
+          syncViewTransformUI();
+          renderFrame(animState.currentTime);
+        } else if (e.touches.length === 2) {
+          const t0 = e.touches[0];
+          const t1 = e.touches[1];
+          const dist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
+          if (lastTouchDist > 10) {
+            const midClientX = (t0.clientX + t1.clientX) * 0.5;
+            const midClientY = (t0.clientY + t1.clientY) * 0.5;
+            const pt = clientToCanvasCoords(midClientX, midClientY);
+            const scaleRatio = dist / lastTouchDist;
+            zoomMapAtCanvasPoint(viewTransform.zoom * scaleRatio, pt.x, pt.y);
+          }
+          lastTouchDist = dist;
+        }
+      }, { passive: false });
+
+      canvas.addEventListener('touchend', () => {
+        viewTransform.isDragging = false;
+        lastTouchDist = 0;
+        flashViewportGuide();
+      });
+
+      // 5. 左侧面板与悬浮工具栏上的缩放/复位控件事件
+      const mapZoomInput = document.getElementById('mapZoomInput');
+      mapZoomInput.addEventListener('input', () => {
+        const targetZoom = parseFloat(mapZoomInput.value);
+        const { projMode } = getParams();
+        const vp = computeMapViewport(projMode);
+        const cx = vp.mapLeft + vp.mapWidth * 0.5;
+        const cy = vp.mapTop + vp.mapHeight * 0.5;
+        zoomMapAtCanvasPoint(targetZoom, cx, cy);
+      });
+
+      document.getElementById('clipViewportCheckbox').addEventListener('change', (e) => {
+        viewTransform.clipToViewport = e.target.checked;
+        flashViewportGuide();
+        renderFrame(animState.currentTime);
+      });
+
+      document.getElementById('zoomInBtn').addEventListener('click', () => {
+        const { projMode } = getParams();
+        const vp = computeMapViewport(projMode);
+        zoomMapAtCanvasPoint(viewTransform.zoom * 1.2, vp.mapLeft + vp.mapWidth * 0.5, vp.mapTop + vp.mapHeight * 0.5);
+      });
+
+      document.getElementById('zoomOutBtn').addEventListener('click', () => {
+        const { projMode } = getParams();
+        const vp = computeMapViewport(projMode);
+        zoomMapAtCanvasPoint(viewTransform.zoom / 1.2, vp.mapLeft + vp.mapWidth * 0.5, vp.mapTop + vp.mapHeight * 0.5);
+      });
+
+      document.getElementById('zoomBadgeBtn').addEventListener('click', resetViewTransform);
+      document.getElementById('resetViewHudBtn').addEventListener('click', resetViewTransform);
+      document.getElementById('resetViewSidebarBtn').addEventListener('click', resetViewTransform);
+    }
+
+    /*************************************************************************
+     * 8. 主循环与通用控件交互事件绑定
      *************************************************************************/
     function tick(now) {
       const dt = Math.min(0.1, (now - animState.lastFrameTime) / 1000);
@@ -1290,7 +1644,10 @@
 
       scrubber.value = animState.currentTime;
       document.getElementById('timeDisplay').textContent =
-        `${animState.currentTime.toFixed(2)} / ${params.totalDur.toFixed(2)}s`;
+        `${animState.currentTime.toFixed(2)} / params.totalDur.toFixed(2)`.replace(
+          'params.totalDur.toFixed(2)',
+          `${params.totalDur.toFixed(2)}s`
+        );
 
       renderFrame(animState.currentTime);
       requestAnimationFrame(tick);
@@ -1354,6 +1711,7 @@
         document.getElementById('titleText').value = 'SOUTH AMERICA';
         document.getElementById('subTitleText').value = 'Every ridge, Caribbean to Cape Horn';
         buildRidgeLines();
+        resetViewTransform();
         animState.currentTime = 0;
         animState.isPlaying = true;
         document.getElementById('playPauseBtn').textContent = '暂停播放';
@@ -1421,8 +1779,9 @@
         }
       });
 
-      // 导出当前帧高清静态图 PNG（按所选分辨率档位与当前亮/暗主题导出）
+      // 导出当前帧高清静态图 PNG（按所选分辨率档位、当前亮/暗主题与当前缩放/拖动构图导出）
       document.getElementById('exportPngBtn').addEventListener('click', () => {
+        viewTransform.suppressGuideForExport = true;
         updateCanvasDimensions();
         renderFrame(animState.currentTime);
         const resKey = document.getElementById('resolutionSelect').value;
@@ -1435,6 +1794,7 @@
         a.href = url;
         a.download = `${cleanTitle}_${resKey}_${W}x${H}_${themeTag}.png`;
         a.click();
+        viewTransform.suppressGuideForExport = false;
       });
     }
 
@@ -1445,6 +1805,8 @@
       generateSouthAmericaProceduralDEM();
       buildRidgeLines();
       bindEvents();
+      bindCanvasZoomPanEvents();
+      syncViewTransformUI();
       requestAnimationFrame(tick);
     };
   </script>
