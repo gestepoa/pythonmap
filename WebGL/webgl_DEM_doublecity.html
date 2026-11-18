@@ -1,0 +1,2002 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>双城海拔对比 — GeoTIFF DEM 像素海拔重排可视化工作室</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- GeoTIFF.js for parsing .tif / .tiff DEM files in browser -->
+  <script src="https://cdn.jsdelivr.net/npm/geotiff@2.1.3/dist-browser/geotiff.js"></script>
+  <!-- Editorial Serif & Sans Fonts matching mapped.earth -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,400&family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --paper-bg: #f3efe6;
+      --ink-dark: #201d18;
+      --ink-muted: #5a5347;
+    }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #161618;
+      color: #f4f4f5;
+      margin: 0;
+      overflow-x: hidden;
+    }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #1f1f23;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #3f3f46;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #52525b;
+    }
+    /* Range slider styling */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 6px;
+      border-radius: 999px;
+      background: #34343c;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #d97706;
+      border: 2px solid #fef3c7;
+      margin-top: -5px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.45);
+      transition: transform 0.15s ease, background-color 0.15s ease;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+      background: #f59e0b;
+    }
+    .poster-shadow {
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    }
+    .dropzone-active {
+      border-color: #f59e0b !important;
+      background-color: rgba(245, 158, 11, 0.12) !important;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col lg:flex-row">
+
+  <!-- Top / Left Stage: Interactive Poster Canvas & Playback Controls -->
+  <main class="flex-1 flex flex-col items-center justify-between p-3 sm:p-5 lg:p-6 bg-[#121214] relative select-none overflow-hidden">
+    
+    <!-- Top Mini Status Bar -->
+    <div class="w-full max-w-3xl flex flex-wrap items-center justify-between gap-2 mb-2 px-1">
+      <div class="flex items-center gap-2.5">
+        <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+        </span>
+        <div>
+          <h1 class="text-sm font-semibold text-zinc-100 tracking-tight flex items-center gap-2">
+            GeoTIFF DEM 像素海拔重排引擎
+            <span id="badgeMode" class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">双区域对比模式</span>
+          </h1>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 text-xs text-zinc-400">
+        <div class="flex items-center gap-1 bg-zinc-800/90 border border-zinc-700/80 rounded-md px-2 py-0.5">
+          <span class="text-zinc-400 text-[11px]">比例:</span>
+          <select id="selectAspectTop" class="bg-transparent text-amber-300 font-semibold text-xs focus:outline-none cursor-pointer">
+            <option value="3:4" selected>3:4 竖图</option>
+            <option value="9:16">9:16 竖屏</option>
+            <option value="4:5">4:5 社交竖图</option>
+            <option value="1:1">1:1 方图</option>
+            <option value="4:3">4:3 横图</option>
+            <option value="16:9">16:9 宽屏</option>
+          </select>
+        </div>
+        <span id="particleCountBadge" class="px-2.5 py-1 rounded-md bg-zinc-800/80 border border-zinc-700/70 font-mono">
+          粒子数: --
+        </span>
+        <button id="btnQuickLang" class="px-2.5 py-1 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 transition flex items-center gap-1" title="切换海报中英文标注">
+          <span>🌐</span>
+          <span id="langLabel">海报语言: 中文</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Center Poster Canvas Container -->
+    <div class="relative flex-1 w-full flex items-center justify-center my-1 min-h-[460px]">
+      <div id="canvasAspectWrapper" class="relative flex items-center justify-center max-h-[calc(100vh-175px)]" style="aspect-ratio: 3 / 4;">
+        <canvas id="posterCanvas" width="900" height="1200" class="w-auto h-full max-h-[calc(100vh-175px)] max-w-full rounded-xl poster-shadow bg-[#f3efe6] cursor-pointer" title="点击画布可播放 / 暂停动画"></canvas>
+
+        <!-- Loading / Parsing Overlay -->
+        <div id="loadingOverlay" class="hidden absolute inset-0 rounded-xl bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center z-20">
+          <div class="w-11 h-11 border-3 border-amber-400 border-t-transparent rounded-full animate-spin mb-3"></div>
+          <p id="loadingTitle" class="text-sm font-semibold text-white">正在解析 GeoTIFF 高程数据...</p>
+          <p id="loadingSub" class="text-xs text-zinc-300 mt-1">提取栅格高程、计算 3D 山体阴影与排序分箱坐标</p>
+        </div>
+
+        <!-- Recording Indicator Badge -->
+        <div id="recordingBadge" class="hidden absolute top-3 left-3 px-3 py-1.5 rounded-full bg-red-600/95 text-white text-xs font-semibold flex items-center gap-2 shadow-lg z-20">
+          <span class="w-2.5 h-2.5 rounded-full bg-white animate-ping"></span>
+          <span id="recordingText">正在录制动画视频...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Playback & Timeline Scrubber Bar -->
+    <div class="w-full max-w-2xl bg-zinc-900/95 border border-zinc-800 rounded-2xl p-3 sm:px-4 shadow-xl mt-2">
+      <div class="flex flex-col gap-2.5">
+        <!-- Timeline Scrubber Row -->
+        <div class="flex items-center gap-3">
+          <button id="btnPlayPause" class="w-9 h-9 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 flex items-center justify-center font-bold shadow transition shrink-0" title="播放 / 暂停 (空格键)">
+            <svg id="iconPlay" class="w-4 h-4 hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            <svg id="iconPause" class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+          </button>
+
+          <button id="btnRestart" class="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 flex items-center justify-center transition shrink-0" title="重头播放">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+          </button>
+
+          <div class="flex-1 flex flex-col">
+            <div class="flex justify-between text-[11px] text-zinc-400 mb-1 font-mono">
+              <span id="phaseStatusText" class="text-amber-300 font-sans font-medium">阶段: 地形展示 → 像素重排</span>
+              <span>
+                时间 <strong id="timeReadout" class="text-zinc-200">0.0s</strong> / <span id="durationReadout">6.5s</span>
+                &nbsp;·&nbsp; 重排进度 <strong id="morphReadout" class="text-amber-400">0%</strong>
+              </span>
+            </div>
+            <input id="timelineSlider" type="range" min="0" max="1000" value="0" class="w-full" />
+          </div>
+        </div>
+
+        <!-- Secondary Quick Controls: Direct Morph Scrubber & Phase Jump Buttons -->
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-zinc-800/80 text-xs">
+          <div class="flex items-center gap-1.5">
+            <span class="text-zinc-400 text-[11px]">快速定位:</span>
+            <button data-jump="0" class="btn-jump px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition">00:00 原始地形图</button>
+            <button data-jump="0.33" class="btn-jump px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition">00:02 像素流散中</button>
+            <button data-jump="0.65" class="btn-jump px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition">00:04 海拔直方图</button>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <label class="flex items-center gap-1.5 text-zinc-300 cursor-pointer">
+              <input id="chkLoop" type="checkbox" checked class="rounded bg-zinc-800 border-zinc-600 text-amber-500 focus:ring-0" />
+              <span>循环播放</span>
+            </label>
+            <div class="flex items-center gap-1">
+              <span class="text-zinc-400">倍速:</span>
+              <select id="selectSpeed" class="bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5 text-zinc-200 text-xs focus:outline-none">
+                <option value="0.5">0.5x 慢放</option>
+                <option value="0.75">0.75x</option>
+                <option value="1" selected>1.0x 原速</option>
+                <option value="1.5">1.5x</option>
+                <option value="2">2.0x</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Right Control Sidebar -->
+  <aside class="w-full lg:w-[430px] xl:w-[460px] bg-zinc-900 border-t lg:border-t-0 lg:border-l border-zinc-800 flex flex-col lg:h-screen lg:overflow-y-auto shrink-0">
+    
+    <!-- Sidebar Header -->
+    <div class="p-4 border-b border-zinc-800 bg-zinc-900/90 sticky top-0 z-10 backdrop-blur space-y-2.5">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <span>控制面板与 DEM 数据源</span>
+          </h2>
+          <p class="text-xs text-zinc-400 mt-0.5">上传您自己的 <code class="text-amber-300">.tif / .tiff</code> 高程数据或体验内置地形</p>
+        </div>
+        <div class="flex gap-1.5">
+          <button id="btnRecordVideo" class="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-xs flex items-center gap-1.5 shadow transition">
+            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
+            <span>录制视频</span>
+          </button>
+          <button id="btnExportPng" class="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-medium text-xs border border-zinc-700 transition" title="保存当前帧高清海报 PNG">
+            导出 PNG
+          </button>
+        </div>
+      </div>
+
+      <!-- Video Quality Selector Bar -->
+      <div class="flex items-center justify-between gap-2 pt-2 border-t border-zinc-800/80 text-xs">
+        <span class="text-zinc-400 flex items-center gap-1.5 shrink-0">
+          <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+          </svg>
+          <span>导出视频画质:</span>
+        </span>
+        <select id="selectVideoQuality" class="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1 text-zinc-100 text-xs font-medium focus:outline-none focus:border-amber-400 cursor-pointer">
+          <option value="standard">标准流畅 (720p级 · 30fps · 6 Mbps)</option>
+          <option value="hd" selected>高清画质 (1080p级 · 60fps · 16 Mbps)</option>
+          <option value="ultra">超清画质 (1440p级 · 60fps · 32 Mbps)</option>
+          <option value="master">极清原画 (2K母带 · 60fps · 50 Mbps)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Status Notification Banner (No alert() used) -->
+    <div id="toastBanner" class="hidden mx-4 mt-3 p-3 rounded-xl border text-xs flex items-start justify-between gap-2 transition-all">
+      <span id="toastText"></span>
+      <button id="btnCloseToast" class="text-zinc-400 hover:text-white shrink-0">✕</button>
+    </div>
+
+    <!-- Sidebar Content Sections -->
+    <div class="p-4 space-y-5 flex-1">
+
+      <!-- SECTION 1: Layout Mode & Built-in Presets -->
+      <section class="bg-zinc-950/60 border border-zinc-800/90 rounded-2xl p-3.5 space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-amber-400">1. 模式、长宽比与预设示例</h3>
+          <div class="inline-flex rounded-lg bg-zinc-900 p-0.5 border border-zinc-800 text-xs">
+            <button id="btnModeDual" class="px-2.5 py-1 rounded-md bg-amber-500 text-zinc-950 font-semibold transition">双区域对比 (视频同款)</button>
+            <button id="btnModeSingle" class="px-2.5 py-1 rounded-md text-zinc-400 hover:text-white transition">单区域特写</button>
+          </div>
+        </div>
+
+        <!-- Aspect Ratio Selector Row -->
+        <div class="flex items-center justify-between gap-2 pt-0.5 text-xs">
+          <span class="text-zinc-400 shrink-0">动画画布长宽比:</span>
+          <div class="grid grid-cols-6 gap-1 flex-1">
+            <button data-aspect="3:4" class="btn-aspect px-1.5 py-1 rounded bg-amber-500 text-zinc-950 font-semibold text-[11px] transition">3:4</button>
+            <button data-aspect="9:16" class="btn-aspect px-1.5 py-1 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 text-[11px] transition">9:16</button>
+            <button data-aspect="4:5" class="btn-aspect px-1.5 py-1 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 text-[11px] transition">4:5</button>
+            <button data-aspect="1:1" class="btn-aspect px-1.5 py-1 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 text-[11px] transition">1:1</button>
+            <button data-aspect="4:3" class="btn-aspect px-1.5 py-1 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 text-[11px] transition">4:3</button>
+            <button data-aspect="16:9" class="btn-aspect px-1.5 py-1 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 text-[11px] transition">16:9</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 gap-2">
+          <button id="btnPresetFranceGermany" class="w-full text-left px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800/90 border border-zinc-800 hover:border-amber-500/40 transition flex items-center justify-between group">
+            <div>
+              <div class="text-xs font-semibold text-zinc-100 group-hover:text-amber-300">🇫🇷 vs 🇩🇪 加载视频同款：France vs Germany</div>
+              <div class="text-[11px] text-zinc-400">还原视频完整数据特征 (中位数 195m vs 205m, 均值 345m vs 283m)</div>
+            </div>
+            <span class="text-xs text-amber-400 font-medium shrink-0 ml-2">加载 →</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- SECTION 2: GeoTIFF Upload Dropzones -->
+      <section class="bg-zinc-950/60 border border-zinc-800/90 rounded-2xl p-3.5 space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-amber-400">2. 上传 GeoTIFF (.tif / .tiff) 高程数据</h3>
+          <button id="btnSwapRegions" class="text-[11px] px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition">
+            ⇅ 上下区域互换
+          </button>
+        </div>
+
+        <!-- Region A (Top) Upload Card -->
+        <div id="dropzoneA" class="border-2 border-dashed border-zinc-700/80 hover:border-amber-500/60 rounded-xl p-3 transition bg-zinc-900/50">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[11px] font-bold">区域 A (上方)</span>
+              <input id="inputNameA" type="text" value="France" class="bg-zinc-800 border border-zinc-700 rounded px-2 py-0.5 text-xs font-semibold text-white w-36 focus:outline-none focus:border-amber-400" placeholder="区域 A 名称" />
+            </div>
+            <label class="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-medium cursor-pointer transition">
+              <span>选择 .tif 文件</span>
+              <input id="fileInputA" type="file" accept=".tif,.tiff,image/tiff" class="hidden" />
+            </label>
+          </div>
+          <p class="text-[11px] text-zinc-400">支持拖拽 <code class="text-zinc-300">.tif / .tiff</code> 到此框内，自动读取第一波段高程值</p>
+          <div id="statsA" class="mt-2 pt-2 border-t border-zinc-800/80 grid grid-cols-4 gap-1 text-[11px] font-mono text-zinc-300">
+            <div>中位: <span class="text-amber-300 font-semibold">195m</span></div>
+            <div>均值: <span class="text-amber-300 font-semibold">345m</span></div>
+            <div>极值: <span>0~2650m</span></div>
+            <div>像元: <span>34.2k</span></div>
+          </div>
+        </div>
+
+        <!-- Region B (Bottom) Upload Card -->
+        <div id="dropzoneB" class="border-2 border-dashed border-zinc-700/80 hover:border-amber-500/60 rounded-xl p-3 transition bg-zinc-900/50">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 text-[11px] font-bold">区域 B (下方)</span>
+              <input id="inputNameB" type="text" value="Germany" class="bg-zinc-800 border border-zinc-700 rounded px-2 py-0.5 text-xs font-semibold text-white w-36 focus:outline-none focus:border-amber-400" placeholder="区域 B 名称" />
+            </div>
+            <label class="px-2.5 py-1 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 text-xs font-medium cursor-pointer transition">
+              <span>选择 .tif 文件</span>
+              <input id="fileInputB" type="file" accept=".tif,.tiff,image/tiff" class="hidden" />
+            </label>
+          </div>
+          <p class="text-[11px] text-zinc-400">上传第二个区域的 GeoTIFF，系统将在同一海拔横轴下进行像素排序对比</p>
+          <div id="statsB" class="mt-2 pt-2 border-t border-zinc-800/80 grid grid-cols-4 gap-1 text-[11px] font-mono text-zinc-300">
+            <div>中位: <span class="text-sky-300 font-semibold">205m</span></div>
+            <div>均值: <span class="text-sky-300 font-semibold">283m</span></div>
+            <div>极值: <span>0~2520m</span></div>
+            <div>像元: <span>33.8k</span></div>
+          </div>
+        </div>
+
+        <!-- DEM Cleaning & NoData Options -->
+        <div class="pt-1 space-y-2 text-xs">
+          <div class="flex items-center justify-between">
+            <label class="flex items-center gap-2 text-zinc-300 cursor-pointer">
+              <input id="chkAutoCornerMask" type="checkbox" checked class="rounded bg-zinc-800 border-zinc-600 text-amber-500 focus:ring-0" />
+              <span>自动抠除四角背景值 (识别矩形边界外的空白掩膜)</span>
+            </label>
+          </div>
+          <div class="flex items-center justify-between">
+            <label class="flex items-center gap-2 text-zinc-300 cursor-pointer">
+              <input id="chkFilterSeaLevel" type="checkbox" class="rounded bg-zinc-800 border-zinc-600 text-amber-500 focus:ring-0" />
+              <span>剔除海平面及以下像元 (&lt;= 0 m)</span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 3: Elevation Axis, Binning & Visual Style -->
+      <section class="bg-zinc-950/60 border border-zinc-800/90 rounded-2xl p-3.5 space-y-3">
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-amber-400">3. 海拔横轴、分箱与渲染样式</h3>
+
+        <div class="grid grid-cols-2 gap-2.5 text-xs">
+          <div>
+            <label class="block text-zinc-400 mb-1">横轴刻度范围模式</label>
+            <select id="selectAxisMode" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-zinc-200 focus:outline-none focus:border-amber-400">
+              <option value="min2000" selected>默认范围 (DEM最小值 – 2000 m+)</option>
+              <option value="auto">智能自适应刻度 (+尾部溢出柱)</option>
+              <option value="video1500">视频同款固定 (0 – 1.5 km+)</option>
+              <option value="full">完整极值范围 (无截断)</option>
+              <option value="custom">自定义最小/最大截断值</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-zinc-400 mb-1">高程分层设色方案</label>
+            <select id="selectColorRamp" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-zinc-200 focus:outline-none focus:border-amber-400">
+              <option value="classic" selected>Classic Hypsometric (视频同款绿-棕)</option>
+              <option value="alpine">Alpine Snow (绿谷-岩棕-雪山顶)</option>
+              <option value="vintage">Warm Cartographic (复古暖赭石)</option>
+              <option value="viridis">Viridis (科学感知色带)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Custom Axis Min / Max Inputs (Shown when Custom is selected) -->
+        <div id="customAxisBox" class="hidden grid grid-cols-2 gap-2.5 pt-1 text-xs">
+          <div>
+            <label class="block text-zinc-400 mb-1">横轴起点海拔 (m)</label>
+            <input id="inputCustomMin" type="number" value="0" step="50" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1 text-white" />
+          </div>
+          <div>
+            <label class="block text-zinc-400 mb-1">横轴截断海拔 (m+)</label>
+            <input id="inputCustomMax" type="number" value="2000" step="100" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1 text-white" />
+          </div>
+        </div>
+
+        <!-- Sliders for Bins, Hillshade, and Sweep Curve -->
+        <div class="space-y-2.5 pt-1 text-xs">
+          <div>
+            <div class="flex justify-between text-zinc-300 mb-1">
+              <span>主区间直方图柱数 (不含尾部 + 溢出柱)</span>
+              <span id="valBinCount" class="font-mono text-amber-300">15 柱 (共16柱)</span>
+            </div>
+            <input id="sliderBinCount" type="range" min="9" max="30" step="3" value="15" class="w-full" />
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <div class="flex justify-between text-zinc-300 mb-1">
+                <span>3D 山体阴影立体度</span>
+                <span id="valHillshade" class="font-mono text-amber-300">100%</span>
+              </div>
+              <input id="sliderHillshade" type="range" min="0" max="150" value="100" class="w-full" />
+            </div>
+
+            <div>
+              <div class="flex justify-between text-zinc-300 mb-1">
+                <span>粒子流散弧度</span>
+                <span id="valSweepArc" class="font-mono text-amber-300">标准</span>
+              </div>
+              <input id="sliderSweepArc" type="range" min="0" max="200" value="100" class="w-full" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 4: Editorial Typography, Labels & Logo Upload -->
+      <section class="bg-zinc-950/60 border border-zinc-800/90 rounded-2xl p-3.5 space-y-2.5">
+        <div class="flex items-center justify-between">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-amber-400">4. 海报标题、文案与 Logo 定制</h3>
+          <button id="btnToggleLangInside" class="text-[11px] text-amber-300 hover:underline">切换为英文文案</button>
+        </div>
+
+        <div class="grid grid-cols-1 gap-2 text-xs">
+          <div>
+            <label class="block text-zinc-400 mb-0.5">主标题 (Title)</label>
+            <input id="inputTitle" type="text" value="双城海拔对比" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-amber-400" />
+          </div>
+          <div>
+            <label class="block text-zinc-400 mb-0.5">副标题 (Subtitle)</label>
+            <input id="inputSubtitle" type="text" value="①地图未按同一比例尺缩放 ②上下两图横轴一致" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-amber-400" />
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-zinc-400 mb-0.5">左上署名</label>
+              <input id="inputAuthor" type="text" value="李寒星制图" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-1 text-zinc-200 focus:outline-none focus:border-amber-400" />
+            </div>
+            <div>
+              <label class="block text-zinc-400 mb-0.5">右上角标文字</label>
+              <input id="inputBrand" type="text" value="海王星地图先锋" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-1 text-zinc-200 focus:outline-none focus:border-amber-400" />
+            </div>
+          </div>
+          <!-- Upload Custom Logo Image (JPG/PNG) -->
+          <div class="pt-1">
+            <div class="flex items-center justify-between mb-1">
+              <label class="text-zinc-400">右上角 Logo 图片 (JPG / PNG)</label>
+              <button id="btnClearLogo" class="text-[11px] text-zinc-500 hover:text-red-400 hidden">恢复默认地球图标</button>
+            </div>
+            <label class="flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 hover:border-amber-500/50 text-zinc-200 text-xs font-medium cursor-pointer transition">
+              <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              </svg>
+              <span id="logoFileName">选择本地 JPG 或 PNG 文件...</span>
+              <input id="fileInputLogo" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" class="hidden" />
+            </label>
+          </div>
+          <div>
+            <label class="block text-zinc-400 mb-0.5">底部数据来源说明</label>
+            <input id="inputFooter" type="text" value="Copernicus DEM / GLO-30" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-1 text-zinc-300 text-[11px] focus:outline-none focus:border-amber-400" />
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </aside>
+
+  <!-- Main Application Script -->
+  <script>
+    /*************************************************************************
+     * 1. APPLICATION STATE & CONFIGURATION
+     *************************************************************************/
+    const ASPECT_PRESETS = {
+      '3:4':  { w: 900,  h: 1200, css: '3 / 4' },
+      '9:16': { w: 800,  h: 1422, css: '9 / 16' },
+      '4:5':  { w: 880,  h: 1100, css: '4 / 5' },
+      '1:1':  { w: 1000, h: 1000, css: '1 / 1' },
+      '4:3':  { w: 1200, h: 900,  css: '4 / 3' },
+      '16:9': { w: 1280, h: 720,  css: '16 / 9' }
+    };
+
+    const VIDEO_QUALITY_PRESETS = {
+      standard: { label: '标准 720p',  scale: 0.8,  fps: 30, bps: 6_000_000 },
+      hd:       { label: '高清 1080p', scale: 1.0,  fps: 60, bps: 16_000_000 },
+      ultra:    { label: '超清 1440p', scale: 1.25, fps: 60, bps: 32_000_000 },
+      master:   { label: '原画 2K',    scale: 1.5,  fps: 60, bps: 50_000_000 }
+    };
+
+    let CW = 900;   // Internal Poster Canvas Width (Default 3:4 Portrait)
+    let CH = 1200;  // Internal Poster Canvas Height
+
+    const state = {
+      aspectRatio: '3:4',    // Default 3:4 aspect ratio
+      videoQuality: 'hd',    // 'standard' | 'hd' | 'ultra' | 'master'
+      resScale: 1.0,         // Resolution multiplier from video quality preset
+      mode: 'dual',          // 'dual' or 'single'
+      lang: 'zh',            // Default to Chinese ('zh')
+      axisMode: 'min2000',   // 'min2000' (DEM min to 2000), 'auto', 'video1500', 'full', 'custom'
+      customMin: 0,
+      customMax: 2000,
+      numRegularBins: 15,    // 15 regular bins + 1 overflow bin = 16 bars (matches video)
+      hasOverflowBin: true,
+      colorRamp: 'classic',
+      hillshadeStrength: 1.0,
+      sweepArcStrength: 1.0,
+      autoCornerMask: true,
+      filterSeaLevel: false,
+
+      // Animation Timeline (matches 6.5s video structure)
+      isPlaying: true,
+      loop: true,
+      speed: 1.0,
+      totalDuration: 6.5,    // seconds
+      currentTime: 0.0,      // seconds in [0, totalDuration]
+      morphProgress: 0.0,    // 0 = Map, 1 = Sorted Histogram
+
+      // Poster Editorial Texts (Default Chinese)
+      title: '双城海拔对比',
+      subtitle: '①地图未按同一比例尺缩放 ②上下两图横轴一致',
+      author: '李寒星制图',
+      brand: '海王星地图先锋',
+      customLogoImg: null,   // Loaded HTMLImageElement for custom user logo
+      halfAboveLabel: '50% 高于',
+      meanElevLabel: '平均海拔',
+      footerLine1: 'Copernicus DEM / GLO-30',
+      footerLine2: '',
+
+      // Raw DEM Objects for Region A & Region B
+      demA: null,
+      demB: null,
+
+      // Compiled Particle & Histogram Render Models
+      modelA: null,
+      modelB: null,
+      sharedAxis: {
+        minElev: 0,
+        cutoffElev: 2000,
+        maxElev: 2500,
+        numBins: 16,
+        numRegularBins: 15,
+        hasOverflow: true,
+        ticks: []
+      }
+    };
+
+    const canvas = document.getElementById('posterCanvas');
+    const ctx = canvas.getContext('2d', { alpha: false });
+    // Dedicated pixel manipulation buffer for fast 60fps particle & map rendering
+    let frameImageData = ctx.createImageData(CW, CH);
+    let frameUint32 = new Uint32Array(frameImageData.data.buffer);
+
+    // Precompute little-endian ABGR packed paper color (#f3efe6 -> R:243, G:239, B:230)
+    const PAPER_R = 243, PAPER_G = 239, PAPER_B = 230;
+    const PAPER_UINT32 = (255 << 24) | (PAPER_B << 16) | (PAPER_G << 8) | PAPER_R;
+
+    /**
+     * Dynamically changes the poster canvas aspect ratio & resolution
+     */
+    function setAspectRatio(ratioKey, customResScale) {
+      const preset = ASPECT_PRESETS[ratioKey] || ASPECT_PRESETS['3:4'];
+      state.aspectRatio = ratioKey;
+      if (customResScale !== undefined) {
+        state.resScale = customResScale;
+      } else {
+        const qPreset = VIDEO_QUALITY_PRESETS[state.videoQuality] || VIDEO_QUALITY_PRESETS.hd;
+        state.resScale = qPreset.scale;
+      }
+
+      CW = Math.round(preset.w * state.resScale);
+      CH = Math.round(preset.h * state.resScale);
+
+      canvas.width = CW;
+      canvas.height = CH;
+      const wrapper = document.getElementById('canvasAspectWrapper');
+      if (wrapper) wrapper.style.aspectRatio = preset.css;
+
+      frameImageData = ctx.createImageData(CW, CH);
+      frameUint32 = new Uint32Array(frameImageData.data.buffer);
+
+      // Sync UI controls
+      const selectTop = document.getElementById('selectAspectTop');
+      if (selectTop) selectTop.value = ratioKey;
+      document.querySelectorAll('.btn-aspect').forEach(btn => {
+        const active = btn.getAttribute('data-aspect') === ratioKey;
+        btn.className = active
+          ? 'btn-aspect px-1.5 py-1 rounded bg-amber-500 text-zinc-950 font-semibold text-[11px] transition'
+          : 'btn-aspect px-1.5 py-1 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 text-[11px] transition';
+      });
+
+      rebuildModels();
+      renderPosterFrame();
+    }
+
+    /*************************************************************************
+     * 2. HYPSOMETRIC COLOR RAMPS & INTERPOLATION
+     *************************************************************************/
+    const COLOR_RAMPS = {
+      classic: [
+        { t: 0.00, rgb: [97, 145, 64] },
+        { t: 0.08, rgb: [124, 166, 73] },
+        { t: 0.16, rgb: [164, 189, 86] },
+        { t: 0.25, rgb: [204, 198, 106] },
+        { t: 0.36, rgb: [214, 174, 96] },
+        { t: 0.50, rgb: [194, 134, 68] },
+        { t: 0.68, rgb: [164, 96, 48] },
+        { t: 0.85, rgb: [130, 66, 33] },
+        { t: 1.00, rgb: [98, 46, 22] }
+      ],
+      alpine: [
+        { t: 0.00, rgb: [72, 133, 66] },
+        { t: 0.18, rgb: [138, 179, 88] },
+        { t: 0.35, rgb: [212, 192, 114] },
+        { t: 0.55, rgb: [184, 125, 72] },
+        { t: 0.78, rgb: [132, 82, 54] },
+        { t: 0.92, rgb: [175, 165, 160] },
+        { t: 1.00, rgb: [213, 224, 237] }
+      ],
+      vintage: [
+        { t: 0.00, rgb: [132, 158, 102] },
+        { t: 0.22, rgb: [188, 186, 118] },
+        { t: 0.45, rgb: [214, 168, 102] },
+        { t: 0.70, rgb: [176, 112, 66] },
+        { t: 1.00, rgb: [108, 56, 34] }
+      ],
+      viridis: [
+        { t: 0.00, rgb: [68, 1, 84] },
+        { t: 0.25, rgb: [59, 82, 139] },
+        { t: 0.50, rgb: [33, 145, 140] },
+        { t: 0.75, rgb: [94, 201, 98] },
+        { t: 1.00, rgb: [248, 230, 33] }
+      ]
+    };
+
+    function sampleColorRamp(rampName, normT) {
+      const stops = COLOR_RAMPS[rampName] || COLOR_RAMPS.classic;
+      const t = Math.max(0, Math.min(1, normT));
+      for (let i = 0; i < stops.length - 1; i++) {
+        const s0 = stops[i];
+        const s1 = stops[i + 1];
+        if (t >= s0.t && t <= s1.t) {
+          const local = (t - s0.t) / Math.max(1e-6, s1.t - s0.t);
+          return [
+            Math.round(s0.rgb[0] + (s1.rgb[0] - s0.rgb[0]) * local),
+            Math.round(s0.rgb[1] + (s1.rgb[1] - s0.rgb[1]) * local),
+            Math.round(s0.rgb[2] + (s1.rgb[2] - s0.rgb[2]) * local)
+          ];
+        }
+      }
+      return stops[stops.length - 1].rgb.slice();
+    }
+
+    /*************************************************************************
+     * 3. PROCEDURAL DEMO DEM GENERATORS
+     *************************************************************************/
+    function hash2D(ix, iy, seed = 1) {
+      let n = ix * 374761393 + iy * 668265263 + seed * 1442695041;
+      n = (n ^ (n >> 13)) * 1274126177;
+      return ((n ^ (n >> 16)) >>> 0) / 4294967295;
+    }
+
+    function valueNoise2D(x, y, seed = 1) {
+      const ix = Math.floor(x);
+      const iy = Math.floor(y);
+      const fx = x - ix;
+      const fy = y - iy;
+      const ux = fx * fx * (3 - 2 * fx);
+      const uy = fy * fy * (3 - 2 * fy);
+      const a = hash2D(ix, iy, seed);
+      const b = hash2D(ix + 1, iy, seed);
+      const c = hash2D(ix, iy + 1, seed);
+      const d = hash2D(ix + 1, iy + 1, seed);
+      return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy;
+    }
+
+    function fbm2D(x, y, octaves = 5, seed = 1) {
+      let val = 0, amp = 0.5, freq = 1, norm = 0;
+      for (let i = 0; i < octaves; i++) {
+        val += amp * valueNoise2D(x * freq, y * freq, seed + i * 17);
+        norm += amp;
+        amp *= 0.5;
+        freq *= 2.05;
+      }
+      return val / norm;
+    }
+
+    function ridgedFbm2D(x, y, octaves = 5, seed = 1) {
+      let val = 0, amp = 0.5, freq = 1, norm = 0;
+      for (let i = 0; i < octaves; i++) {
+        const n = valueNoise2D(x * freq, y * freq, seed + i * 31);
+        const ridge = 1.0 - Math.abs(2.0 * n - 1.0);
+        val += amp * ridge * ridge;
+        norm += amp;
+        amp *= 0.5;
+        freq *= 2.12;
+      }
+      return val / norm;
+    }
+
+    function pointInPolygon(px, py, polygon) {
+      let inside = false;
+      for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i][0], yi = polygon[i][1];
+        const xj = polygon[j][0], yj = polygon[j][1];
+        const intersect = ((yi > py) !== (yj > py)) &&
+          (px < (xj - xi) * (py - yi) / ((yj - yi) || 1e-9) + xi);
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    }
+
+    function generateFranceDemoDEM() {
+      const W = 250, H = 225;
+      const data = new Float32Array(W * H);
+      data.fill(-9999);
+      const franceMainland = [
+        [0.45, 0.04], [0.51, 0.05], [0.58, 0.11], [0.68, 0.16],
+        [0.80, 0.22], [0.76, 0.34], [0.72, 0.43], [0.75, 0.50],
+        [0.78, 0.59], [0.74, 0.67], [0.78, 0.76], [0.70, 0.82],
+        [0.61, 0.80], [0.54, 0.85], [0.51, 0.91], [0.39, 0.89],
+        [0.25, 0.82], [0.28, 0.68], [0.24, 0.54], [0.19, 0.45],
+        [0.06, 0.34], [0.06, 0.28], [0.19, 0.28], [0.24, 0.20],
+        [0.23, 0.15], [0.32, 0.18], [0.37, 0.11]
+      ];
+      const corsicaPoly = [
+        [0.91, 0.75], [0.94, 0.80], [0.95, 0.88], [0.92, 0.95],
+        [0.88, 0.93], [0.87, 0.85], [0.89, 0.79]
+      ];
+
+      for (let y = 0; y < H; y++) {
+        const ny = y / H;
+        for (let x = 0; x < W; x++) {
+          const nx = x / W;
+          const coastJiggle = (fbm2D(nx * 14, ny * 14, 4, 101) - 0.5) * 0.032;
+          const inMainland = pointInPolygon(nx + coastJiggle, ny + coastJiggle, franceMainland);
+          const inCorsica = pointInPolygon(nx + coastJiggle * 0.5, ny + coastJiggle * 0.5, corsicaPoly);
+          if (!inMainland && !inCorsica) continue;
+
+          const rough = fbm2D(nx * 7.5, ny * 7.5, 5, 202);
+          const ridge = ridgedFbm2D(nx * 11, ny * 11, 5, 303);
+
+          let elev = 0;
+          if (inCorsica) {
+            const cDist = Math.hypot((nx - 0.91) * 1.4, (ny - 0.86));
+            elev = 180 + Math.max(0, 1 - cDist * 14) * 1450 * ridge + rough * 220;
+          } else {
+            const basePlain = 22 + Math.pow(rough, 1.35) * 215;
+            const westFactor = Math.exp(-Math.pow((nx - 0.32) / 0.24, 2) - Math.pow((ny - 0.36) / 0.28, 2));
+            const aquitaineFactor = Math.exp(-Math.pow((nx - 0.30) / 0.16, 2) - Math.pow((ny - 0.68) / 0.18, 2));
+            const alpsEnv = Math.exp(-Math.pow((nx - 0.73) / 0.105, 2) - Math.pow((ny - 0.62) / 0.16, 2));
+            const alps = alpsEnv * (650 + 2150 * Math.pow(ridge, 1.25));
+            const pyrEnv = Math.exp(-Math.pow((nx - 0.38) / 0.16, 2) - Math.pow((ny - 0.87) / 0.055, 2));
+            const pyrenees = pyrEnv * (550 + 1850 * Math.pow(ridge, 1.3));
+            const massifEnv = Math.exp(-Math.pow((nx - 0.53) / 0.13, 2) - Math.pow((ny - 0.64) / 0.13, 2));
+            const massif = massifEnv * (280 + 820 * ridge * rough);
+            const juraEnv = Math.exp(-Math.pow((nx - 0.72) / 0.075, 2) - Math.pow((ny - 0.38) / 0.15, 2));
+            const jura = juraEnv * (240 + 680 * ridge);
+            const hills = Math.exp(-Math.pow((nx - 0.62) / 0.15, 2) - Math.pow((ny - 0.18) / 0.12, 2)) * 210 * rough;
+            const rhoneValley = Math.exp(-Math.pow((nx - 0.635) / 0.032, 2) - Math.pow((ny - 0.66) / 0.16, 2));
+
+            elev = basePlain * (1 - 0.38 * westFactor - 0.42 * aquitaineFactor)
+                 + (alps + massif + jura + hills) * (1 - 0.62 * rhoneValley)
+                 + pyrenees;
+          }
+          data[y * W + x] = Math.max(2, elev);
+        }
+      }
+      calibrateDEMStats(data, -9999, 195, 345);
+      return { name: 'France', width: W, height: H, data, noData: -9999, isDemo: true };
+    }
+
+    function generateGermanyDemoDEM() {
+      const W = 230, H = 250;
+      const data = new Float32Array(W * H);
+      data.fill(-9999);
+      const germanyPoly = [
+        [0.37, 0.04], [0.49, 0.06], [0.54, 0.14], [0.72, 0.12],
+        [0.82, 0.18], [0.85, 0.31], [0.89, 0.44], [0.87, 0.53],
+        [0.71, 0.61], [0.76, 0.70], [0.85, 0.77], [0.79, 0.85],
+        [0.81, 0.93], [0.66, 0.94], [0.54, 0.95], [0.34, 0.92],
+        [0.24, 0.90], [0.25, 0.76], [0.16, 0.69], [0.14, 0.56],
+        [0.16, 0.42], [0.22, 0.31], [0.21, 0.20], [0.33, 0.19],
+        [0.35, 0.11]
+      ];
+
+      for (let y = 0; y < H; y++) {
+        const ny = y / H;
+        for (let x = 0; x < W; x++) {
+          const nx = x / W;
+          const coastJiggle = (fbm2D(nx * 15, ny * 15, 4, 505) - 0.5) * 0.034;
+          if (!pointInPolygon(nx + coastJiggle, ny + coastJiggle, germanyPoly)) continue;
+
+          const rough = fbm2D(nx * 8.0, ny * 8.0, 5, 606);
+          const ridge = ridgedFbm2D(nx * 11.5, ny * 11.5, 5, 707);
+          let northLowland = 8 + rough * 85 * Math.pow(Math.min(1, ny / 0.45), 1.4);
+          const centralEnv = Math.exp(-Math.pow((ny - 0.56) / 0.19, 2));
+          const centralUplands = centralEnv * (145 + 420 * rough * (0.45 + 0.55 * ridge));
+          const blackForestEnv = Math.exp(-Math.pow((nx - 0.33) / 0.11, 2) - Math.pow((ny - 0.81) / 0.10, 2));
+          const blackForest = blackForestEnv * (280 + 780 * ridge);
+          const bavForestEnv = Math.exp(-Math.pow((nx - 0.77) / 0.09, 2) - Math.pow((ny - 0.74) / 0.09, 2));
+          const bavForest = bavForestEnv * (260 + 680 * ridge);
+          const forelandEnv = Math.exp(-Math.pow((nx - 0.58) / 0.22, 2) - Math.pow((ny - 0.84) / 0.10, 2));
+          const alpsRimEnv = Math.exp(-Math.pow((nx - 0.58) / 0.20, 2) - Math.pow((ny - 0.935) / 0.032, 2));
+          const rhinePlain = Math.exp(-Math.pow((nx - 0.25) / 0.035, 2) - Math.pow((ny - 0.74) / 0.13, 2));
+
+          let elev = northLowland
+                   + (centralUplands + blackForest + bavForest) * (1 - 0.65 * rhinePlain)
+                   + forelandEnv * (240 + 260 * rough)
+                   + alpsRimEnv * (680 + 1450 * Math.pow(ridge, 1.3));
+
+          data[y * W + x] = Math.max(2, elev);
+        }
+      }
+      calibrateDEMStats(data, -9999, 205, 283);
+      return { name: 'Germany', width: W, height: H, data, noData: -9999, isDemo: true };
+    }
+
+    function calibrateDEMStats(data, noData, targetMedian, targetMean) {
+      const valid = [];
+      for (let i = 0; i < data.length; i++) {
+        if (data[i] !== noData && data[i] > -500) valid.push(data[i]);
+      }
+      if (!valid.length) return;
+      valid.sort((a, b) => a - b);
+      const curMed = valid[Math.floor(valid.length * 0.5)];
+      const scaleToMed = targetMedian / Math.max(1, curMed);
+
+      let bestGamma = 1.0;
+      let bestDiff = Infinity;
+      for (let g = 0.65; g <= 1.65; g += 0.025) {
+        let sum = 0;
+        for (let i = 0; i < valid.length; i += 4) {
+          const v = valid[i] * scaleToMed;
+          const mapped = v <= targetMedian ? v : targetMedian + Math.pow((v - targetMedian) / 500, g) * 500;
+          sum += mapped;
+        }
+        const meanEst = sum / Math.ceil(valid.length / 4);
+        const diff = Math.abs(meanEst - targetMean);
+        if (diff < bestDiff) { bestDiff = diff; bestGamma = g; }
+      }
+
+      for (let i = 0; i < data.length; i++) {
+        if (data[i] === noData || data[i] <= -500) continue;
+        const v = data[i] * scaleToMed;
+        data[i] = v <= targetMedian ? v : targetMedian + Math.pow((v - targetMedian) / 500, bestGamma) * 500;
+      }
+    }
+
+    /*************************************************************************
+     * 4. GEOTIFF PARSER & SAMPLE .TIF GENERATOR
+     *************************************************************************/
+    async function parseUploadedGeoTIFF(file) {
+      const arrayBuffer = await file.arrayBuffer();
+      let width, height, rasterData, gdalNoData = null;
+
+      if (window.GeoTIFF && typeof window.GeoTIFF.fromArrayBuffer === 'function') {
+        const tiff = await window.GeoTIFF.fromArrayBuffer(arrayBuffer);
+        const image = await tiff.getImage();
+        width = image.getWidth();
+        height = image.getHeight();
+        gdalNoData = image.getGDALNoData();
+        if (gdalNoData !== null && gdalNoData !== undefined) gdalNoData = Number(gdalNoData);
+
+        const maxDim = 650;
+        let readW = width, readH = height;
+        if (Math.max(width, height) > maxDim) {
+          const scale = maxDim / Math.max(width, height);
+          readW = Math.max(10, Math.round(width * scale));
+          readH = Math.max(10, Math.round(height * scale));
+        }
+
+        const rasters = await image.readRasters({ width: readW, height: readH, samples: [0] });
+        rasterData = new Float32Array(rasters[0]);
+        width = readW;
+        height = readH;
+      } else {
+        throw new Error('GeoTIFF 解析库尚未加载完成');
+      }
+
+      const cleanName = file.name.replace(/\.(geotiff|tiff|tif)$/i, '');
+      return { name: cleanName || 'Uploaded DEM', width, height, data: rasterData, noData: gdalNoData, isDemo: false };
+    }
+
+    /*************************************************************************
+     * 5. DEM PREPROCESSING, HILLSHADING & PARTICLE ENGINE
+     *************************************************************************/
+    function analyzeDEM(dem) {
+      const { width: W, height: H, data, noData } = dem;
+      const validMask = new Uint8Array(W * H);
+      let cornerBgVal = null;
+      if (state.autoCornerMask && W > 4 && H > 4) {
+        const corners = [data[0], data[W - 1], data[(H - 1) * W], data[H * W - 1]].filter(v => Number.isFinite(v));
+        if (corners.length >= 3) {
+          for (let i = 0; i < corners.length; i++) {
+            const matches = corners.filter(c => Math.abs(c - corners[i]) < 1e-4).length;
+            if (matches >= 2) { cornerBgVal = corners[i]; break; }
+          }
+        }
+      }
+
+      for (let i = 0; i < data.length; i++) {
+        const v = data[i];
+        if (!Number.isFinite(v)) continue;
+        if (noData !== null && noData !== undefined && Math.abs(v - noData) < 1e-3) continue;
+        if (v <= -500 || v >= 12000 || v === -9999 || v === -32768 || v === 32767) continue;
+        if (state.filterSeaLevel && v <= 0) continue;
+        validMask[i] = 1;
+      }
+
+      if (cornerBgVal !== null) {
+        const visited = new Uint8Array(W * H);
+        const queue = new Int32Array(W * H);
+        let qHead = 0, qTail = 0;
+        function tryEnqueue(idx) {
+          if (visited[idx]) return;
+          if (Math.abs(data[idx] - cornerBgVal) < 1e-3) {
+            visited[idx] = 1;
+            validMask[idx] = 0;
+            queue[qTail++] = idx;
+          }
+        }
+        for (let x = 0; x < W; x++) { tryEnqueue(x); tryEnqueue((H - 1) * W + x); }
+        for (let y = 0; y < H; y++) { tryEnqueue(y * W); tryEnqueue(y * W + (W - 1)); }
+        while (qHead < qTail) {
+          const curr = queue[qHead++];
+          const cx = curr % W;
+          const cy = (curr / W) | 0;
+          if (cx > 0) tryEnqueue(curr - 1);
+          if (cx < W - 1) tryEnqueue(curr + 1);
+          if (cy > 0) tryEnqueue(curr - W);
+          if (cy < H - 1) tryEnqueue(curr + W);
+        }
+      }
+
+      let minX = W, maxX = 0, minY = H, maxY = 0;
+      const validValues = [];
+      let sum = 0;
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          const idx = y * W + x;
+          if (!validMask[idx]) continue;
+          const v = data[idx];
+          validValues.push(v);
+          sum += v;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+
+      if (validValues.length < 10) {
+        validValues.length = 0; sum = 0; minX = 0; maxX = W - 1; minY = 0; maxY = H - 1;
+        for (let i = 0; i < data.length; i++) {
+          const v = Number.isFinite(data[i]) && data[i] > -9000 ? data[i] : 0;
+          validMask[i] = 1; validValues.push(v); sum += v;
+        }
+      }
+
+      validValues.sort((a, b) => a - b);
+      const count = validValues.length;
+      return {
+        validMask,
+        count,
+        minElev: validValues[0],
+        maxElev: validValues[count - 1],
+        medianElev: validValues[Math.floor(count * 0.5)],
+        meanElev: sum / count,
+        p02Elev: validValues[Math.floor(count * 0.02)],
+        p96Elev: validValues[Math.floor(count * 0.96)],
+        p98Elev: validValues[Math.floor(count * 0.98)],
+        bbox: { minX, maxX, minY, maxY, w: Math.max(1, maxX - minX + 1), h: Math.max(1, maxY - minY + 1) }
+      };
+    }
+
+    function computeSharedAxis(statsA, statsB) {
+      const numReg = state.numRegularBins;
+      let minAxis = 0, cutoffAxis = 2000, hasOverflow = true;
+      const combMin = statsB ? Math.min(statsA.minElev, statsB.minElev) : statsA.minElev;
+      const combMax = statsB ? Math.max(statsA.maxElev, statsB.maxElev) : statsA.maxElev;
+      const combP96 = statsB ? Math.max(statsA.p96Elev, statsB.p96Elev) : statsA.p96Elev;
+
+      if (state.axisMode === 'min2000') {
+        minAxis = Math.floor(combMin);
+        cutoffAxis = 2000;
+        if (cutoffAxis <= minAxis) cutoffAxis = minAxis + 2000;
+        hasOverflow = true;
+      } else if (state.axisMode === 'video1500') {
+        minAxis = 0; cutoffAxis = 1500; hasOverflow = true;
+      } else if (state.axisMode === 'custom') {
+        minAxis = Number(state.customMin) || 0;
+        cutoffAxis = Math.max(minAxis + 30, Number(state.customMax) || 2000);
+        hasOverflow = combMax > cutoffAxis;
+      } else if (state.axisMode === 'full') {
+        minAxis = combMin >= 0 && combMin < 400 ? 0 : Math.floor(combMin / 100) * 100;
+        const span = Math.max(30, combMax - minAxis);
+        const niceSteps = [10, 20, 50, 100, 150, 200, 250, 300, 500, 1000, 1500, 2000, 2500, 3000];
+        let majorStep = Math.ceil(span / 3);
+        for (const s of niceSteps) { if (s * 3 >= span) { majorStep = s; break; } }
+        cutoffAxis = minAxis + majorStep * 3;
+        hasOverflow = false;
+      } else {
+        minAxis = combMin >= 0 && combMin < 450 ? 0 : Math.floor(combMin / 100) * 100;
+        const targetSpan = Math.max(60, combP96 - minAxis);
+        if (minAxis === 0 && combP96 >= 700 && combP96 <= 1800) {
+          cutoffAxis = 1500;
+        } else {
+          const niceSteps = [20, 50, 100, 200, 250, 300, 400, 500, 750, 1000, 1500, 2000, 2500];
+          let chosenStep = niceSteps[niceSteps.length - 1];
+          for (const s of niceSteps) { if (s * 3 >= targetSpan * 0.92) { chosenStep = s; break; } }
+          cutoffAxis = minAxis + chosenStep * 3;
+        }
+        hasOverflow = true;
+      }
+
+      const numBins = hasOverflow ? numReg + 1 : numReg;
+      const binStep = (cutoffAxis - minAxis) / numReg;
+      const useKm = cutoffAxis >= 1000 && minAxis === 0 && ((cutoffAxis - minAxis) / 3) % 100 === 0;
+      function formatTick(val, isLastCutoff) {
+        if (Math.round(val) === 0) return '0';
+        let label = useKm ? ((val / 1000).toFixed(val % 1000 === 0 ? 0 : 1) + ' km') : (Math.round(val) + ' m');
+        if (isLastCutoff && hasOverflow) label += '+';
+        return label;
+      }
+
+      const ticks = [
+        { binIndex: 0, value: minAxis, label: formatTick(minAxis, false) },
+        { binIndex: numReg / 3, value: minAxis + (cutoffAxis - minAxis) / 3, label: formatTick(minAxis + (cutoffAxis - minAxis) / 3, false) },
+        { binIndex: (2 * numReg) / 3, value: minAxis + (2 * (cutoffAxis - minAxis)) / 3, label: formatTick(minAxis + (2 * (cutoffAxis - minAxis)) / 3, false) },
+        { binIndex: numReg, value: cutoffAxis, label: formatTick(cutoffAxis, true) }
+      ];
+
+      return { minElev: minAxis, cutoffElev: cutoffAxis, maxElev: Math.max(cutoffAxis, combMax), binStep, numRegularBins: numReg, numBins, hasOverflow, ticks };
+    }
+
+    function buildRegionParticlesAndMap(dem, stats, slotBox, axis) {
+      const { width: srcW, height: srcH, data } = dem;
+      const { validMask, bbox } = stats;
+      const scale = Math.min(slotBox.mapMaxW / bbox.w, slotBox.mapMaxH / bbox.h);
+      const mapW = Math.max(20, Math.round(bbox.w * scale));
+      const mapH = Math.max(20, Math.round(bbox.h * scale));
+      const mapLeft = Math.round(slotBox.mapCenterX - mapW / 2);
+      const mapTop = Math.round(slotBox.mapCenterY - mapH / 2);
+
+      const gridElev = new Float32Array(mapW * mapH);
+      const gridValid = new Uint8Array(mapW * mapH);
+
+      // Smooth bilinear sampling of elevation values to prevent blocky upsampling artifacts
+      for (let py = 0; py < mapH; py++) {
+        const fy = bbox.minY + (py + 0.5) / scale - 0.5;
+        const syNear = Math.min(srcH - 1, Math.max(0, Math.floor(bbox.minY + (py + 0.5) / scale)));
+        const y0 = Math.max(0, Math.min(srcH - 1, Math.floor(fy)));
+        const y1 = Math.max(0, Math.min(srcH - 1, y0 + 1));
+        const wy = Math.max(0, Math.min(1, fy - y0));
+
+        for (let px = 0; px < mapW; px++) {
+          const fx = bbox.minX + (px + 0.5) / scale - 0.5;
+          const sxNear = Math.min(srcW - 1, Math.max(0, Math.floor(bbox.minX + (px + 0.5) / scale)));
+          const nearIdx = syNear * srcW + sxNear;
+          if (!validMask[nearIdx]) continue;
+
+          gridValid[py * mapW + px] = 1;
+          const x0 = Math.max(0, Math.min(srcW - 1, Math.floor(fx)));
+          const x1 = Math.max(0, Math.min(srcW - 1, x0 + 1));
+          const wx = Math.max(0, Math.min(1, fx - x0));
+
+          const fallback = data[nearIdx];
+          const i00 = y0 * srcW + x0, i10 = y0 * srcW + x1;
+          const i01 = y1 * srcW + x0, i11 = y1 * srcW + x1;
+          const v00 = validMask[i00] ? data[i00] : fallback;
+          const v10 = validMask[i10] ? data[i10] : fallback;
+          const v01 = validMask[i01] ? data[i01] : fallback;
+          const v11 = validMask[i11] ? data[i11] : fallback;
+
+          const topVal = v00 + (v10 - v00) * wx;
+          const botVal = v01 + (v11 - v01) * wx;
+          gridElev[py * mapW + px] = topVal + (botVal - topVal) * wy;
+        }
+      }
+
+      const gridShade = new Float32Array(mapW * mapH);
+      const elevSpan = Math.max(100, axis.cutoffElev - axis.minElev);
+      const zFactor = (3.8 * state.hillshadeStrength) / elevSpan;
+      const lx = -0.53, ly = -0.53, lz = 0.66;
+
+      for (let py = 0; py < mapH; py++) {
+        for (let px = 0; px < mapW; px++) {
+          const idx = py * mapW + px;
+          if (!gridValid[idx]) continue;
+          const c = gridElev[idx];
+          const l = (px > 0 && gridValid[idx - 1]) ? gridElev[idx - 1] : c;
+          const r = (px < mapW - 1 && gridValid[idx + 1]) ? gridElev[idx + 1] : c;
+          const u = (py > 0 && gridValid[idx - mapW]) ? gridElev[idx - mapW] : c;
+          const d = (py < mapH - 1 && gridValid[idx + mapW]) ? gridElev[idx + mapW] : c;
+          const dzdx = (r - l) * 0.5 * zFactor;
+          const dzdy = (d - u) * 0.5 * zFactor;
+          const invLen = 1.0 / Math.sqrt(dzdx * dzdx + dzdy * dzdy + 1.0);
+          const dot = (-dzdx * invLen) * lx + (-dzdy * invLen) * ly + invLen * lz;
+          gridShade[idx] = Math.max(-0.32, Math.min(0.42, (dot - 0.62) * 1.15));
+        }
+      }
+
+      // Build clean exterior-only drop shadow (punch out map interior so it NEVER veils or blurs the map)
+      const shadowCanvas = document.createElement('canvas');
+      shadowCanvas.width = mapW + 40;
+      shadowCanvas.height = mapH + 40;
+      const sCtx = shadowCanvas.getContext('2d');
+      const maskCanvas = document.createElement('canvas');
+      maskCanvas.width = mapW;
+      maskCanvas.height = mapH;
+      const mCtx = maskCanvas.getContext('2d');
+      const mImg = mCtx.createImageData(mapW, mapH);
+      for (let i = 0; i < gridValid.length; i++) {
+        if (gridValid[i]) {
+          const p = i * 4;
+          mImg.data[p] = 48;
+          mImg.data[p + 1] = 40;
+          mImg.data[p + 2] = 28;
+          mImg.data[p + 3] = 255;
+        }
+      }
+      mCtx.putImageData(mImg, 0, 0);
+
+      sCtx.save();
+      sCtx.filter = 'blur(5px)';
+      sCtx.globalAlpha = 0.22;
+      sCtx.drawImage(maskCanvas, 24, 25);
+      sCtx.restore();
+
+      // Cut out the map silhouette itself so 0% of the shadow overlaps the terrain pixels
+      sCtx.save();
+      sCtx.globalCompositeOperation = 'destination-out';
+      sCtx.drawImage(maskCanvas, 20, 20);
+      sCtx.restore();
+
+      const rawParticles = [];
+      const numBins = axis.numBins;
+      const binCounts = new Int32Array(numBins);
+
+      for (let py = 0; py < mapH; py++) {
+        for (let px = 0; px < mapW; px++) {
+          const idx = py * mapW + px;
+          if (!gridValid[idx]) continue;
+          const elev = gridElev[idx];
+          const shade = gridShade[idx];
+          const normElev = Math.max(0, Math.min(1, (elev - axis.minElev) / Math.max(1, axis.cutoffElev - axis.minElev)));
+          const baseRGB = sampleColorRamp(state.colorRamp, normElev);
+
+          const mapR = Math.max(0, Math.min(255, Math.round(baseRGB[0] + shade * 72 + 4)));
+          const mapG = Math.max(0, Math.min(255, Math.round(baseRGB[1] + shade * 68 + 4)));
+          const mapB = Math.max(0, Math.min(255, Math.round(baseRGB[2] + shade * 58 + 3)));
+          const barR = Math.max(0, Math.min(255, Math.round(baseRGB[0] + shade * 22)));
+          const barG = Math.max(0, Math.min(255, Math.round(baseRGB[1] + shade * 20)));
+          const barB = Math.max(0, Math.min(255, Math.round(baseRGB[2] + shade * 18)));
+
+          let bIdx = elev >= axis.cutoffElev ? numBins - 1 : (elev <= axis.minElev ? 0 : Math.min(axis.numRegularBins - 1, Math.floor((elev - axis.minElev) / axis.binStep)));
+          binCounts[bIdx]++;
+
+          rawParticles.push({
+            sx: mapLeft + px, sy: mapTop + py,
+            nx: px / mapW, ny: py / mapH,
+            elev, normElev, bin: bIdx,
+            mapColor: (255 << 24) | (mapB << 16) | (mapG << 8) | mapR,
+            barColor: (255 << 24) | (barB << 16) | (barG << 8) | barR
+          });
+        }
+      }
+
+      rawParticles.sort((a, b) => (a.elev - b.elev) || (a.sy - b.sy) || (a.sx - b.sx));
+      const totalParticles = rawParticles.length;
+      const binFractions = new Float32Array(numBins);
+      let maxBinFraction = 0;
+      for (let b = 0; b < numBins; b++) {
+        binFractions[b] = totalParticles > 0 ? binCounts[b] / totalParticles : 0;
+        if (binFractions[b] > maxBinFraction) maxBinFraction = binFractions[b];
+      }
+
+      return { name: dem.name, stats, slotBox, mapLeft, mapTop, mapW, mapH, shadowCanvas, rawParticles, totalParticles, binCounts, binFractions, maxBinFraction, typed: null, barsGeometry: [] };
+    }
+
+    function finalizeHistogramPacking(model, sharedMaxFraction, axis) {
+      const { slotBox, rawParticles, totalParticles, binCounts, binFractions } = model;
+      const numBins = axis.numBins;
+      const chartW = slotBox.chartRight - slotBox.chartLeft;
+      const stepW = chartW / numBins;
+      const barW = Math.max(4, Math.floor(stepW - 2.5));
+
+      const barsGeometry = [];
+      let pCursor = 0;
+      const sxArr = new Float32Array(totalParticles);
+      const syArr = new Float32Array(totalParticles);
+      const txArr = new Float32Array(totalParticles);
+      const tyArr = new Float32Array(totalParticles);
+      const delayArr = new Float32Array(totalParticles);
+      const arcArr = new Float32Array(totalParticles);
+      const mapColArr = new Uint32Array(totalParticles);
+      const barColArr = new Uint32Array(totalParticles);
+
+      for (let b = 0; b < numBins; b++) {
+        const count = binCounts[b];
+        const frac = binFractions[b];
+        const barLeft = Math.round(slotBox.chartLeft + b * stepW);
+        const barH = count > 0 ? Math.max(2, Math.round(sharedMaxFraction > 0 ? (frac / sharedMaxFraction) * slotBox.maxBarH : 0)) : 0;
+        const barTop = slotBox.baselineY - barH;
+
+        const rgbLow = sampleColorRamp(state.colorRamp, Math.min(1, b / Math.max(1, axis.numRegularBins)));
+        const rgbHigh = sampleColorRamp(state.colorRamp, Math.min(1, (b + 0.9) / Math.max(1, axis.numRegularBins)));
+
+        barsGeometry.push({
+          binIndex: b, x: barLeft, y: barTop, w: barW, h: barH, baselineY: slotBox.baselineY, count, frac,
+          colorBottom: `rgb(${rgbLow[0]}, ${rgbLow[1]}, ${rgbLow[2]})`,
+          colorTop: `rgb(${rgbHigh[0]}, ${rgbHigh[1]}, ${rgbHigh[2]})`
+        });
+
+        for (let k = 0; k < count; k++) {
+          const p = rawParticles[pCursor];
+          const progressInBin = count > 1 ? k / (count - 1) : 0.5;
+          const col = k % barW;
+          const ty = slotBox.baselineY - 1 - Math.floor(progressInBin * Math.max(0, barH - 1));
+          const tx = barLeft + col;
+
+          sxArr[pCursor] = p.sx; syArr[pCursor] = p.sy; txArr[pCursor] = tx; tyArr[pCursor] = ty;
+          delayArr[pCursor] = Math.min(0.45, (p.normElev * 0.25) + ((1.0 - p.ny) * 0.11 + p.nx * 0.06) + hash2D(p.sx, p.sy, 77) * 0.06);
+          arcArr[pCursor] = (32 + p.normElev * 55 + (hash2D(p.sx, p.sy, 99) - 0.5) * 24) * state.sweepArcStrength;
+          mapColArr[pCursor] = p.mapColor; barColArr[pCursor] = p.barColor;
+          pCursor++;
+        }
+      }
+
+      model.barsGeometry = barsGeometry;
+      model.typed = { sx: sxArr, sy: syArr, tx: txArr, ty: tyArr, delay: delayArr, arc: arcArr, mapCol: mapColArr, barCol: barColArr };
+    }
+
+    function rebuildModels() {
+      if (!state.demA) return;
+      const statsA = analyzeDEM(state.demA);
+      const statsB = (state.mode === 'dual' && state.demB) ? analyzeDEM(state.demB) : null;
+      state.sharedAxis = computeSharedAxis(statsA, statsB);
+
+      const padX = Math.round(CW * 0.06);
+      if (state.mode === 'dual' && state.demB && statsB) {
+        const slotAHeaderY = Math.round(CH * 0.162);
+        const slotABaselineY = Math.round(CH * 0.480);
+        const slotAH = slotABaselineY - slotAHeaderY;
+        const slotBHeaderY = Math.round(CH * 0.560);
+        const slotBBaselineY = Math.round(CH * 0.878);
+        const slotBH = slotBBaselineY - slotBHeaderY;
+
+        const slotA = {
+          headerY: slotAHeaderY, mapCenterX: Math.round(CW * 0.53), mapCenterY: Math.round(slotAHeaderY + slotAH * 0.50),
+          mapMaxW: Math.round(CW * 0.60), mapMaxH: Math.round(slotAH * 0.90),
+          chartLeft: padX, chartRight: CW - padX, baselineY: slotABaselineY, maxBarH: Math.round(slotAH * 0.74), statTopY: slotAHeaderY + Math.round(CH * 0.020)
+        };
+        const slotB = {
+          headerY: slotBHeaderY, mapCenterX: Math.round(CW * 0.53), mapCenterY: Math.round(slotBHeaderY + slotBH * 0.50),
+          mapMaxW: Math.round(CW * 0.60), mapMaxH: Math.round(slotBH * 0.90),
+          chartLeft: padX, chartRight: CW - padX, baselineY: slotBBaselineY, maxBarH: Math.round(slotBH * 0.74), statTopY: slotBHeaderY + Math.round(CH * 0.020)
+        };
+
+        state.modelA = buildRegionParticlesAndMap(state.demA, statsA, slotA, state.sharedAxis);
+        state.modelB = buildRegionParticlesAndMap(state.demB, statsB, slotB, state.sharedAxis);
+        const sharedMaxFrac = Math.max(state.modelA.maxBinFraction, state.modelB.maxBinFraction, 0.05);
+        finalizeHistogramPacking(state.modelA, sharedMaxFrac, state.sharedAxis);
+        finalizeHistogramPacking(state.modelB, sharedMaxFrac, state.sharedAxis);
+      } else {
+        const singleHeaderY = Math.round(CH * 0.175);
+        const singleBaselineY = Math.round(CH * 0.855);
+        const singleH = singleBaselineY - singleHeaderY;
+        const slotSingle = {
+          headerY: singleHeaderY, mapCenterX: Math.round(CW * 0.52), mapCenterY: Math.round(singleHeaderY + singleH * 0.50),
+          mapMaxW: Math.round(CW * 0.78), mapMaxH: Math.round(singleH * 0.84),
+          chartLeft: padX, chartRight: CW - padX, baselineY: singleBaselineY, maxBarH: Math.round(singleH * 0.68), statTopY: singleHeaderY + Math.round(CH * 0.028)
+        };
+
+        state.modelA = buildRegionParticlesAndMap(state.demA, statsA, slotSingle, state.sharedAxis);
+        state.modelB = null;
+        const sharedMaxFrac = Math.max(state.modelA.maxBinFraction, 0.05);
+        finalizeHistogramPacking(state.modelA, sharedMaxFrac, state.sharedAxis);
+      }
+      updateStatsUI();
+    }
+
+    /*************************************************************************
+     * 6. POSTER RENDERER (60 FPS HYBRID PIXEL BUFFER + VECTOR TYPOGRAPHY)
+     *************************************************************************/
+    function timeToMorphProgress(tSec) {
+      const holdStart = 0.95, transEnd = 3.25;
+      if (tSec <= holdStart) return 0;
+      if (tSec >= transEnd) return 1;
+      return (tSec - holdStart) / (transEnd - holdStart);
+    }
+
+    function stampModelParticles(model, progress) {
+      if (!model || !model.typed) return;
+      const { sx, sy, tx, ty, delay, arc, mapCol, barCol } = model.typed;
+      const count = model.totalParticles;
+      const useBarCol = progress > 0.65;
+
+      if (progress <= 0.0005) {
+        for (let i = 0; i < count; i++) {
+          const x = sx[i] | 0, y = sy[i] | 0;
+          if (x >= 0 && x < CW && y >= 0 && y < CH) frameUint32[y * CW + x] = mapCol[i];
+        }
+        return;
+      }
+
+      const invSpan = 1.0 / 0.56;
+      for (let i = 0; i < count; i++) {
+        let lt = (progress - delay[i]) * invSpan;
+        if (lt <= 0) {
+          const x = sx[i] | 0, y = sy[i] | 0;
+          if (x >= 0 && x < CW && y >= 0 && y < CH) frameUint32[y * CW + x] = mapCol[i];
+        } else if (lt >= 1) {
+          const x = tx[i] | 0, y = ty[i] | 0;
+          if (x >= 0 && x < CW && y >= 0 && y < CH) frameUint32[y * CW + x] = barCol[i];
+        } else {
+          const inv = 1.0 - lt;
+          const easeX = 1.0 - inv * inv * inv;
+          const easeY = lt < 0.5 ? 4.0 * lt * lt * lt : 1.0 - Math.pow(-2.0 * lt + 2.0, 3) * 0.5;
+          const lift = Math.sin(lt * Math.PI) * arc[i];
+          const px = (sx[i] + (tx[i] - sx[i]) * easeX) | 0;
+          const py = (sy[i] + (ty[i] - sy[i]) * easeY - lift) | 0;
+
+          if (px >= 0 && px < CW && py >= 0 && py < CH) {
+            const col = useBarCol ? barCol[i] : mapCol[i];
+            const idx = py * CW + px;
+            frameUint32[idx] = col;
+            if (px + 1 < CW) frameUint32[idx + 1] = col;
+            if (py + 1 < CH) frameUint32[idx + CW] = col;
+          }
+        }
+      }
+    }
+
+    function drawSettledHistogramBars(model, progress) {
+      if (!model || progress < 0.55) return;
+      const barAlpha = Math.max(0, Math.min(0.88, (progress - 0.70) / 0.24));
+      if (barAlpha > 0.01) {
+        ctx.save();
+        ctx.globalAlpha = barAlpha;
+        for (const bar of model.barsGeometry) {
+          if (bar.h <= 0) continue;
+          const grad = ctx.createLinearGradient(0, bar.baselineY, 0, bar.y);
+          grad.addColorStop(0, bar.colorBottom); grad.addColorStop(1, bar.colorTop);
+          ctx.fillStyle = grad;
+          ctx.fillRect(bar.x, bar.y, bar.w, bar.h);
+        }
+        ctx.restore();
+      }
+
+      const tickAlpha = Math.max(0, Math.min(1, (progress - 0.45) / 0.25));
+      if (tickAlpha > 0.01) {
+        ctx.save();
+        ctx.globalAlpha = tickAlpha;
+        ctx.strokeStyle = '#f3efe6'; ctx.lineWidth = 1.6;
+        const axis = state.sharedAxis;
+        const chartW = model.slotBox.chartRight - model.slotBox.chartLeft;
+        const stepW = chartW / axis.numBins;
+        for (let b = 1; b < axis.numBins; b++) {
+          const tx = model.slotBox.chartLeft + b * stepW - 1.2;
+          ctx.beginPath(); ctx.moveTo(tx, model.slotBox.baselineY); ctx.lineTo(tx, model.slotBox.baselineY - 7); ctx.stroke();
+        }
+        ctx.restore();
+      }
+    }
+
+    function drawStatisticalAnnotations(model, progress) {
+      if (!model || progress < 0.72) return;
+      const s = state.resScale || 1.0;
+      const alpha = Math.max(0, Math.min(1, (progress - 0.72) / 0.20));
+      const slideOffset = (1 - alpha) * 10 * s;
+      const axis = state.sharedAxis;
+      const { chartLeft, chartRight, baselineY, statTopY } = model.slotBox;
+      const chartW = chartRight - chartLeft;
+      const stepW = chartW / axis.numBins;
+
+      function elevToX(elevVal) {
+        const clamped = Math.max(axis.minElev, Math.min(axis.cutoffElev + axis.binStep, elevVal));
+        return chartLeft + Math.min(axis.numBins - 0.2, Math.max(0.1, (clamped - axis.minElev) / axis.binStep)) * stepW;
+      }
+      function getBarTopAtX(xPos) {
+        for (const bar of model.barsGeometry) {
+          if (xPos >= bar.x - 2 && xPos <= bar.x + bar.w + 2) return bar.y;
+        }
+        return baselineY;
+      }
+
+      const medElev = Math.round(model.stats.medianElev);
+      const meanElev = Math.round(model.stats.meanElev);
+      const medX = Math.round(elevToX(model.stats.medianElev)) + 0.5;
+      const meanX = Math.round(elevToX(model.stats.meanElev)) + 0.5;
+      const medLineTop = statTopY + slideOffset;
+      const meanLineTop = statTopY + 54 * s + slideOffset;
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = '#332e27'; ctx.fillStyle = '#26221c';
+
+      ctx.lineWidth = 1.6 * s; ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(medX, Math.min(baselineY, getBarTopAtX(medX))); ctx.lineTo(medX, medLineTop); ctx.stroke();
+
+      ctx.lineWidth = 1.5 * s; ctx.setLineDash([5 * s, 4 * s]);
+      ctx.beginPath(); ctx.moveTo(meanX, Math.min(baselineY, getBarTopAtX(meanX))); ctx.lineTo(meanX, meanLineTop); ctx.stroke();
+      ctx.setLineDash([]);
+
+      const serifFont = "'Source Serif 4', 'Noto Serif SC', Georgia, serif";
+      ctx.font = `400 ${Math.round(20 * s)}px ${serifFont}`; ctx.textBaseline = 'top';
+
+      const medAlignLeft = (meanX < medX && Math.abs(meanX - medX) < 95 * s) || (medX > chartRight - 140 * s);
+      ctx.textAlign = medAlignLeft ? 'right' : 'left';
+      const medPad = medAlignLeft ? -8 * s : 8 * s;
+      ctx.fillText(state.halfAboveLabel, medX + medPad, medLineTop - 2 * s);
+      ctx.fillText(`${medElev} m`, medX + medPad, medLineTop + 22 * s);
+
+      const meanAlignLeft = meanX > chartRight - 150 * s;
+      ctx.textAlign = meanAlignLeft ? 'right' : 'left';
+      const meanPad = meanAlignLeft ? -8 * s : 8 * s;
+      ctx.fillText(state.meanElevLabel, meanX + meanPad, meanLineTop - 2 * s);
+      ctx.fillText(`${meanElev} m`, meanX + meanPad, meanLineTop + 22 * s);
+
+      ctx.restore();
+    }
+
+    function drawSharedXAxis(model, progress, isBottomChart) {
+      if (!model || progress < 0.45) return;
+      const s = state.resScale || 1.0;
+      const alpha = Math.max(0, Math.min(1, (progress - 0.45) / 0.28));
+      const { chartLeft, chartRight, baselineY } = model.slotBox;
+      const axis = state.sharedAxis;
+      const stepW = (chartRight - chartLeft) / axis.numBins;
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = '#3d372e'; ctx.lineWidth = 1.8 * s;
+      ctx.beginPath(); ctx.moveTo(chartLeft, baselineY + 0.5); ctx.lineTo(chartRight, baselineY + 0.5); ctx.stroke();
+
+      const serifFont = "'Source Serif 4', 'Noto Serif SC', Georgia, serif";
+      for (let i = 0; i < axis.ticks.length; i++) {
+        const t = axis.ticks[i];
+        const tx = Math.round(chartLeft + t.binIndex * stepW) + 0.5;
+        ctx.beginPath(); ctx.moveTo(tx, baselineY + 0.5); ctx.lineTo(tx, baselineY + (isBottomChart ? 11 * s : 7 * s)); ctx.stroke();
+        if (isBottomChart) {
+          ctx.font = `700 ${Math.round(22 * s)}px ${serifFont}`;
+          ctx.fillStyle = '#201d18'; ctx.textBaseline = 'top'; ctx.textAlign = 'center';
+          ctx.fillText(t.label, tx, baselineY + 17 * s);
+        }
+      }
+
+      ctx.restore();
+    }
+
+    /**
+     * Draws a clean, minimalist editorial divider line between the top and bottom charts in dual mode
+     */
+    function drawDualChartDivider(padX) {
+      if (state.mode !== 'dual' || !state.modelA || !state.modelB) return;
+      const s = state.resScale || 1.0;
+      const topBottomY = state.modelA.slotBox.baselineY + 7 * s;
+      const bottomTitleTopY = state.modelB.slotBox.headerY - 24 * s;
+      const divY = Math.round((topBottomY + bottomTitleTopY) * 0.5) + 0.5;
+
+      ctx.save();
+
+      // Continuous tapered horizontal line (no center diamond or dot ornaments)
+      const lineGrad = ctx.createLinearGradient(padX, divY, CW - padX, divY);
+      lineGrad.addColorStop(0, 'rgba(90, 80, 66, 0.08)');
+      lineGrad.addColorStop(0.12, 'rgba(90, 80, 66, 0.38)');
+      lineGrad.addColorStop(0.5, 'rgba(82, 72, 58, 0.48)');
+      lineGrad.addColorStop(0.88, 'rgba(90, 80, 66, 0.38)');
+      lineGrad.addColorStop(1, 'rgba(90, 80, 66, 0.08)');
+
+      ctx.strokeStyle = lineGrad;
+      ctx.lineWidth = 1.15 * s;
+      ctx.beginPath();
+      ctx.moveTo(padX, divY);
+      ctx.lineTo(CW - padX, divY);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function drawGlobeLogo(cx, cy, radius) {
+      ctx.save();
+      ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.fillStyle = '#1b2622'; ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, cy, radius - 1.5, 0, Math.PI * 2); ctx.clip();
+      ctx.fillStyle = '#539e7a';
+      ctx.beginPath(); ctx.ellipse(cx - radius * 0.42, cy - radius * 0.18, radius * 0.45, radius * 0.62, 0.35, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(cx + radius * 0.42, cy + radius * 0.15, radius * 0.48, radius * 0.55, -0.25, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(cx + radius * 0.1, cy - radius * 0.65, radius * 0.4, radius * 0.22, 0.1, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+
+    function renderPosterFrame() {
+      const progress = state.morphProgress;
+      frameUint32.fill(PAPER_UINT32);
+
+      if (state.modelA) stampModelParticles(state.modelA, progress);
+      if (state.mode === 'dual' && state.modelB) stampModelParticles(state.modelB, progress);
+      ctx.putImageData(frameImageData, 0, 0);
+
+      // Exterior-only subtle drop shadow (interior already punched out via destination-out)
+      if (progress < 0.12) {
+        const shadowAlpha = Math.max(0, 1 - progress / 0.10);
+        ctx.save();
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.globalAlpha = shadowAlpha;
+        if (state.modelA && state.modelA.shadowCanvas) {
+          ctx.drawImage(state.modelA.shadowCanvas, state.modelA.mapLeft - 20, state.modelA.mapTop - 20);
+        }
+        if (state.mode === 'dual' && state.modelB && state.modelB.shadowCanvas) {
+          ctx.drawImage(state.modelB.shadowCanvas, state.modelB.mapLeft - 20, state.modelB.mapTop - 20);
+        }
+        ctx.restore();
+      }
+
+      if (state.modelA) drawSettledHistogramBars(state.modelA, progress);
+      if (state.mode === 'dual' && state.modelB) drawSettledHistogramBars(state.modelB, progress);
+
+      const s = state.resScale || 1.0;
+      const headingFont = "'Fraunces', 'Source Serif 4', 'Noto Serif SC', Georgia, serif";
+      const bodySerif = "'Source Serif 4', 'Noto Serif SC', Georgia, serif";
+      const monoFont = "'Inter', 'Noto Serif SC', monospace, sans-serif";
+
+      const padX = Math.round(CW * 0.06);
+      const topBarY = Math.round(CH * 0.044);
+      const titleY = Math.round(CH * 0.091);
+      const subtitleY = Math.round(CH * 0.121);
+
+      // Editorial divider between top & bottom charts in dual mode
+      drawDualChartDivider(padX);
+
+      ctx.fillStyle = '#3a352d';
+      ctx.font = `500 ${Math.round(16 * s)}px ${monoFont}`;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(state.author, padX, topBarY);
+
+      // Top-right brand & Logo rendering (Custom image upload or default globe)
+      if (state.brand.trim() || state.customLogoImg) {
+        ctx.font = `700 ${Math.round(25 * s)}px ${headingFont}`;
+        ctx.fillStyle = '#201d18';
+        ctx.textAlign = 'right';
+        ctx.fillText(state.brand, CW - padX, topBarY);
+        const brandWidth = ctx.measureText(state.brand).width;
+        const logoSize = 16 * s;
+        const logoX = CW - padX - brandWidth - (brandWidth > 0 ? 24 * s : 0) - logoSize;
+        const logoY = topBarY - logoSize;
+
+        if (state.customLogoImg && state.customLogoImg.complete) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(logoX + logoSize, logoY + logoSize, logoSize, 0, Math.PI * 2);
+          ctx.clip();
+          ctx.drawImage(state.customLogoImg, logoX, logoY, logoSize * 2, logoSize * 2);
+          ctx.restore();
+        } else {
+          drawGlobeLogo(logoX + logoSize, topBarY - 1 * s, logoSize);
+        }
+      }
+
+      ctx.font = `700 ${Math.round(44 * s)}px ${headingFont}`;
+      ctx.fillStyle = '#201d18';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      ctx.fillText(state.title, padX, titleY);
+
+      ctx.font = `400 ${Math.round(22 * s)}px ${bodySerif}`;
+      ctx.fillStyle = '#2d2923';
+      ctx.fillText(state.subtitle, padX, subtitleY);
+
+      if (state.modelA) {
+        ctx.font = `700 ${Math.round(32 * s)}px ${headingFont}`;
+        ctx.fillStyle = '#201d18'; ctx.textAlign = 'left';
+        ctx.fillText(state.modelA.name, padX, state.modelA.slotBox.headerY);
+      }
+
+      if (state.mode === 'dual' && state.modelB) {
+        ctx.font = `700 ${Math.round(32 * s)}px ${headingFont}`;
+        ctx.fillStyle = '#201d18'; ctx.textAlign = 'left';
+        ctx.fillText(state.modelB.name, padX, state.modelB.slotBox.headerY);
+      }
+
+      if (state.modelA) {
+        drawStatisticalAnnotations(state.modelA, progress);
+        drawSharedXAxis(state.modelA, progress, state.mode === 'single');
+      }
+      if (state.mode === 'dual' && state.modelB) {
+        drawStatisticalAnnotations(state.modelB, progress);
+        drawSharedXAxis(state.modelB, progress, true);
+      }
+
+      ctx.font = `400 ${Math.round(15 * s)}px ${bodySerif}`;
+      ctx.fillStyle = '#453f36'; ctx.textAlign = 'left';
+      if (state.footerLine2 && state.footerLine2.trim()) {
+        ctx.fillText(state.footerLine1, padX, CH - Math.round(CH * 0.036));
+        ctx.fillText(state.footerLine2, padX, CH - Math.round(CH * 0.018));
+      } else {
+        ctx.fillText(state.footerLine1, padX, CH - Math.round(CH * 0.024));
+      }
+    }
+
+    /*************************************************************************
+     * 7. ANIMATION LOOP & VIDEO EXPORT
+     *************************************************************************/
+    let lastRafTime = performance.now();
+
+    function animationLoop(now) {
+      const dt = Math.min(0.1, (now - lastRafTime) / 1000);
+      lastRafTime = now;
+
+      if (state.isPlaying) {
+        state.currentTime += dt * state.speed;
+        if (state.currentTime >= state.totalDuration) {
+          if (state.loop) state.currentTime = 0;
+          else { state.currentTime = state.totalDuration; setPlayingState(false); }
+        }
+        state.morphProgress = timeToMorphProgress(state.currentTime);
+        syncTimelineUI();
+      }
+
+      renderPosterFrame();
+      requestAnimationFrame(animationLoop);
+    }
+
+    function setPlayingState(playing) {
+      state.isPlaying = playing;
+      document.getElementById('iconPlay').classList.toggle('hidden', playing);
+      document.getElementById('iconPause').classList.toggle('hidden', !playing);
+    }
+
+    function syncTimelineUI() {
+      const slider = document.getElementById('timelineSlider');
+      slider.value = Math.round((state.currentTime / state.totalDuration) * 1000);
+      document.getElementById('timeReadout').textContent = state.currentTime.toFixed(1) + 's';
+      document.getElementById('durationReadout').textContent = state.totalDuration.toFixed(1) + 's';
+      document.getElementById('morphReadout').textContent = Math.round(state.morphProgress * 100) + '%';
+
+      const phaseEl = document.getElementById('phaseStatusText');
+      if (state.morphProgress <= 0.01) phaseEl.textContent = '阶段 1/3: 3D 分层设色地形图展示';
+      else if (state.morphProgress < 0.99) phaseEl.textContent = '阶段 2/3: 像素按海拔流式排序中...';
+      else phaseEl.textContent = '阶段 3/3: 海拔分布直方图与中位/均值统计';
+    }
+
+    let activeRecorder = null;
+    function startVideoRecording() {
+      if (activeRecorder && activeRecorder.state === 'recording') return;
+      if (typeof canvas.captureStream !== 'function' || typeof MediaRecorder === 'undefined') {
+        showToast('当前浏览器环境不支持 Canvas 视频录制，请使用 Chrome / Edge / Firefox 桌面版。', 'error');
+        return;
+      }
+
+      const qPreset = VIDEO_QUALITY_PRESETS[state.videoQuality] || VIDEO_QUALITY_PRESETS.hd;
+      if (Math.abs(state.resScale - qPreset.scale) > 0.001) setAspectRatio(state.aspectRatio, qPreset.scale);
+
+      const stream = canvas.captureStream(qPreset.fps);
+      const mimeTypes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
+      let selectedMime = '';
+      for (const m of mimeTypes) { if (MediaRecorder.isTypeSupported(m)) { selectedMime = m; break; } }
+
+      const chunks = [];
+      activeRecorder = selectedMime ? new MediaRecorder(stream, { mimeType: selectedMime, videoBitsPerSecond: qPreset.bps }) : new MediaRecorder(stream, { videoBitsPerSecond: qPreset.bps });
+
+      const prevLoop = state.loop;
+      state.loop = false; state.currentTime = 0; state.morphProgress = 0;
+      setPlayingState(true);
+
+      const recBadge = document.getElementById('recordingBadge');
+      document.getElementById('recordingText').textContent = `正在录制 ${qPreset.label} (${CW}×${CH} · ${qPreset.fps}fps)...`;
+      recBadge.classList.remove('hidden');
+
+      activeRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunks.push(e.data); };
+      activeRecorder.onstop = () => {
+        recBadge.classList.add('hidden');
+        state.loop = prevLoop;
+        const blob = new Blob(chunks, { type: selectedMime || 'video/webm' });
+        const ext = (selectedMime && selectedMime.includes('mp4')) ? 'mp4' : 'webm';
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `elevation_pixel_sort_${state.videoQuality}_${CW}x${CH}_${Date.now()}.${ext}`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        showToast(`动画视频 (${qPreset.label}, ${CW}×${CH}) 录制完成，已自动下载！`, 'success');
+      };
+
+      activeRecorder.start();
+      const checkTimer = setInterval(() => {
+        if (!activeRecorder || activeRecorder.state !== 'recording') { clearInterval(checkTimer); return; }
+        if (state.currentTime >= state.totalDuration - 0.05) { clearInterval(checkTimer); activeRecorder.stop(); }
+      }, 80);
+    }
+
+    /*************************************************************************
+     * 8. UI EVENT HANDLERS & LOGO UPLOAD
+     *************************************************************************/
+    function showToast(message, type = 'info') {
+      const banner = document.getElementById('toastBanner');
+      const textEl = document.getElementById('toastText');
+      banner.classList.remove('hidden', 'bg-emerald-950/80', 'border-emerald-500/40', 'text-emerald-200', 'bg-red-950/80', 'border-red-500/40', 'text-red-200', 'bg-amber-950/80', 'border-amber-500/40', 'text-amber-200');
+      if (type === 'success') banner.classList.add('bg-emerald-950/80', 'border-emerald-500/40', 'text-emerald-200');
+      else if (type === 'error') banner.classList.add('bg-red-950/80', 'border-red-500/40', 'text-red-200');
+      else banner.classList.add('bg-amber-950/80', 'border-amber-500/40', 'text-amber-200');
+      textEl.textContent = message;
+    }
+
+    function updateStatsUI() {
+      if (state.modelA) {
+        const sA = state.modelA.stats;
+        document.getElementById('inputNameA').value = state.demA.name;
+        document.getElementById('statsA').innerHTML = `
+          <div>中位: <span class="text-amber-300 font-semibold">${Math.round(sA.medianElev)}m</span></div>
+          <div>均值: <span class="text-amber-300 font-semibold">${Math.round(sA.meanElev)}m</span></div>
+          <div>极值: <span>${Math.round(sA.minElev)}~${Math.round(sA.maxElev)}m</span></div>
+          <div>粒子: <span>${(state.modelA.totalParticles / 1000).toFixed(1)}k</span></div>
+        `;
+      }
+      if (state.mode === 'dual' && state.modelB) {
+        const sB = state.modelB.stats;
+        document.getElementById('inputNameB').value = state.demB.name;
+        document.getElementById('statsB').innerHTML = `
+          <div>中位: <span class="text-sky-300 font-semibold">${Math.round(sB.medianElev)}m</span></div>
+          <div>均值: <span class="text-sky-300 font-semibold">${Math.round(sB.meanElev)}m</span></div>
+          <div>极值: <span>${Math.round(sB.minElev)}~${Math.round(sB.maxElev)}m</span></div>
+          <div>粒子: <span>${(state.modelB.totalParticles / 1000).toFixed(1)}k</span></div>
+        `;
+      }
+      const totalP = (state.modelA ? state.modelA.totalParticles : 0) + (state.mode === 'dual' && state.modelB ? state.modelB.totalParticles : 0);
+      document.getElementById('particleCountBadge').textContent = `总像素粒子: ${totalP.toLocaleString()}`;
+    }
+
+    async function handleGeoTIFFFileUpload(file, slot) {
+      if (!file) return;
+      const overlay = document.getElementById('loadingOverlay');
+      overlay.classList.remove('hidden');
+      try {
+        await new Promise(r => setTimeout(r, 30));
+        const parsedDEM = await parseUploadedGeoTIFF(file);
+        if (slot === 'A') state.demA = parsedDEM;
+        else { state.demB = parsedDEM; if (state.mode !== 'dual') setLayoutMode('dual'); }
+        rebuildModels();
+        state.currentTime = 0; state.morphProgress = 0; setPlayingState(true);
+        showToast(`已成功解析 ${file.name} (${parsedDEM.width}×${parsedDEM.height})！`, 'success');
+      } catch (err) {
+        showToast(`解析 GeoTIFF 失败: ${err.message || '请确认文件格式'}`, 'error');
+      } finally {
+        overlay.classList.add('hidden');
+      }
+    }
+
+    /**
+     * Handles local JPG / PNG image selection for the top-right logo
+     */
+    function handleLogoFileUpload(file) {
+      if (!file) return;
+      if (!['image/jpeg', 'image/png'].includes(file.type)) {
+        showToast('Logo 图片仅支持 JPG 或 PNG 格式！', 'error');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          state.customLogoImg = img;
+          document.getElementById('logoFileName').textContent = file.name;
+          document.getElementById('btnClearLogo').classList.remove('hidden');
+          renderPosterFrame();
+          showToast(`已成功加载自定义 Logo: ${file.name}`, 'success');
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function clearCustomLogo() {
+      state.customLogoImg = null;
+      document.getElementById('fileInputLogo').value = '';
+      document.getElementById('logoFileName').textContent = '选择本地 JPG 或 PNG 文件...';
+      document.getElementById('btnClearLogo').classList.add('hidden');
+      renderPosterFrame();
+      showToast('已恢复默认的地图先锋地球徽标', 'info');
+    }
+
+    function setLayoutMode(mode) {
+      state.mode = mode;
+      const btnDual = document.getElementById('btnModeDual');
+      const btnSingle = document.getElementById('btnModeSingle');
+      const dropzoneB = document.getElementById('dropzoneB');
+      const btnSwap = document.getElementById('btnSwapRegions');
+      const badge = document.getElementById('badgeMode');
+
+      if (mode === 'dual') {
+        btnDual.className = 'px-2.5 py-1 rounded-md bg-amber-500 text-zinc-950 font-semibold transition';
+        btnSingle.className = 'px-2.5 py-1 rounded-md text-zinc-400 hover:text-white transition';
+        dropzoneB.classList.remove('hidden'); btnSwap.classList.remove('hidden'); badge.textContent = '双区域对比模式';
+      } else {
+        btnSingle.className = 'px-2.5 py-1 rounded-md bg-amber-500 text-zinc-950 font-semibold transition';
+        btnDual.className = 'px-2.5 py-1 rounded-md text-zinc-400 hover:text-white transition';
+        dropzoneB.classList.add('hidden'); btnSwap.classList.add('hidden'); badge.textContent = '单区域特写模式';
+      }
+      rebuildModels();
+    }
+
+    function togglePosterLanguage() {
+      if (state.lang === 'en') {
+        state.lang = 'zh';
+        state.title = '双城海拔对比';
+        state.subtitle = '①地图未按同一比例尺缩放 ②上下两图横轴一致';
+        state.halfAboveLabel = '50% 高于';
+        state.meanElevLabel = '平均海拔';
+        document.getElementById('langLabel').textContent = '海报语言: 中文';
+        document.getElementById('btnToggleLangInside').textContent = '切换为英文文案';
+      } else {
+        state.lang = 'en';
+        state.title = 'Which is higher?';
+        state.subtitle = '①Maps not to scale ②Same axis on both charts';
+        state.halfAboveLabel = 'half above';
+        state.meanElevLabel = 'mean elevation';
+        document.getElementById('langLabel').textContent = '海报语言: EN';
+        document.getElementById('btnToggleLangInside').textContent = '切换为中文文案';
+      }
+      document.getElementById('inputTitle').value = state.title;
+      document.getElementById('inputSubtitle').value = state.subtitle;
+      if (!state.isPlaying) renderPosterFrame();
+    }
+
+    function setupEventListeners() {
+      document.getElementById('btnPlayPause').addEventListener('click', () => {
+        if (!state.isPlaying && state.currentTime >= state.totalDuration - 0.05) state.currentTime = 0;
+        setPlayingState(!state.isPlaying);
+      });
+      canvas.addEventListener('click', () => {
+        if (!state.isPlaying && state.currentTime >= state.totalDuration - 0.05) state.currentTime = 0;
+        setPlayingState(!state.isPlaying);
+      });
+      document.getElementById('btnRestart').addEventListener('click', () => {
+        state.currentTime = 0; state.morphProgress = 0; setPlayingState(true);
+      });
+
+      window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
+          e.preventDefault(); setPlayingState(!state.isPlaying);
+        }
+      });
+
+      const timelineSlider = document.getElementById('timelineSlider');
+      timelineSlider.addEventListener('input', (e) => {
+        setPlayingState(false);
+        state.currentTime = (Number(e.target.value) / 1000) * state.totalDuration;
+        state.morphProgress = timeToMorphProgress(state.currentTime);
+        syncTimelineUI();
+      });
+
+      document.querySelectorAll('.btn-jump').forEach(btn => {
+        btn.addEventListener('click', () => {
+          setPlayingState(false);
+          state.currentTime = Number(btn.getAttribute('data-jump')) * state.totalDuration;
+          state.morphProgress = timeToMorphProgress(state.currentTime);
+          syncTimelineUI();
+        });
+      });
+
+      document.getElementById('chkLoop').addEventListener('change', (e) => state.loop = e.target.checked);
+      document.getElementById('selectSpeed').addEventListener('change', (e) => state.speed = Number(e.target.value) || 1.0);
+
+      document.getElementById('btnModeDual').addEventListener('click', () => setLayoutMode('dual'));
+      document.getElementById('btnModeSingle').addEventListener('click', () => setLayoutMode('single'));
+
+      document.getElementById('selectAspectTop').addEventListener('change', (e) => setAspectRatio(e.target.value));
+      document.querySelectorAll('.btn-aspect').forEach(btn => {
+        btn.addEventListener('click', () => setAspectRatio(btn.getAttribute('data-aspect')));
+      });
+
+      document.getElementById('btnPresetFranceGermany').addEventListener('click', () => {
+        state.demA = generateFranceDemoDEM();
+        state.demB = generateGermanyDemoDEM();
+        state.axisMode = 'min2000';
+        document.getElementById('selectAxisMode').value = 'min2000';
+        document.getElementById('customAxisBox').classList.add('hidden');
+        setLayoutMode('dual');
+        state.currentTime = 0; setPlayingState(true);
+        showToast('已加载视频同款 France vs Germany 模拟高程数据！', 'info');
+      });
+
+      document.getElementById('selectVideoQuality').addEventListener('change', (e) => {
+        state.videoQuality = e.target.value;
+        const qPreset = VIDEO_QUALITY_PRESETS[state.videoQuality] || VIDEO_QUALITY_PRESETS.hd;
+        setAspectRatio(state.aspectRatio, qPreset.scale);
+        showToast(`已切换画质为：${qPreset.label} (${CW}×${CH} · ${qPreset.fps}fps)`, 'info');
+      });
+
+      document.getElementById('btnSwapRegions').addEventListener('click', () => {
+        if (!state.demB) return;
+        const temp = state.demA; state.demA = state.demB; state.demB = temp;
+        rebuildModels();
+        if (!state.isPlaying) renderPosterFrame();
+      });
+
+      // GeoTIFF Inputs & Dropzones
+      const fileInputA = document.getElementById('fileInputA');
+      const fileInputB = document.getElementById('fileInputB');
+      fileInputA.addEventListener('change', (e) => { if (e.target.files[0]) handleGeoTIFFFileUpload(e.target.files[0], 'A'); e.target.value = ''; });
+      fileInputB.addEventListener('change', (e) => { if (e.target.files[0]) handleGeoTIFFFileUpload(e.target.files[0], 'B'); e.target.value = ''; });
+
+      function bindDropzone(elId, slot) {
+        const dz = document.getElementById(elId);
+        dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('dropzone-active'); });
+        dz.addEventListener('dragleave', () => dz.classList.remove('dropzone-active'));
+        dz.addEventListener('drop', (e) => {
+          e.preventDefault(); dz.classList.remove('dropzone-active');
+          const file = e.dataTransfer?.files?.[0];
+          if (file) handleGeoTIFFFileUpload(file, slot);
+        });
+      }
+      bindDropzone('dropzoneA', 'A');
+      bindDropzone('dropzoneB', 'B');
+
+      // Logo Upload Listener
+      document.getElementById('fileInputLogo').addEventListener('change', (e) => {
+        if (e.target.files[0]) handleLogoFileUpload(e.target.files[0]);
+      });
+      document.getElementById('btnClearLogo').addEventListener('click', clearCustomLogo);
+
+      // Update both raw DEM name and compiled render model name immediately on input
+      document.getElementById('inputNameA').addEventListener('input', (e) => {
+        if (state.demA) state.demA.name = e.target.value;
+        if (state.modelA) state.modelA.name = e.target.value;
+        if (!state.isPlaying) renderPosterFrame();
+      });
+      document.getElementById('inputNameB').addEventListener('input', (e) => {
+        if (state.demB) state.demB.name = e.target.value;
+        if (state.modelB) state.modelB.name = e.target.value;
+        if (!state.isPlaying) renderPosterFrame();
+      });
+
+      document.getElementById('chkAutoCornerMask').addEventListener('change', (e) => { state.autoCornerMask = e.target.checked; rebuildModels(); });
+      document.getElementById('chkFilterSeaLevel').addEventListener('change', (e) => { state.filterSeaLevel = e.target.checked; rebuildModels(); });
+
+      document.getElementById('selectAxisMode').addEventListener('change', (e) => {
+        state.axisMode = e.target.value;
+        document.getElementById('customAxisBox').classList.toggle('hidden', state.axisMode !== 'custom');
+        rebuildModels();
+      });
+      document.getElementById('inputCustomMin').addEventListener('change', (e) => { state.customMin = Number(e.target.value) || 0; rebuildModels(); });
+      document.getElementById('inputCustomMax').addEventListener('change', (e) => { state.customMax = Number(e.target.value) || 2000; rebuildModels(); });
+      document.getElementById('selectColorRamp').addEventListener('change', (e) => { state.colorRamp = e.target.value; rebuildModels(); });
+
+      document.getElementById('sliderBinCount').addEventListener('input', (e) => {
+        state.numRegularBins = Number(e.target.value);
+        document.getElementById('valBinCount').textContent = `${state.numRegularBins} 柱 (共${state.numRegularBins + 1}柱)`;
+        rebuildModels();
+      });
+      document.getElementById('sliderHillshade').addEventListener('input', (e) => {
+        const val = Number(e.target.value); state.hillshadeStrength = val / 100;
+        document.getElementById('valHillshade').textContent = `${val}%`; rebuildModels();
+      });
+      document.getElementById('sliderSweepArc').addEventListener('input', (e) => {
+        const val = Number(e.target.value); state.sweepArcStrength = val / 100;
+        document.getElementById('valSweepArc').textContent = val === 100 ? '标准' : `${val}%`; rebuildModels();
+      });
+
+      document.getElementById('btnQuickLang').addEventListener('click', togglePosterLanguage);
+      document.getElementById('btnToggleLangInside').addEventListener('click', togglePosterLanguage);
+      document.getElementById('inputTitle').addEventListener('input', (e) => { state.title = e.target.value; if (!state.isPlaying) renderPosterFrame(); });
+      document.getElementById('inputSubtitle').addEventListener('input', (e) => { state.subtitle = e.target.value; if (!state.isPlaying) renderPosterFrame(); });
+      document.getElementById('inputAuthor').addEventListener('input', (e) => { state.author = e.target.value; if (!state.isPlaying) renderPosterFrame(); });
+      document.getElementById('inputBrand').addEventListener('input', (e) => { state.brand = e.target.value; if (!state.isPlaying) renderPosterFrame(); });
+      document.getElementById('inputFooter').addEventListener('input', (e) => {
+        const lines = e.target.value.split('\n');
+        state.footerLine1 = lines[0] || ''; state.footerLine2 = lines[1] || '';
+        if (!state.isPlaying) renderPosterFrame();
+      });
+
+      document.getElementById('btnExportPng').addEventListener('click', () => {
+        renderPosterFrame();
+        const url = canvas.toDataURL('image/png');
+        const a = document.createElement('a'); a.href = url;
+        a.download = `elevation_poster_${Math.round(state.morphProgress * 100)}pct.png`;
+        document.body.appendChild(a); a.click(); a.remove();
+        showToast('已导出当前帧高清海报 PNG！', 'success');
+      });
+
+      document.getElementById('btnRecordVideo').addEventListener('click', startVideoRecording);
+      document.getElementById('btnCloseToast').addEventListener('click', () => {
+        document.getElementById('toastBanner').classList.add('hidden');
+      });
+    }
+
+    window.onload = function () {
+      state.demA = generateFranceDemoDEM();
+      state.demB = generateGermanyDemoDEM();
+      state.axisMode = 'min2000';
+      document.getElementById('selectAxisMode').value = 'min2000';
+
+      setupEventListeners();
+      rebuildModels();
+      syncTimelineUI();
+      requestAnimationFrame(animationLoop);
+    };
+  </script>
+</body>
+</html>
