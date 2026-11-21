@@ -337,6 +337,29 @@
         <div class="pt-1 space-y-2 text-xs">
           <div class="flex items-center justify-between">
             <label class="flex items-center gap-2 text-zinc-300 cursor-pointer">
+              <input id="chkSameMapScale" type="checkbox" checked class="rounded bg-zinc-800 border-zinc-600 text-amber-500 focus:ring-0" />
+              <span class="text-amber-300 font-medium">统一上下地图比例尺 (按真实空间尺度同比例缩放)</span>
+            </label>
+          </div>
+
+          <!-- Overall Map Zoom Control -->
+          <div class="bg-zinc-900/90 border border-zinc-800 rounded-xl p-2.5 space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="text-zinc-300 font-medium flex items-center gap-1.5">
+                <span>🔍 地图整体缩放倍率</span>
+              </span>
+              <div class="flex items-center gap-1">
+                <button type="button" data-zoom="100" class="btn-zoom-preset px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-mono transition">100%</button>
+                <button type="button" data-zoom="125" class="btn-zoom-preset px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-mono transition">125%</button>
+                <button type="button" data-zoom="150" class="btn-zoom-preset px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-mono transition">150%</button>
+                <span id="valMapZoom" class="ml-1 font-mono text-amber-400 font-semibold min-w-[38px] text-right">125%</span>
+              </div>
+            </div>
+            <input id="sliderMapZoom" type="range" min="50" max="220" step="5" value="125" class="w-full" />
+          </div>
+
+          <div class="flex items-center justify-between">
+            <label class="flex items-center gap-2 text-zinc-300 cursor-pointer">
               <input id="chkAutoCornerMask" type="checkbox" checked class="rounded bg-zinc-800 border-zinc-600 text-amber-500 focus:ring-0" />
               <span>自动抠除四角背景值 (识别矩形边界外的空白掩膜)</span>
             </label>
@@ -358,9 +381,9 @@
           <div>
             <label class="block text-zinc-400 mb-1">横轴刻度范围模式</label>
             <select id="selectAxisMode" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-zinc-200 focus:outline-none focus:border-amber-400">
-              <option value="min2000" selected>默认范围 (DEM最小值 – 2000 m+)</option>
+              <option value="min2000" selected>默认范围 (DEM最小值 – 2000 米+)</option>
               <option value="auto">智能自适应刻度 (+尾部溢出柱)</option>
-              <option value="video1500">视频同款固定 (0 – 1.5 km+)</option>
+              <option value="video1500">视频同款固定 (0 – 1500 米+)</option>
               <option value="full">完整极值范围 (无截断)</option>
               <option value="custom">自定义最小/最大截断值</option>
             </select>
@@ -380,11 +403,11 @@
         <!-- Custom Axis Min / Max Inputs (Shown when Custom is selected) -->
         <div id="customAxisBox" class="hidden grid grid-cols-2 gap-2.5 pt-1 text-xs">
           <div>
-            <label class="block text-zinc-400 mb-1">横轴起点海拔 (m)</label>
+            <label class="block text-zinc-400 mb-1">横轴起点海拔 (米)</label>
             <input id="inputCustomMin" type="number" value="0" step="50" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1 text-white" />
           </div>
           <div>
-            <label class="block text-zinc-400 mb-1">横轴截断海拔 (m+)</label>
+            <label class="block text-zinc-400 mb-1">横轴截断海拔 (米+)</label>
             <input id="inputCustomMax" type="number" value="2000" step="100" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1 text-white" />
           </div>
         </div>
@@ -433,7 +456,7 @@
           </div>
           <div>
             <label class="block text-zinc-400 mb-0.5">副标题 (Subtitle)</label>
-            <input id="inputSubtitle" type="text" value="①地图未按同一比例尺缩放 ②上下两图横轴一致" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-amber-400" />
+            <input id="inputSubtitle" type="text" value="①上下地图采用同一比例尺 ②上下两图横轴一致" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-amber-400" />
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div>
@@ -507,6 +530,8 @@
       colorRamp: 'classic',
       hillshadeStrength: 1.0,
       sweepArcStrength: 1.0,
+      sameMapScale: true,
+      mapZoom: 1.25,         // Overall map zoom multiplier (1.25 = 125%)
       autoCornerMask: true,
       filterSeaLevel: false,
 
@@ -520,7 +545,7 @@
 
       // Poster Editorial Texts (Default Chinese)
       title: '双城海拔对比',
-      subtitle: '①地图未按同一比例尺缩放 ②上下两图横轴一致',
+      subtitle: '①上下地图采用同一比例尺 ②上下两图横轴一致',
       author: '李寒星制图',
       brand: '海王星地图先锋',
       customLogoImg: null,   // Loaded HTMLImageElement for custom user logo
@@ -769,7 +794,7 @@
         }
       }
       calibrateDEMStats(data, -9999, 195, 345);
-      return { name: 'France', width: W, height: H, data, noData: -9999, isDemo: true };
+      return { name: 'France', width: W, height: H, data, noData: -9999, isDemo: true, hasGeoScale: true, pxSizeMeters: 4200, pxSizePixels: 1 };
     }
 
     function generateGermanyDemoDEM() {
@@ -815,7 +840,7 @@
         }
       }
       calibrateDEMStats(data, -9999, 205, 283);
-      return { name: 'Germany', width: W, height: H, data, noData: -9999, isDemo: true };
+      return { name: 'Germany', width: W, height: H, data, noData: -9999, isDemo: true, hasGeoScale: true, pxSizeMeters: 3400, pxSizePixels: 1 };
     }
 
     function calibrateDEMStats(data, noData, targetMedian, targetMean) {
@@ -855,12 +880,15 @@
     async function parseUploadedGeoTIFF(file) {
       const arrayBuffer = await file.arrayBuffer();
       let width, height, rasterData, gdalNoData = null;
+      let hasGeoScale = false, pxSizeMeters = 1, pxSizePixels = 1;
 
       if (window.GeoTIFF && typeof window.GeoTIFF.fromArrayBuffer === 'function') {
         const tiff = await window.GeoTIFF.fromArrayBuffer(arrayBuffer);
         const image = await tiff.getImage();
-        width = image.getWidth();
-        height = image.getHeight();
+        const origW = image.getWidth();
+        const origH = image.getHeight();
+        width = origW;
+        height = origH;
         gdalNoData = image.getGDALNoData();
         if (gdalNoData !== null && gdalNoData !== undefined) gdalNoData = Number(gdalNoData);
 
@@ -872,6 +900,41 @@
           readH = Math.max(10, Math.round(height * scale));
         }
 
+        pxSizePixels = origW / Math.max(1, readW);
+
+        // Extract physical ground resolution (meters per sampled pixel) from GeoTIFF bounding box
+        try {
+          const geoBBox = image.getBoundingBox();
+          if (Array.isArray(geoBBox) && geoBBox.length >= 4) {
+            const [minX, minY, maxX, maxY] = geoBBox;
+            const spanX = Math.abs(maxX - minX);
+            const spanY = Math.abs(maxY - minY);
+            if (spanX > 0 && spanY > 0 && Number.isFinite(spanX) && Number.isFinite(spanY)) {
+              const isGeographicDegrees =
+                Math.abs(minX) <= 180.5 && Math.abs(maxX) <= 180.5 &&
+                Math.abs(minY) <= 90.5 && Math.abs(maxY) <= 90.5 &&
+                spanX <= 180 && spanY <= 90;
+
+              let widthMeters, heightMeters;
+              if (isGeographicDegrees) {
+                const midLatRad = ((minY + maxY) * 0.5) * (Math.PI / 180);
+                widthMeters = spanX * 111320 * Math.max(0.15, Math.cos(midLatRad));
+                heightMeters = spanY * 110574;
+              } else {
+                widthMeters = spanX;
+                heightMeters = spanY;
+              }
+              const resX = widthMeters / Math.max(1, readW);
+              const resY = heightMeters / Math.max(1, readH);
+              pxSizeMeters = Math.sqrt(resX * resY);
+              hasGeoScale = true;
+            }
+          }
+        } catch (geoErr) {
+          // Fallback to original raster pixel ratio if GeoTIFF lacks CRS tags
+          hasGeoScale = false;
+        }
+
         const rasters = await image.readRasters({ width: readW, height: readH, samples: [0] });
         rasterData = new Float32Array(rasters[0]);
         width = readW;
@@ -881,7 +944,17 @@
       }
 
       const cleanName = file.name.replace(/\.(geotiff|tiff|tif)$/i, '');
-      return { name: cleanName || 'Uploaded DEM', width, height, data: rasterData, noData: gdalNoData, isDemo: false };
+      return {
+        name: cleanName || 'Uploaded DEM',
+        width,
+        height,
+        data: rasterData,
+        noData: gdalNoData,
+        isDemo: false,
+        hasGeoScale,
+        pxSizeMeters,
+        pxSizePixels
+      };
     }
 
     /*************************************************************************
@@ -1018,10 +1091,8 @@
 
       const numBins = hasOverflow ? numReg + 1 : numReg;
       const binStep = (cutoffAxis - minAxis) / numReg;
-      const useKm = cutoffAxis >= 1000 && minAxis === 0 && ((cutoffAxis - minAxis) / 3) % 100 === 0;
       function formatTick(val, isLastCutoff) {
-        if (Math.round(val) === 0) return '0';
-        let label = useKm ? ((val / 1000).toFixed(val % 1000 === 0 ? 0 : 1) + ' km') : (Math.round(val) + ' m');
+        let label = Math.round(val) + ' 米';
         if (isLastCutoff && hasOverflow) label += '+';
         return label;
       }
@@ -1036,10 +1107,14 @@
       return { minElev: minAxis, cutoffElev: cutoffAxis, maxElev: Math.max(cutoffAxis, combMax), binStep, numRegularBins: numReg, numBins, hasOverflow, ticks };
     }
 
-    function buildRegionParticlesAndMap(dem, stats, slotBox, axis) {
+    function buildRegionParticlesAndMap(dem, stats, slotBox, axis, forcedScale) {
       const { width: srcW, height: srcH, data } = dem;
       const { validMask, bbox } = stats;
-      const scale = Math.min(slotBox.mapMaxW / bbox.w, slotBox.mapMaxH / bbox.h);
+      const zoom = state.mapZoom || 1.0;
+      const fitScale = Math.min(slotBox.mapMaxW / bbox.w, slotBox.mapMaxH / bbox.h) * zoom;
+      const rawScale = (forcedScale && Number.isFinite(forcedScale) && forcedScale > 0) ? forcedScale : fitScale;
+      const maxSafeScale = Math.min((CW * 0.94) / bbox.w, (CH * 0.75) / bbox.h);
+      const scale = Math.max(0.05, Math.min(rawScale, maxSafeScale));
       const mapW = Math.max(20, Math.round(bbox.w * scale));
       const mapH = Math.max(20, Math.round(bbox.h * scale));
       const mapLeft = Math.round(slotBox.mapCenterX - mapW / 2);
@@ -1250,18 +1325,46 @@
         const slotBH = slotBBaselineY - slotBHeaderY;
 
         const slotA = {
-          headerY: slotAHeaderY, mapCenterX: Math.round(CW * 0.53), mapCenterY: Math.round(slotAHeaderY + slotAH * 0.50),
-          mapMaxW: Math.round(CW * 0.60), mapMaxH: Math.round(slotAH * 0.90),
+          headerY: slotAHeaderY, mapCenterX: Math.round(CW * 0.52), mapCenterY: Math.round(slotAHeaderY + slotAH * 0.50),
+          mapMaxW: Math.round(CW * 0.65), mapMaxH: Math.round(slotAH * 0.92),
           chartLeft: padX, chartRight: CW - padX, baselineY: slotABaselineY, maxBarH: Math.round(slotAH * 0.74), statTopY: slotAHeaderY + Math.round(CH * 0.020)
         };
         const slotB = {
-          headerY: slotBHeaderY, mapCenterX: Math.round(CW * 0.53), mapCenterY: Math.round(slotBHeaderY + slotBH * 0.50),
-          mapMaxW: Math.round(CW * 0.60), mapMaxH: Math.round(slotBH * 0.90),
+          headerY: slotBHeaderY, mapCenterX: Math.round(CW * 0.52), mapCenterY: Math.round(slotBHeaderY + slotBH * 0.50),
+          mapMaxW: Math.round(CW * 0.65), mapMaxH: Math.round(slotBH * 0.92),
           chartLeft: padX, chartRight: CW - padX, baselineY: slotBBaselineY, maxBarH: Math.round(slotBH * 0.74), statTopY: slotBHeaderY + Math.round(CH * 0.020)
         };
 
-        state.modelA = buildRegionParticlesAndMap(state.demA, statsA, slotA, state.sharedAxis);
-        state.modelB = buildRegionParticlesAndMap(state.demB, statsB, slotB, state.sharedAxis);
+        let forcedScaleA = null;
+        let forcedScaleB = null;
+        if (state.sameMapScale) {
+          const useGeoMeters = Boolean(state.demA.hasGeoScale && state.demB.hasGeoScale);
+          const unitA = useGeoMeters ? (state.demA.pxSizeMeters || 1) : (state.demA.pxSizePixels || 1);
+          const unitB = useGeoMeters ? (state.demB.pxSizeMeters || 1) : (state.demB.pxSizePixels || 1);
+
+          const physWA = statsA.bbox.w * unitA;
+          const physHA = statsA.bbox.h * unitA;
+          const physWB = statsB.bbox.w * unitB;
+          const physHB = statsB.bbox.h * unitB;
+
+          const maxScalePerUnitA = Math.min(slotA.mapMaxW / Math.max(1e-6, physWA), slotA.mapMaxH / Math.max(1e-6, physHA));
+          const maxScalePerUnitB = Math.min(slotB.mapMaxW / Math.max(1e-6, physWB), slotB.mapMaxH / Math.max(1e-6, physHB));
+
+          // Keep 1:1 relative scale while applying user's overall mapZoom multiplier (clamped safely to canvas width)
+          const safeCapPerUnitA = Math.min((CW * 0.92) / Math.max(1e-6, physWA), (slotAH * 1.42) / Math.max(1e-6, physHA));
+          const safeCapPerUnitB = Math.min((CW * 0.92) / Math.max(1e-6, physWB), (slotBH * 1.42) / Math.max(1e-6, physHB));
+          const sharedScalePerUnit = Math.min(
+            Math.min(maxScalePerUnitA, maxScalePerUnitB) * (state.mapZoom || 1.0),
+            safeCapPerUnitA,
+            safeCapPerUnitB
+          );
+
+          forcedScaleA = sharedScalePerUnit * unitA;
+          forcedScaleB = sharedScalePerUnit * unitB;
+        }
+
+        state.modelA = buildRegionParticlesAndMap(state.demA, statsA, slotA, state.sharedAxis, forcedScaleA);
+        state.modelB = buildRegionParticlesAndMap(state.demB, statsB, slotB, state.sharedAxis, forcedScaleB);
         const sharedMaxFrac = Math.max(state.modelA.maxBinFraction, state.modelB.maxBinFraction, 0.05);
         finalizeHistogramPacking(state.modelA, sharedMaxFrac, state.sharedAxis);
         finalizeHistogramPacking(state.modelB, sharedMaxFrac, state.sharedAxis);
@@ -1413,13 +1516,13 @@
       ctx.textAlign = medAlignLeft ? 'right' : 'left';
       const medPad = medAlignLeft ? -8 * s : 8 * s;
       ctx.fillText(state.halfAboveLabel, medX + medPad, medLineTop - 2 * s);
-      ctx.fillText(`${medElev} m`, medX + medPad, medLineTop + 22 * s);
+      ctx.fillText(`${medElev} 米`, medX + medPad, medLineTop + 22 * s);
 
       const meanAlignLeft = meanX > chartRight - 150 * s;
       ctx.textAlign = meanAlignLeft ? 'right' : 'left';
       const meanPad = meanAlignLeft ? -8 * s : 8 * s;
       ctx.fillText(state.meanElevLabel, meanX + meanPad, meanLineTop - 2 * s);
-      ctx.fillText(`${meanElev} m`, meanX + meanPad, meanLineTop + 22 * s);
+      ctx.fillText(`${meanElev} 米`, meanX + meanPad, meanLineTop + 22 * s);
 
       ctx.restore();
     }
@@ -1709,9 +1812,9 @@
         const sA = state.modelA.stats;
         document.getElementById('inputNameA').value = state.demA.name;
         document.getElementById('statsA').innerHTML = `
-          <div>中位: <span class="text-amber-300 font-semibold">${Math.round(sA.medianElev)}m</span></div>
-          <div>均值: <span class="text-amber-300 font-semibold">${Math.round(sA.meanElev)}m</span></div>
-          <div>极值: <span>${Math.round(sA.minElev)}~${Math.round(sA.maxElev)}m</span></div>
+          <div>中位: <span class="text-amber-300 font-semibold">${Math.round(sA.medianElev)}米</span></div>
+          <div>均值: <span class="text-amber-300 font-semibold">${Math.round(sA.meanElev)}米</span></div>
+          <div>极值: <span>${Math.round(sA.minElev)}~${Math.round(sA.maxElev)}米</span></div>
           <div>粒子: <span>${(state.modelA.totalParticles / 1000).toFixed(1)}k</span></div>
         `;
       }
@@ -1719,9 +1822,9 @@
         const sB = state.modelB.stats;
         document.getElementById('inputNameB').value = state.demB.name;
         document.getElementById('statsB').innerHTML = `
-          <div>中位: <span class="text-sky-300 font-semibold">${Math.round(sB.medianElev)}m</span></div>
-          <div>均值: <span class="text-sky-300 font-semibold">${Math.round(sB.meanElev)}m</span></div>
-          <div>极值: <span>${Math.round(sB.minElev)}~${Math.round(sB.maxElev)}m</span></div>
+          <div>中位: <span class="text-sky-300 font-semibold">${Math.round(sB.medianElev)}米</span></div>
+          <div>均值: <span class="text-sky-300 font-semibold">${Math.round(sB.meanElev)}米</span></div>
+          <div>极值: <span>${Math.round(sB.minElev)}~${Math.round(sB.maxElev)}米</span></div>
           <div>粒子: <span>${(state.modelB.totalParticles / 1000).toFixed(1)}k</span></div>
         `;
       }
@@ -1805,7 +1908,9 @@
       if (state.lang === 'en') {
         state.lang = 'zh';
         state.title = '双城海拔对比';
-        state.subtitle = '①地图未按同一比例尺缩放 ②上下两图横轴一致';
+        state.subtitle = state.sameMapScale
+          ? '①上下地图采用同一比例尺 ②上下两图横轴一致'
+          : '①地图未按同一比例尺缩放 ②上下两图横轴一致';
         state.halfAboveLabel = '50% 高于';
         state.meanElevLabel = '平均海拔';
         document.getElementById('langLabel').textContent = '海报语言: 中文';
@@ -1813,7 +1918,9 @@
       } else {
         state.lang = 'en';
         state.title = 'Which is higher?';
-        state.subtitle = '①Maps not to scale ②Same axis on both charts';
+        state.subtitle = state.sameMapScale
+          ? '①Maps drawn to the same scale ②Same axis on both charts'
+          : '①Maps not to scale ②Same axis on both charts';
         state.halfAboveLabel = 'half above';
         state.meanElevLabel = 'mean elevation';
         document.getElementById('langLabel').textContent = '海报语言: EN';
@@ -1931,6 +2038,58 @@
         if (state.demB) state.demB.name = e.target.value;
         if (state.modelB) state.modelB.name = e.target.value;
         if (!state.isPlaying) renderPosterFrame();
+      });
+
+      document.getElementById('chkSameMapScale').addEventListener('change', (e) => {
+        state.sameMapScale = e.target.checked;
+        const autoSubtitles = [
+          '①地图未按同一比例尺缩放 ②上下两图横轴一致',
+          '①上下地图采用同一比例尺 ②上下两图横轴一致',
+          '①Maps not to scale ②Same axis on both charts',
+          '①Maps drawn to the same scale ②Same axis on both charts'
+        ];
+        if (autoSubtitles.includes(state.subtitle.trim())) {
+          if (state.lang === 'zh') {
+            state.subtitle = state.sameMapScale
+              ? '①上下地图采用同一比例尺 ②上下两图横轴一致'
+              : '①地图未按同一比例尺缩放 ②上下两图横轴一致';
+          } else {
+            state.subtitle = state.sameMapScale
+              ? '①Maps drawn to the same scale ②Same axis on both charts'
+              : '①Maps not to scale ②Same axis on both charts';
+          }
+          document.getElementById('inputSubtitle').value = state.subtitle;
+        }
+        rebuildModels();
+        if (!state.isPlaying) renderPosterFrame();
+      });
+
+      function applyMapZoomValue(zoomPct) {
+        const clamped = Math.max(50, Math.min(220, Math.round(Number(zoomPct) || 100)));
+        state.mapZoom = clamped / 100;
+        document.getElementById('sliderMapZoom').value = clamped;
+        document.getElementById('valMapZoom').textContent = `${clamped}%`;
+        document.querySelectorAll('.btn-zoom-preset').forEach(btn => {
+          const isMatch = Number(btn.getAttribute('data-zoom')) === clamped;
+          btn.className = isMatch
+            ? 'btn-zoom-preset px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-mono transition'
+            : 'btn-zoom-preset px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-mono transition';
+        });
+        // If user is paused at histogram phase, jump to 00:00 map view so they can see the map size change immediately
+        if (!state.isPlaying && state.morphProgress > 0.15) {
+          state.currentTime = 0;
+          state.morphProgress = 0;
+          syncTimelineUI();
+        }
+        rebuildModels();
+        if (!state.isPlaying) renderPosterFrame();
+      }
+
+      document.getElementById('sliderMapZoom').addEventListener('input', (e) => {
+        applyMapZoomValue(e.target.value);
+      });
+      document.querySelectorAll('.btn-zoom-preset').forEach(btn => {
+        btn.addEventListener('click', () => applyMapZoomValue(btn.getAttribute('data-zoom')));
       });
 
       document.getElementById('chkAutoCornerMask').addEventListener('change', (e) => { state.autoCornerMask = e.target.checked; rebuildModels(); });
